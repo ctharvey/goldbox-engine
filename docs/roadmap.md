@@ -30,7 +30,11 @@
 
 Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-of-radiance.md). Design: [ADR-0002](decisions/0002-master-campaigns-and-modular-rulesets.md).
 
-## M2 — Import first original title (Pool of Radiance)
+## M2 — Shared formats and first original title (Pool of Radiance)
+- [x] Shared DAX archive scanner + bounded record RLE extraction against synthetic fixtures
+- [x] Data-driven, unverified DOS profiles for Pool of Radiance and Curse of the Azure Bonds
+- [x] Read-only CLI scan mode (no original assets or resources committed)
+- [ ] Implement GLB decoder for later variants; identify further title-specific ECL dialects
 - [ ] User-selected original installation and format version fingerprinting
 - [ ] Implement independent decoders (maps, sprites, journals/events)
 - [ ] Normalize ECL event semantics and link journal references

@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(GOLDBOX_BUILD_TESTS "Build project tests" ON)
 
+add_subdirectory(formats)
 add_subdirectory(engine)
 add_subdirectory(apps)
 

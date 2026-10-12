@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "ssi.pool-of-radiance.dos",
+  "title": "Pool of Radiance (DOS)",
+  "formatFamily": "goldbox-dos",
+  "archiveFormat": "dax-v1",
+  "eventDialect": "unverified",
+  "rulesProfile": "adnd-first-edition-unimplemented",
+  "validationStatus": "unverified",
+  "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"]
+}

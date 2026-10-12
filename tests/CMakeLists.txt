@@ -19,3 +19,13 @@ add_test(NAME goldbox_cli_classic
         --mods ${PROJECT_SOURCE_DIR}/examples/mods
         --journal 17 --mode classic)
 set_tests_properties(goldbox_cli_classic PROPERTIES PASS_REGULAR_EXPRESSION "A locked door blocks the passage")
+
+add_executable(goldbox_dax_tests dax_test.cpp)
+target_link_libraries(goldbox_dax_tests PRIVATE goldbox_formats)
+add_test(NAME goldbox_dax_tests COMMAND goldbox_dax_tests)
+
+add_executable(goldbox_game_profile_tests game_profile_test.cpp)
+target_link_libraries(goldbox_game_profile_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_game_profile_tests COMMAND goldbox_game_profile_tests
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json
+    ${PROJECT_SOURCE_DIR}/games/curse-of-the-azure-bonds/profile.json)

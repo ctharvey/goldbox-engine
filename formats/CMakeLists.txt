@@ -1,0 +1,8 @@
+add_library(goldbox_formats STATIC src/dax.cpp)
+target_include_directories(goldbox_formats PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_features(goldbox_formats PUBLIC cxx_std_20)
+if(MSVC)
+    target_compile_options(goldbox_formats PRIVATE /W4)
+else()
+    target_compile_options(goldbox_formats PRIVATE -Wall -Wextra -Wpedantic)
+endif()

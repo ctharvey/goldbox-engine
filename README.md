@@ -2,7 +2,7 @@
 
 An independent, MIT-licensed, OpenXcom-inspired framework for playing and enhancing classic SSI Gold Box RPGs **using original resources supplied by the player**.
 
-**Status: M1 — working JSON content importer and external journal mod loader. Not a playable Gold Box game.** Original SSI file decoders, adventure event processing, combat, renderer, and embedded JS runtime are not implemented.
+**Status: M2 first slice — M1 journal mods plus a shared DAX archive reader and two data-driven game profiles. Not a playable Gold Box game.** Original SSI file decoders, adventure event processing, combat, renderer, and embedded JS runtime are not implemented.
 
 ## What actually works today
 
@@ -14,6 +14,8 @@ An independent, MIT-licensed, OpenXcom-inspired framework for playing and enhanc
 - Output session metadata with game identifier, mode, and applied mod IDs/versions; **not a full savegame**.
 - TypeScript types for mod authoring; **compiled JS execution is not implemented**.
 - Reject symlinked mod directories/manifests, invalid IDs, oversized JSON files, and unknown manifest fields.
+- Shared read-only DAX archive scanner and bounded RLE extraction, tested only on synthetic files.
+- Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run
 
@@ -44,6 +46,15 @@ From the repository root, after building:
 
 The executable's location varies with the Windows generator; e.g. `build/apps/Debug/goldbox_cli.exe`.
 
+Inspect a user-supplied DOS archive locally without modifying it:
+
+```bash
+./build/apps/goldbox_cli --scan-dax /path/to/GEO0.DAX \
+  --game-profile games/pool-of-radiance/profile.json
+```
+
+The CLI prints only the archive index; no original game compatibility has been validated yet.
+
 Optional: add `--save-meta session.json` to create non-overwriting session metadata. This records only **the startup configuration**, not gameplay state.
 
 For TypeScript mod SDK authoring (requires Node.js and npm):
@@ -59,7 +70,9 @@ npm run check
 ```text
 apps/                Console integration and CLI
 engine/include/      Public engine/content/mod interfaces
-engine/src/          Core, Boost.JSON adapter, import/mod implementations
+engine/src/          Core, Boost.JSON adapter, game profiles, import/mod implementations
+formats/             Shared archive decoders (DAX first)
+games/               Declarative per-game compatibility profiles (unverified)
 examples/content/    Entirely fictional original sample campaign
 examples/mods/       External sample data mod
 packages/mod-sdk/     Proposed TypeScript mod manifest API
@@ -79,7 +92,7 @@ scripts/             Hygiene checks
 - This project uses Boost.JSON via the user's Boost installation (Boost Software License 1.0); it does not vendor the Boost source.
 - Original game compatibility requires separate importer implementations and independently validated behavior.
 
-See the new [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
+See the [shared importer architecture](docs/universal-importer.md) and [DAX format documentation](docs/formats/dax-v1.md). See also the [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
 
 For the current, working M1 implementation, see [mod format](docs/mod-format.md), [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), [licensing policy](docs/licensing-and-provenance.md), and [dependency inventory](THIRD_PARTY.md).
 

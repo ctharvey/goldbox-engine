@@ -6,6 +6,7 @@ add_library(goldbox_core STATIC
     src/journal.cpp
     src/content.cpp
     src/mods.cpp
+    src/game_profile.cpp
 )
 target_include_directories(goldbox_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${Boost_INCLUDE_DIRS})
 target_compile_features(goldbox_core PUBLIC cxx_std_20)
