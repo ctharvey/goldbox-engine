@@ -30,6 +30,15 @@
 
 Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-of-radiance.md). Design: [ADR-0002](decisions/0002-master-campaigns-and-modular-rulesets.md).
 
+## Open-source adoption track (2026-10-12)
+- [x] Audit actual implementations, source-file licenses, provenance and maintenance across Gold Box Explorer, SSI Engine, OpenXcom, UAF/Dungeon Craft, OpenUA and others
+- [x] Identify pilot reuse targets and avoid-code-copy licensing blockers: [source audit](research/oss-reuse-audit-2026-10-12.md)
+- [ ] Port and attribute bounded ECL lexical/opcode decoding from eligible Gold Box Explorer modules; verify against synthetic tests
+- [ ] Adapt GEO map/wall/event normalization with preserved upstream notices and source review
+- [ ] Cross-check the existing DAX parser against other OSS implementations and owned-game archives
+- [ ] Review SSI Engine ECL VM source and version-specific GPL terms before any translation
+- [ ] Clarify OpenUA's GPLv2-root/MIT-design-document mismatch prior to any code reuse
+
 ## M2 — Shared formats and first original title (Pool of Radiance)
 - [x] Shared DAX archive scanner + bounded record RLE extraction against synthetic fixtures
 - [x] Data-driven, unverified DOS profiles for Pool of Radiance and Curse of the Azure Bonds
