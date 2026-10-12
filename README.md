@@ -88,6 +88,7 @@ scripts/             Hygiene checks
 
 - User supplies legally obtained SSI resources. No proprietary original assets, binaries, journal passages, or manuals are distributed.
 - Refer to OpenXcom for **architecture**, not copied GPL implementation.
+- **Open-source first:** evaluate existing libraries and Gold Box tooling before custom implementations. See [reuse policy and candidate inventory](docs/open-source-first.md).
 - Only incorporate external code once its file-level licenses, provenance, notices, and dependency obligations are reviewed.
 - This project uses Boost.JSON via the user's Boost installation (Boost Software License 1.0); it does not vendor the Boost source.
 - Original game compatibility requires separate importer implementations and independently validated behavior.
