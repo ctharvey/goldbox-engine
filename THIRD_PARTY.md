@@ -18,6 +18,10 @@ Boost.JSON headers are compiled as part of this application using `boost/json/sr
 - SSI Engine: https://github.com/TiCoKH/ssi-engine — GPL-3.0. Research/interoperability reference only; no code copied.
 - QuickJS-NG: https://github.com/quickjs-ng/quickjs — MIT. Future script host candidate; not integrated.
 
+## Reuse evaluation requirement
+
+Before writing a new parser, event runtime, UI framework, renderer, or script host, consult [the open-source-first policy](docs/open-source-first.md). Record candidates and file-level license review before adopting or porting code. The candidate inventory in that policy is **not** a claim that the libraries are installed.
+
 ## Future optional dependencies (not installed by this project)
 
 - SDL3 for windowing/input/rendering.
