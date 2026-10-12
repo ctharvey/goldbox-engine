@@ -14,7 +14,7 @@ SKIP_DIRS = {".git", "build", "node_modules", "dist", "__pycache__"}
 KINDS = {"adapted", "dependency", "reference"}
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-MARKER = re.compile(r"Attribution-ID:\\s*([a-z0-9-]+)")
+MARKER = re.compile(r"Attribution-ID:\s*([a-z0-9-]+)")
 errors: list[str] = []
 
 
@@ -145,7 +145,7 @@ for path in ROOT.rglob("*"):
         require(source_id in seen_ids, f"{rel}: undeclared Attribution-ID {source_id}")
         require(adopted_files.get(rel) == source_id or rel in all_registry_files,
                 f"{rel}: marker not linked to localFiles in registry")
-    if re.search(r"\\badapted\\b.*\\bfrom\\b|\\badapted\\b.*\\bwith attribution\\b", header, re.I):
+    if re.search(r"\badapted\b.*\bfrom\b|\badapted\b.*\bwith attribution\b", header, re.I):
         require(bool(markers), f"{rel}: upstream-adapted source has no Attribution-ID header")
 
 if errors:
