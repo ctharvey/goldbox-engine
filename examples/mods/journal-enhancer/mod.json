@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "example.journal-enhancer",
+  "version": "0.1.0",
+  "priority": 100,
+  "patches": [
+    {
+      "target": "journal",
+      "id": 17,
+      "title": "Old Tower (Enhanced)",
+      "body": "You discover a weathered inscription on the door."
+    }
+  ]
+}

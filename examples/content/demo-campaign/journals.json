@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "gameId": "demo-original-campaign",
+  "sourceFormat": "synthetic-v1",
+  "journals": [
+    { "id": 17, "title": "Old Tower", "body": "A locked door blocks the passage." },
+    { "id": 18, "title": "Forest Trail", "body": "The tracks disappear into the trees." }
+  ]
+}
