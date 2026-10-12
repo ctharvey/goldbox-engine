@@ -34,7 +34,7 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 - [x] Audit actual implementations, source-file licenses, provenance and maintenance across Gold Box Explorer, SSI Engine, OpenXcom, UAF/Dungeon Craft, OpenUA and others
 - [x] Identify pilot reuse targets and avoid-code-copy licensing blockers: [source audit](research/oss-reuse-audit-2026-10-12.md)
 - [x] Port and attribute bounded ECL lexical/opcode decoding from MIT Gold Box Explorer behavior; synthetic unit tests pass (unvalidated on SSI resources)
-- [ ] Adapt GEO map/wall/event normalization with preserved upstream notices and source review
+- [x] Adapt MIT Gold Box Explorer GEO 16×16 map/wall/event decoder with preserved upstream license and synthetic tests (not SSI validated)
 - [ ] Cross-check the existing DAX parser against other OSS implementations and owned-game archives
 - [ ] Review SSI Engine ECL VM source and version-specific GPL terms before any translation
 - [ ] Clarify OpenUA's GPLv2-root/MIT-design-document mismatch prior to any code reuse
@@ -45,8 +45,8 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 - [x] Read-only CLI scan mode (no original assets or resources committed)
 - [ ] Implement GLB decoder for later variants; identify further title-specific ECL dialects
 - [ ] User-selected original installation and format version fingerprinting
-- [ ] Implement independent decoders (maps, sprites, journals/events); ECL lexical/operand pilot implemented but event execution not started
-- [ ] Normalize ECL event semantics and link journal references
+- [ ] Complete and validate original SSI decoders (GEO 16×16 and ECL lexical pilots implemented; sprites, journal dispatch and executable event VM pending)
+- [ ] Resolve GEO event selectors to validated ECL dispatch entry points and normalize journal/event semantics (GEO→ECL record association only implemented)
 - [ ] Expand test suite with synthetic/reverse-engineered behavioral fixtures
 - [ ] Never include original assets in repository, build, or tests
 

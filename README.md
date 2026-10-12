@@ -2,7 +2,7 @@
 
 An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playing and enhancing classic SSI Gold Box RPGs **using original resources supplied by the player**.
 
-**Status: M2 first slice — M1 journal mods plus a shared DAX archive reader and two data-driven game profiles. Not a playable Gold Box game.** Original SSI file decoders, adventure event processing, combat, renderer, and embedded JS runtime are not implemented.
+**Status: M2 parser pilots — M1 journal mods, a shared DAX reader, ECL lexical decoding, GEO map/event decoding, and two data-driven game profiles. Not a playable Gold Box game.** Full original SSI game import, event dispatch/execution, combat, renderer, and embedded JS runtime remain unimplemented.
 
 ## What actually works today
 
@@ -16,6 +16,7 @@ An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playi
 - Reject symlinked mod directories/manifests, invalid IDs, oversized JSON files, and unknown manifest fields.
 - Shared read-only DAX archive scanner and bounded RLE extraction, tested only on synthetic files.
 - **ECL lexical decoder pilot:** bounded six-bit text, typed operands, and caller-selected opcode tables (synthetic tests only; no VM/gameplay execution).
+- **GEO map decoder pilot:** read-only 16×16 map cell/wall/door/event planes and explicit ECL record pairing (synthetic tests only; no event address resolution).
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run
@@ -54,7 +55,18 @@ Inspect a user-supplied DOS archive locally without modifying it:
   --game-profile games/pool-of-radiance/profile.json
 ```
 
-The CLI prints only the archive index; no original game compatibility has been validated yet.
+For a read-only summary of map records and raw event counts, without printing copyrighted map geometry:
+
+```bash
+./build/apps/goldbox_cli --scan-geo /path/to/GEO1.DAX \
+  --game-profile games/pool-of-radiance/profile.json
+
+# Only when the exact GEO/ECL record pairing has been verified:
+./build/apps/goldbox_cli --scan-geo /path/to/GEO1.DAX --geo-record 20 \
+  --ecl-dax /path/to/ECL1.DAX --ecl-record 4
+```
+
+The identifiers above are illustrative, not verified against a real installation. Scans do not alter source assets. ECL event addresses remain unresolved; original game compatibility has not been established.
 
 Optional: add `--save-meta session.json` to create non-overwriting session metadata. This records only **the startup configuration**, not gameplay state.
 
@@ -72,7 +84,7 @@ npm run check
 apps/                Console integration and CLI
 engine/include/      Public engine/content/mod interfaces
 engine/src/          Core, Boost.JSON adapter, game profiles, import/mod implementations
-formats/             Shared archive decoders (DAX first)
+formats/             Shared DAX archive, ECL lexer, GEO map decoders (still unverified)
 games/               Declarative per-game compatibility profiles (unverified)
 examples/content/    Entirely fictional original sample campaign
 examples/mods/       External sample data mod
@@ -94,7 +106,7 @@ scripts/             Hygiene checks
 - This project uses Boost.JSON via the user's Boost installation (Boost Software License 1.0); it does not vendor the Boost source.
 - Original game compatibility requires separate importer implementations and independently validated behavior.
 
-See the [shared importer architecture](docs/universal-importer.md), [DAX format documentation](docs/formats/dax-v1.md), and [ECL decoding pilot](docs/formats/ecl-v1.md). See also the [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
+See the [shared importer architecture](docs/universal-importer.md), [DAX format documentation](docs/formats/dax-v1.md), and [ECL decoding pilot](docs/formats/ecl-v1.md), and [GEO decoding pilot](docs/formats/geo-v1.md). See also the [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
 
 For the current, working M1 implementation, see [mod format](docs/mod-format.md), [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), [licensing policy](docs/licensing-and-provenance.md), and [dependency inventory](THIRD_PARTY.md).
 

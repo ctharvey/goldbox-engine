@@ -33,3 +33,7 @@ add_test(NAME goldbox_game_profile_tests COMMAND goldbox_game_profile_tests
 add_executable(goldbox_ecl_tests ecl_test.cpp)
 target_link_libraries(goldbox_ecl_tests PRIVATE goldbox_formats)
 add_test(NAME goldbox_ecl_tests COMMAND goldbox_ecl_tests)
+
+add_executable(goldbox_geo_tests geo_test.cpp)
+target_link_libraries(goldbox_geo_tests PRIVATE goldbox_formats)
+add_test(NAME goldbox_geo_tests COMMAND goldbox_geo_tests)
