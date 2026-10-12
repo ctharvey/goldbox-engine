@@ -8,7 +8,7 @@
 - GPLv3-compatible source may be incorporated with its existing license notices and corresponding-source obligations. GPL-3.0-or-later, GPL-3.0-only, LGPL and permissive components each require their **specific terms** to be reviewed.
 - Do not assume that every GPL-labeled project or file is compatible: GPL-2.0-only and GPLv3 are generally incompatible; 'GPL-3.0-only' source can constrain later-version relicensing of a combined distribution.
 - Verify file-level exceptions, dual-license options, contributor rights, third-party assets and dependency obligations; review AGPL and other copyleft components explicitly.
-- Preserve license texts/copyright notices when required, and log source URLs, revisions, modified paths and attribution in [../THIRD_PARTY.md](../THIRD_PARTY.md).
+- Preserve license texts/copyright notices when required, and log source URLs, revisions, modified paths and attribution in [../THIRD_PARTY.md](../THIRD_PARTY.md) and in the machine-readable [../attribution/sources.json](../attribution/sources.json).
 - GPL imposes obligations when **conveying/distributing** covered code or binaries; private modifications not conveyed ordinarily do not trigger source publication obligations.
 - The engine's license does not automatically make independent user mods or campaigns GPL; whether a tightly coupled plugin forms a covered combined work is fact-specific.
 

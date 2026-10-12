@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 Goldbox Engine contributors
+// Portions adapted: Copyright (c) 2018 Bil Simser (MIT)
+// Attribution-ID: gold-box-explorer-geo
 // GEO cell-plane parsing adapted from Gold Box Explorer by Bil Simser (MIT).
 // Upstream revision eac30abaa6ee66aea6f5d65ebe6d676b10015a8f.
 // See THIRD_PARTY.md and licenses/gold-box-explorer-MIT.txt.

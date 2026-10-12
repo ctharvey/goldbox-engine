@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "lastReviewed": "2026-10-12",
+  "description": "Provenance inventory of adopted code, external dependencies and research-only references. Only kind=adapted means upstream implementation has been ported/incorporated.",
+  "entries": [
+    {
+      "id": "gold-box-explorer-ecl",
+      "kind": "adapted",
+      "project": "Gold Box Explorer",
+      "upstreamRepository": "https://github.com/bsimser/Gold-Box-Explorer",
+      "upstreamRevision": "eac30abaa6ee66aea6f5d65ebe6d676b10015a8f",
+      "upstreamFiles": [
+        "src/Common/Plugins/DaxEcl/DaxEclFile.cs",
+        "src/Common/Plugins/DaxEcl/Memory.cs"
+      ],
+      "license": "MIT",
+      "licenseFile": "licenses/gold-box-explorer-MIT.txt",
+      "licenseUrl": "https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/LICENSE",
+      "copyrightNotice": "Copyright (c) 2018 Bil Simser",
+      "localFiles": [
+        "formats/include/goldbox/formats/ecl.hpp",
+        "formats/src/ecl.cpp"
+      ],
+      "purpose": "ECL six-bit packed text and typed operand decoding",
+      "modifications": "Adapted from C# to bounded C++20 decoding, added typed operands, caller-provided opcode specs, truncation checking and synthetic tests.",
+      "reviewed": "2026-10-12"
+    },
+    {
+      "id": "gold-box-explorer-geo",
+      "kind": "adapted",
+      "project": "Gold Box Explorer",
+      "upstreamRepository": "https://github.com/bsimser/Gold-Box-Explorer",
+      "upstreamRevision": "eac30abaa6ee66aea6f5d65ebe6d676b10015a8f",
+      "upstreamFiles": [
+        "src/Common/Plugins/GeoDax/GeoDaxFile.cs",
+        "src/Common/Plugins/GeoDax/GeoWallRecord.cs",
+        "src/Common/Plugins/GeoDax/GeoMapRecord.cs"
+      ],
+      "license": "MIT",
+      "licenseFile": "licenses/gold-box-explorer-MIT.txt",
+      "licenseUrl": "https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/LICENSE",
+      "copyrightNotice": "Copyright (c) 2018 Bil Simser",
+      "localFiles": [
+        "formats/include/goldbox/formats/geo.hpp",
+        "formats/src/geo.cpp"
+      ],
+      "purpose": "16x16 GEO map, wall, door and raw event plane decoder",
+      "modifications": "Ported map-cell plane indexing to bounded C++20 structures; removed System.Drawing, hardcoded map names and Windows UI coupling; added explicit ECL record pairing and synthetic tests.",
+      "reviewed": "2026-10-12"
+    },
+    {
+      "id": "boost-json",
+      "kind": "dependency",
+      "project": "Boost.JSON",
+      "upstreamRepository": "https://github.com/boostorg/json",
+      "upstreamRevision": null,
+      "version": "Boost >=1.75; M1 tested with 1.83 (package-managed, specific version selected by builder)",
+      "upstreamFiles": [],
+      "license": "BSL-1.0",
+      "licenseFile": null,
+      "licenseUrl": "https://www.boost.org/LICENSE_1_0.txt",
+      "copyrightNotice": "Copyright holders as stated in supplied Boost.JSON package",
+      "localFiles": [
+        "engine/src/boost_json.cpp"
+      ],
+      "purpose": "JSON parsing and serialization through a system-installed Boost header implementation",
+      "modifications": "Unmodified external Boost.JSON; compilation shim includes boost/json/src.hpp. No Boost source vendored.",
+      "reviewed": "2026-10-12"
+    },
+    {
+      "id": "ssi-engine-ecl-reference",
+      "kind": "reference",
+      "project": "SSI Engine",
+      "upstreamRepository": "https://github.com/TiCoKH/ssi-engine",
+      "upstreamRevision": "51d4b6d409fa798754f5ff2ccb249f3c0b6d029b",
+      "upstreamFiles": [
+        "src/main/java/engine/script/EclArgument.java",
+        "src/main/java/engine/script/EclOpCode.java"
+      ],
+      "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
+      "licenseFile": null,
+      "licenseUrl": "https://github.com/TiCoKH/ssi-engine/blob/master/LICENSE",
+      "copyrightNotice": "Upstream authors, as documented by source history",
+      "localFiles": [],
+      "purpose": "Research ECL operand byte widths and provisional opcode behavior",
+      "modifications": "No Java implementation copied or translated; behavior consulted during ECL decoding design.",
+      "reviewed": "2026-10-12"
+    },
+    {
+      "id": "openxcom-modding-reference",
+      "kind": "reference",
+      "project": "OpenXcom",
+      "upstreamRepository": "https://github.com/OpenXcom/OpenXcom",
+      "upstreamRevision": "4a4bae5fa2e5a09282928e84943fc84b093e34ff",
+      "upstreamFiles": [
+        "src/Engine/ModInfo.cpp",
+        "src/Mod/Mod.cpp",
+        "src/Engine/Options.cpp"
+      ],
+      "license": "GPL-3.0-or-later",
+      "licenseFile": null,
+      "licenseUrl": "https://github.com/OpenXcom/OpenXcom/blob/master/LICENSE.txt",
+      "copyrightNotice": "Copyright 2010-2016 OpenXcom Developers (as in source-file notices)",
+      "localFiles": [],
+      "purpose": "Research master mod, extension metadata, ruleset overlays and configuration conventions",
+      "modifications": "No OpenXcom source copied; only architectural conventions inform Goldbox Engine design.",
+      "reviewed": "2026-10-12"
+    }
+  ]
+}

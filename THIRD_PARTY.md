@@ -1,5 +1,7 @@
 # Third-party licensing and provenance
 
+**Canonical machine-readable attribution registry:** [attribution/sources.json](attribution/sources.json), with [maintenance rules](attribution/README.md). It distinguishes implemented adaptations, external dependencies and research-only references; the sections below provide human-readable detail. Keep both updated in the same change.
+
 ## Actually used (M2)
 
 | Library | License | Use | Distribution |

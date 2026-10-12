@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 Goldbox Engine contributors
+// Portions adapted: Copyright (c) 2018 Bil Simser (MIT)
+// Attribution-ID: gold-box-explorer-geo
 // GEO 16x16 cell layout adapted from Gold Box Explorer (MIT), by Bil Simser.
 // Upstream: src/Common/Plugins/GeoDax/GeoDaxFile.cs and GeoWallRecord.cs.
 // See THIRD_PARTY.md and licenses/gold-box-explorer-MIT.txt.

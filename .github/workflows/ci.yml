@@ -17,6 +17,8 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Hygiene
         run: python3 scripts/check_hygiene.py
+      - name: Third-party attribution
+        run: python3 scripts/check_attribution.py
   typescript:
     runs-on: ubuntu-24.04
     steps:

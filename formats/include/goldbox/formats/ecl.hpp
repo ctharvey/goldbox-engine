@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 Goldbox Engine contributors
+// Portions adapted: Copyright (c) 2018 Bil Simser (MIT)
+// Attribution-ID: gold-box-explorer-ecl
 // Six-bit text/typed operand decoding adapted with attribution from the
 // MIT-licensed Gold Box Explorer. SSI Engine was a behavior reference only.
 // See THIRD_PARTY.md and licenses/.
