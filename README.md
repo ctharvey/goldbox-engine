@@ -79,7 +79,9 @@ scripts/             Hygiene checks
 - This project uses Boost.JSON via the user's Boost installation (Boost Software License 1.0); it does not vendor the Boost source.
 - Original game compatibility requires separate importer implementations and independently validated behavior.
 
-See [OpenXcom architectural comparison](docs/openxcom-architecture-notes.md), [mod format](docs/mod-format.md), [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), [licensing policy](docs/licensing-and-provenance.md), and [dependency inventory](THIRD_PARTY.md).
+See the new [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
+
+For the current, working M1 implementation, see [mod format](docs/mod-format.md), [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), [licensing policy](docs/licensing-and-provenance.md), and [dependency inventory](THIRD_PARTY.md).
 
 ## License
 
