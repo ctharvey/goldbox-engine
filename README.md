@@ -1,6 +1,6 @@
 # Goldbox Engine (working title)
 
-An independent, MIT-licensed, OpenXcom-inspired framework for playing and enhancing classic SSI Gold Box RPGs **using original resources supplied by the player**.
+An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playing and enhancing classic SSI Gold Box RPGs **using original resources supplied by the player**.
 
 **Status: M2 first slice — M1 journal mods plus a shared DAX archive reader and two data-driven game profiles. Not a playable Gold Box game.** Original SSI file decoders, adventure event processing, combat, renderer, and embedded JS runtime are not implemented.
 
@@ -87,7 +87,7 @@ scripts/             Hygiene checks
 ## Design and legal safeguards
 
 - User supplies legally obtained SSI resources. No proprietary original assets, binaries, journal passages, or manuals are distributed.
-- Refer to OpenXcom for **architecture**, not copied GPL implementation.
+- OpenXcom and SSI Engine can now be evaluated for **GPL-compatible source reuse**, with file-level licensing, provenance and attribution review; none of their code has been incorporated so far.
 - **Open-source first:** evaluate existing libraries and Gold Box tooling before custom implementations. See [reuse policy and candidate inventory](docs/open-source-first.md).
 - Only incorporate external code once its file-level licenses, provenance, notices, and dependency obligations are reviewed.
 - This project uses Boost.JSON via the user's Boost installation (Boost Software License 1.0); it does not vendor the Boost source.
@@ -99,4 +99,4 @@ For the current, working M1 implementation, see [mod format](docs/mod-format.md)
 
 ## License
 
-Original code in this project is MIT-licensed (see [LICENSE](LICENSE)). Dependencies remain subject to their respective licenses.
+Project-owned code is offered under **GNU GPL version 3 or any later version** (SPDX: `GPL-3.0-or-later`). See [LICENSE](LICENSE) for the full GPLv3 text, [LICENSING.md](LICENSING.md) for relicensing details, and [THIRD_PARTY.md](THIRD_PARTY.md) for separately licensed dependencies. Earlier published MIT-licensed revisions remain available under their original MIT terms.

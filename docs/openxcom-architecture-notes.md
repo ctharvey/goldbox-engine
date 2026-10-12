@@ -42,8 +42,6 @@ implementation, method bodies, or translated code is included here.**
 - Text/journal content provided by the user or separately licensed sources.
 - Core designed to run headlessly to support deterministic compatibility tests.
 
-## Compliance requirement
+## Licensing status after 2026-10-12 relicensing
 
-Treat OpenXcom as an **architectural reference**. Any proposal to copy or port
-an implementation from GPL code triggers license re-evaluation rather than
-automatic inclusion in this MIT-licensed project.
+These original architecture notes were authored before the move from MIT to **GPL-3.0-or-later**. OpenXcom implementations may now be considered for **attributed source reuse** once individual files, authorship, licenses, dependencies and notices have been checked. The architectural research itself remains useful and no OpenXcom implementation code has been included yet. See [../LICENSING.md](../LICENSING.md).

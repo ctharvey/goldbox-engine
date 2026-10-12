@@ -2,13 +2,13 @@
 
 Date: 2026-10-12  
 Status: research / design input only  
-Scope: independently developed, MIT-licensed Goldbox Engine. **No OpenXcom source or SSI assets incorporated.**
+Scope: GPL-3.0-or-later Goldbox Engine (MIT when initial research was written). **No OpenXcom source or SSI assets were incorporated during this investigation.**
 
 ## Executive findings
 
 1. OpenXcom has an installed master-game mod, optional user mods, separate original resource files, and declarative ruleset overlays. A user enables mods and the engine resolves effective definitions from the chosen master plus compatible enabled mods.
 2. The original Gold Box *Pool of Radiance* DOS data is split into indexed DAX resource files (geography, event bytecode, monsters/items, visuals, etc.). ECL controls campaign progression and also refers to numeric resources and persistent state.
-3. We should borrow the *data flow and boundaries*, not the GPL implementation or its unique code. The Goldbox design must account for ECL/event semantics and provenance, and must not make modders edit proprietary DAX binaries.
+3. The *data flow and boundaries* remain useful; now that project-owned code is GPL-3.0-or-later, compatible upstream GPL code can also be assessed for reuse with full provenance and licensing review. The Goldbox design must account for ECL/event semantics and must not make modders edit proprietary DAX binaries.
 
 ## A. OpenXcom: directory-level observation
 
@@ -180,7 +180,7 @@ Choose JSON/JSONC initially to preserve the working Boost.JSON parser and TypeSc
 
 ## E. Legal/provenance boundaries
 
-- OpenXcom uses GPL licensing: its code is **architecture reference only** under our MIT policy, with no copying, translation, or adaption of GPL implementation.
+- OpenXcom uses GPL licensing: it was **architecture reference only** under our original MIT policy. Under the current GPL-3.0-or-later policy, specific compatible source files may be reused following audit and attribution; none have yet been copied.
 - Gold Box Explorer is MIT: review exact file licenses, copyright notices, dependencies, and provenance before reusing parsers.
 - Publicly documented binary field layouts and observable compatibility behavior may guide independent implementations. Maintain sources and tests that demonstrate our own work.
 - Do not commit SSI game binaries, scans, art, game text, campaign exports, or proprietary manuals.
@@ -190,7 +190,7 @@ Choose JSON/JSONC initially to preserve the working Boost.JSON parser and TypeSc
 ## F. Immediate follow-ups / research gaps
 
 1. Collect a read-only inventory (paths, sizes, hashes) of the user's DOS `POOLRAD` directory, excluding source assets from Git.
-2. Implement a bounded, read-only DAX header and record-index scanner against synthetic fixtures; evaluate open source parsers **file by file** for MIT compliance.
+2. Implement or reuse a bounded, read-only DAX header/index scanner against synthetic fixtures; evaluate open-source parser files for **GPLv3 compatibility**, provenance and code quality.
 3. Verify header parsing/RLE behavior against user-provided local binary samples and maintain per-version fingerprints.
 4. Build an event/record reference table (`GEO -> ECL -> monsters/visuals/journal`) and a namespaced identifier policy.
 5. Specify a strict modular ruleset schema extending M1's `mod.json` API without breaking current mods.

@@ -127,4 +127,4 @@ Runtime game systems look up effective content by stable identity; they do not t
 
 Advantages: established community modding conventions, additive pack installation, upgrade-safe overlays, reproducibility, and good fit for TypeScript tooling. Costs: normalized model and resource provenance require upfront design, and strict operations/schema may be more verbose than permissive YAML overlays.
 
-We intentionally **do not copy OpenXcom's GPL source code, parser classes, or implementation-specific algorithms**. Only the functional model and independent design patterns are adopted.
+**Historical implementation note:** No OpenXcom source code was incorporated when this ADR was written. The project has since moved to GPL-3.0-or-later, so compatible upstream source can be reused after full per-file license and provenance review. The proposed architecture itself remains independent of any particular upstream implementation.

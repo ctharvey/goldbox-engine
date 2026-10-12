@@ -23,7 +23,7 @@
 ## Research / design investigation (2026-10-12)
 - [x] Inspect OpenXcom's actual master-mod / extension layout and declarative ruleset conventions
 - [x] Identify DOS Pool of Radiance DAX resource families and ECL event responsibilities
-- [x] Document independent, GPL-free master/mod architecture proposal (ADR-0002)
+- [x] Document master/mod architecture proposal (ADR-0002), initially written before GPL relicensing
 - [ ] Decide whether to accept ADR-0002 after schema review
 - [ ] Prototype modular category rulesets with M1 backwards compatibility
 - [ ] Build read-only DAX header/index parser against synthetic files, then validate with user-owned original game resources

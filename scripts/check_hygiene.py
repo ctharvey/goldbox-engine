@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Basic source- and asset-contamination guard. Not a legal/license audit."""
+"""Basic asset and license hygiene checks, not a substitute for legal review."""
 from pathlib import Path
 import sys
 
@@ -8,9 +8,17 @@ IGNORE_DIRS = {".git", ".idea", ".vscode", "build", "build-release", "node_modul
 FORBIDDEN_DIRS = {"originals", "game-data", "proprietary", "ssi-assets"}
 FORBIDDEN_SUFFIXES = {".dsk", ".img", ".iso", ".exe", ".dax", ".sav", ".pak"}
 SOURCE_SUFFIXES = {".c", ".cpp", ".h", ".hpp", ".ts"}
-GPL_MARKERS = ("gnu general public license", "spdx-license-identifier: gpl", "spdx-license-identifier: agpl")
+REVIEW_MARKERS = ("spdx-license-identifier: agpl", "spdx-license-identifier: gpl-2.0-only")
 
 violations = []
+license_path = ROOT / "LICENSE"
+if not license_path.is_file():
+    violations.append("missing LICENSE file")
+else:
+    license_text = license_path.read_text(encoding="utf-8", errors="replace")
+    if "GNU GENERAL PUBLIC LICENSE" not in license_text or "Version 3, 29 June 2007" not in license_text:
+        violations.append("LICENSE must contain the complete GNU GPLv3 text")
+
 for path in ROOT.rglob("*"):
     if not path.is_file():
         continue
@@ -23,10 +31,10 @@ for path in ROOT.rglob("*"):
         violations.append(f"likely proprietary/binary asset: {rel}")
     if path.suffix.lower() in SOURCE_SUFFIXES:
         txt = path.read_text(encoding="utf-8", errors="replace").lower()
-        if any(marker in txt for marker in GPL_MARKERS):
-            violations.append(f"license marker requires review: {rel}")
+        if any(marker in txt for marker in REVIEW_MARKERS):
+            violations.append(f"license marker needs explicit compatibility review: {rel}")
 
 if violations:
     print("Repository hygiene FAILED:\n" + "\n".join("- " + v for v in violations))
     sys.exit(1)
-print("Repository hygiene: PASS (heuristic; still review all third-party code manually)")
+print("Repository hygiene: PASS (heuristic; review all third-party code manually)")

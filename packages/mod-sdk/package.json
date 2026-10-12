@@ -4,7 +4,18 @@
   "private": true,
   "type": "module",
   "description": "TypeScript contracts for Goldbox Engine mods (runtime not implemented)",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "scripts": { "build": "tsc -p tsconfig.json", "check": "tsc -p tsconfig.json --noEmit" },
-  "devDependencies": { "typescript": "~5.9.3" }
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  },
+  "license": "GPL-3.0-or-later"
 }
