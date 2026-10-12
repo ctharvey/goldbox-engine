@@ -5,7 +5,7 @@
 - [x] Synthetic journal resolver tests
 - [x] TypeScript mod API draft
 - [x] Licensing and provenance policy
-- [ ] Remote GitHub repo initialized (GitHub connector has no create-repository action)
+- [x] Public GitHub repository initialized: https://github.com/ctharvey/goldbox-engine
 
 ## M1 — Real content overlays (2026-10-12)
 - [x] JSON synthetic content importer and independent `ContentImporter` interface
@@ -19,6 +19,16 @@
 - [ ] Proper gameplay state and savegame persistence
 - [ ] Migration/version validation for existing saves
 - [ ] Race-hardened mod filesystem loading and broader fuzzing
+
+## Research / design investigation (2026-10-12)
+- [x] Inspect OpenXcom's actual master-mod / extension layout and declarative ruleset conventions
+- [x] Identify DOS Pool of Radiance DAX resource families and ECL event responsibilities
+- [x] Document independent, GPL-free master/mod architecture proposal (ADR-0002)
+- [ ] Decide whether to accept ADR-0002 after schema review
+- [ ] Prototype modular category rulesets with M1 backwards compatibility
+- [ ] Build read-only DAX header/index parser against synthetic files, then validate with user-owned original game resources
+
+Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-of-radiance.md). Design: [ADR-0002](decisions/0002-master-campaigns-and-modular-rulesets.md).
 
 ## M2 — Import first original title (Pool of Radiance)
 - [ ] User-selected original installation and format version fingerprinting
