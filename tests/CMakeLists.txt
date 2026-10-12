@@ -29,3 +29,7 @@ target_link_libraries(goldbox_game_profile_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_game_profile_tests COMMAND goldbox_game_profile_tests
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json
     ${PROJECT_SOURCE_DIR}/games/curse-of-the-azure-bonds/profile.json)
+
+add_executable(goldbox_ecl_tests ecl_test.cpp)
+target_link_libraries(goldbox_ecl_tests PRIVATE goldbox_formats)
+add_test(NAME goldbox_ecl_tests COMMAND goldbox_ecl_tests)

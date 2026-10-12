@@ -19,11 +19,11 @@ Before developing a substantial format parser, rendering/UI subsystem, compressi
 
 ## Known candidates for early evaluation
 
-These are **candidates, not installed dependencies**, unless listed separately as used in `THIRD_PARTY.md`.
+These are **candidate projects unless explicitly listed as adapted/used in [THIRD_PARTY.md](../THIRD_PARTY.md)**. An ECL six-bit decoder adaptation from Gold Box Explorer is now used; its original license notice is preserved.
 
 | Need | Project | License checked | Integration notes / decision |
 | --- | --- | --- | --- |
-| Gold Box archive, bitmap and character file knowledge | [Gold Box Explorer](https://github.com/bsimser/Gold-Box-Explorer) | MIT at repository root; audit source files and history before reuse | Existing C# parsing resources may inform or provide attributable, adapted C++ routines; evaluate first instead of implementing every format ourselves |
+| Gold Box archive, bitmap and character file knowledge | [Gold Box Explorer](https://github.com/bsimser/Gold-Box-Explorer) | MIT at repository root; audit source files and history before reuse | **ECL six-bit decode now adapted to C++ with attribution and tests**; rest of the C# format modules remain candidates requiring individual review |
 | JSON content and rulesets | [Boost.JSON](https://github.com/boostorg/json) | Boost Software License 1.0 | **Already used**, package-managed and not vendored |
 | JavaScript runtime for TypeScript-authored mods | [QuickJS-NG](https://github.com/quickjs-ng/quickjs) | MIT | Prefer embedded library to custom JS runtime; type-check/compile TypeScript outside the engine |
 | 2D rendering, audio and input | [SDL3](https://github.com/libsdl-org/SDL) | zlib | Use library rather than implementing platform backends |

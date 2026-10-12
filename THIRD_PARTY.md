@@ -29,3 +29,12 @@ Before writing a new parser, event runtime, UI framework, renderer, or script ho
 - QuickJS-NG for executing JS emitted by the TypeScript compiler.
 
 No original SSI game files or code, and no copied OpenXcom or SSI Engine implementation, are currently distributed by this repository. Existing Boost.JSON remains independently licensed under BSL-1.0. See [LICENSING.md](LICENSING.md) for project licensing and historical MIT releases.
+
+## Adapted code in M2 ECL decoding pilot (2026-10-12)
+
+| Origin | File(s) adopted / behavior reference | License, revision, attribution | Local changes |
+| --- | --- | --- | --- |
+| [Gold Box Explorer](https://github.com/bsimser/Gold-Box-Explorer) | [DaxEclFile.cs](https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/src/Common/Plugins/DaxEcl/DaxEclFile.cs) and [Memory.cs](https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/src/Common/Plugins/DaxEcl/Memory.cs): 6-bit text decoding and typed operands | **MIT**, copyright (c) 2018 Bil Simser; revision `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f`. Full original license preserved in [licenses/gold-box-explorer-MIT.txt](licenses/gold-box-explorer-MIT.txt) | Adapted from C# concepts/algorithm to C++20 in `formats/src/ecl.cpp` and `formats/include/goldbox/formats/ecl.hpp`. Replaced state-machine loop with bounded bit accumulator; added overflow/truncation checks, selected-dialect opcode table, exceptions, synthetic tests. Original MIT license and author acknowledgement retained. |
+| [SSI Engine](https://github.com/TiCoKH/ssi-engine) | [EclArgument.java](https://github.com/TiCoKH/ssi-engine/blob/51d4b6d409fa798754f5ff2ccb249f3c0b6d029b/src/main/java/engine/script/EclArgument.java), [EclOpCode.java](https://github.com/TiCoKH/ssi-engine/blob/51d4b6d409fa798754f5ff2ccb249f3c0b6d029b/src/main/java/engine/script/EclOpCode.java) | GPLv3, revision `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` | **Behavioral reference only** for type widths and provisional opcode semantics; no Java source ported/copied and no Java dependencies introduced. Source-level reuse remains subject to license review. |
+
+**Implementation status:** ECL text and operand decoding only. This is **not** a playable ECL event VM, and original game compatibility remains unvalidated. Source and tests use synthetic bytes only. See [docs/formats/ecl-v1.md](docs/formats/ecl-v1.md).

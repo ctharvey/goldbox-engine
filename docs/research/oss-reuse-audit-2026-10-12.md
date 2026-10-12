@@ -1,6 +1,6 @@
 # Gold Box open-source reuse audit — 2026-10-12
 
-**Status:** Research completed; no third-party implementation copied or vendored in this change.  
+**Status:** Audit completed; **subsequent ECL lexer pilot adopted/adapted MIT Gold Box Explorer six-bit decoding** in [formats/src/ecl.cpp](../../formats/src/ecl.cpp). Attribution in [THIRD_PARTY.md](../../THIRD_PARTY.md). No original SSI binaries/text or GPL Java code included.  
 **Target repository:** [ctharvey/goldbox-engine](https://github.com/ctharvey/goldbox-engine) (GPL-3.0-or-later)  
 **Decision:** Reuse focused modules, not whole engines. Keep original SSI assets out of the public repository.
 
@@ -54,4 +54,4 @@ This is a hypothesis supported by the audited project scopes; it is not a claim 
 
 ## Current implementation status
 
-Research only in this document. **No upstream code has been imported by this audit**. Existing M2 synthetic DAX tests and data-driven Pool/Curse profiles are not evidence of original-game compatibility.
+The initial audit itself did not copy code. **Follow-up pilot completed:** six-bit ECL text and typed operand decoding adapted from MIT Gold Box Explorer with preserved license, compiler checks and seven synthetic CTest suites. Opcode descriptions were compared to SSI Engine but its Java implementation was not ported. None of this establishes compatibility with real SSI game binaries.

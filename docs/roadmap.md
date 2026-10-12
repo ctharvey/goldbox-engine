@@ -33,7 +33,7 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 ## Open-source adoption track (2026-10-12)
 - [x] Audit actual implementations, source-file licenses, provenance and maintenance across Gold Box Explorer, SSI Engine, OpenXcom, UAF/Dungeon Craft, OpenUA and others
 - [x] Identify pilot reuse targets and avoid-code-copy licensing blockers: [source audit](research/oss-reuse-audit-2026-10-12.md)
-- [ ] Port and attribute bounded ECL lexical/opcode decoding from eligible Gold Box Explorer modules; verify against synthetic tests
+- [x] Port and attribute bounded ECL lexical/opcode decoding from MIT Gold Box Explorer behavior; synthetic unit tests pass (unvalidated on SSI resources)
 - [ ] Adapt GEO map/wall/event normalization with preserved upstream notices and source review
 - [ ] Cross-check the existing DAX parser against other OSS implementations and owned-game archives
 - [ ] Review SSI Engine ECL VM source and version-specific GPL terms before any translation
@@ -45,7 +45,7 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 - [x] Read-only CLI scan mode (no original assets or resources committed)
 - [ ] Implement GLB decoder for later variants; identify further title-specific ECL dialects
 - [ ] User-selected original installation and format version fingerprinting
-- [ ] Implement independent decoders (maps, sprites, journals/events)
+- [ ] Implement independent decoders (maps, sprites, journals/events); ECL lexical/operand pilot implemented but event execution not started
 - [ ] Normalize ECL event semantics and link journal references
 - [ ] Expand test suite with synthetic/reverse-engineered behavioral fixtures
 - [ ] Never include original assets in repository, build, or tests

@@ -15,6 +15,7 @@ An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playi
 - TypeScript types for mod authoring; **compiled JS execution is not implemented**.
 - Reject symlinked mod directories/manifests, invalid IDs, oversized JSON files, and unknown manifest fields.
 - Shared read-only DAX archive scanner and bounded RLE extraction, tested only on synthetic files.
+- **ECL lexical decoder pilot:** bounded six-bit text, typed operands, and caller-selected opcode tables (synthetic tests only; no VM/gameplay execution).
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run
@@ -93,7 +94,7 @@ scripts/             Hygiene checks
 - This project uses Boost.JSON via the user's Boost installation (Boost Software License 1.0); it does not vendor the Boost source.
 - Original game compatibility requires separate importer implementations and independently validated behavior.
 
-See the [shared importer architecture](docs/universal-importer.md) and [DAX format documentation](docs/formats/dax-v1.md). See also the [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
+See the [shared importer architecture](docs/universal-importer.md), [DAX format documentation](docs/formats/dax-v1.md), and [ECL decoding pilot](docs/formats/ecl-v1.md). See also the [OpenXcom mod architecture + Pool of Radiance resource investigation](docs/research/openxcom-mod-system-and-pool-of-radiance.md) and [proposed master/ruleset design](docs/decisions/0002-master-campaigns-and-modular-rulesets.md).
 
 For the current, working M1 implementation, see [mod format](docs/mod-format.md), [architecture](docs/architecture.md), [roadmap](docs/roadmap.md), [licensing policy](docs/licensing-and-provenance.md), and [dependency inventory](THIRD_PARTY.md).
 
