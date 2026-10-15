@@ -9,5 +9,6 @@
 7. Prefer deterministic tests, narrow interfaces and explicit failure handling. Run `cmake --build build && ctest --test-dir build` plus repository hygiene checks before contributing.
 8. Distinguish functional implementations from planned or unvalidated compatibility, and record testing and provenance in the PR.
 9. Distributing a covered binary entails GPL corresponding-source and notice obligations. See [LICENSING.md](LICENSING.md) and the [official GPLv3 text](LICENSE).
+10. **Agents and WSL:** run one WSL build at a time, with `-j2`, and put a `timeout` on any interactive or piped binary (for example `timeout 60 ./build/apps/goldbox_explore ...`). Use `scripts/wsl-build.sh [ctest args]`, which takes a lock, builds with `-j2`, and bounds each step.
 
 Contributions to project-owned files are intended to be available under **GPL-3.0-or-later**, unless clearly identified as separately licensed compatible code and accepted as such. Earlier publicly released MIT-licensed revisions remain subject to their original license grants.
