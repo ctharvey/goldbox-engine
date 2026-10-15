@@ -1,6 +1,9 @@
 # ECL lexer/decode pilot (M2)
 
-**Status:** Implemented and synthetically tested, **not verified with original SSI game files**. No interpreter, event graph, or campaign execution yet.
+**Status:** Lexer, bounded dispatch resolver and minimal headless VM implemented
+and synthetically tested. Lifecycle headers and a narrow original event path
+have also been checked against local Pool of Radiance resources.
+No complete campaign execution or playable compatibility claim.
 
 This is a deliberately narrow adoption from [Gold Box Explorer](https://github.com/bsimser/Gold-Box-Explorer) (MIT). Its ECL text decoder and typed-operand behavior have been adapted to standalone C++20 with strict bounds checks, exception-based error reporting, and a caller-selected instruction dialect. Opcode identifiers/operand counts were cross-checked against [SSI Engine](https://github.com/TiCoKH/ssi-engine) (GPLv3), but no Java VM code was copied.
 
@@ -32,3 +35,30 @@ The decoder is independent of the DAX container layer. Callers must first extrac
 3. Compare parsed instructions against a known reference trace; differentiate generation-1 opcode conflicts and extended dialects.
 4. Add trace/provenance context `(game, archive filename, record ID, offset, dialect)` and test unsupported opcode diagnostics.
 5. Build a bounded interpreter with isolated event state and save compatibility only after semantic parity tests.
+
+## Bounded runtime and state
+
+`engine/include/goldbox/ecl_vm.hpp` separates `EclState`, `EclHost`, and execution
+limits from the format decoder. The default budgets are 10,000 decoded steps
+and 64 subroutine frames. EXIT, GOTO/GOSUB/RETURN, numeric/text memory writes,
+indexed COPY_MEM, AND, comparison/conditional execution, inline text and menus
+are supported. IF instructions conditionally execute the next decoded
+instruction. ON_GOTO/ON_GOSUB select checked addresses and retain a typed
+`DispatchSelection` trace. Code-address numeric reads use imported bytes;
+numeric writes into the program region are rejected. Other opcode semantics,
+unresolved string pointers and absent menu/combat hosts fail explicitly.
+
+State changes made before an error remain visible; execution is not
+transactional. The host owns input and combat behavior. Determinism assumes
+deterministic host responses, and callers must bound blocking host operations
+with a process timeout. No complete combat implementation is supplied.
+
+`ExplorationSession` supplies map coordinates, facing and raw square info via
+profile-selected addresses. Version-1 local saves preserve position/facing,
+numeric memory and string state. Invalid loads are rejected before publishing
+state. The terminal identifies its source pair using game/archive/record IDs,
+configuration and non-cryptographic content checksums; the separate installation
+inventory uses SHA-256. These are prototype saves, not original SSI save files
+or a complete campaign/mod compatibility format.
+
+See [original-resource evidence and remaining gates](../research/local-validation-2026-10-15.md).

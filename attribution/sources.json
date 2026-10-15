@@ -75,15 +75,40 @@
       "upstreamRevision": "51d4b6d409fa798754f5ff2ccb249f3c0b6d029b",
       "upstreamFiles": [
         "src/main/java/engine/script/EclArgument.java",
-        "src/main/java/engine/script/EclOpCode.java"
+        "src/main/java/engine/script/EclOpCode.java",
+        "src/main/java/engine/VirtualMachine.java",
+        "src/main/java/engine/VirtualMemory.java",
+        "src/main/java/engine/EngineConfiguration.java",
+        "src/main/java/engine/Engine.java",
+        "src/main/java/data/script/EclProgram.java",
+        "src/main/java/data/dungeon/DungeonMap.java",
+        "src/main/java/data/DAXFile.java",
+        "src/main/resources/Pool of Radiance.properties",
+        "src/main/resources/Curse of the Azure Bonds.properties"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,
       "licenseUrl": "https://github.com/TiCoKH/ssi-engine/blob/master/LICENSE",
       "copyrightNotice": "Upstream authors, as documented by source history",
       "localFiles": [],
-      "purpose": "Research ECL operand byte widths and provisional opcode behavior",
-      "modifications": "No Java implementation copied or translated; behavior consulted during ECL decoding design.",
+      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics",
+      "modifications": "No Java source copied or translated. Independent bounded C++ implementation informed by observable behavior; profile address facts transcribed from configuration. No upstream engine, dependency or rules implementation adopted.",
+      "reviewed": "2026-10-12"
+    },
+    {
+      "id": "gold-box-explorer-dispatch-reference",
+      "kind": "reference",
+      "project": "Gold Box Explorer",
+      "upstreamRepository": "https://github.com/bsimser/Gold-Box-Explorer",
+      "upstreamRevision": "eac30abaa6ee66aea6f5d65ebe6d676b10015a8f",
+      "upstreamFiles": ["src/Common/Plugins/Dax/DaxFile.cs", "src/Common/Plugins/DaxEcl/Program.cs"],
+      "license": "MIT",
+      "licenseFile": "licenses/gold-box-explorer-MIT.txt",
+      "licenseUrl": "https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/LICENSE",
+      "copyrightNotice": "Copyright (c) 2018 Bil Simser",
+      "localFiles": [],
+      "purpose": "Cross-check DAX index byte count, RLE and ECL address bases; evaluate event-discovery heuristics",
+      "modifications": "Research only; no source copied. Existing independent bounded DAX implementation retained with corrected index interpretation. Byte-pattern event discovery deliberately excluded.",
       "reviewed": "2026-10-12"
     },
     {

@@ -48,3 +48,27 @@ No original SSI game files or code, and no copied OpenXcom or SSI Engine impleme
 | [Gold Box Explorer](https://github.com/bsimser/Gold-Box-Explorer) | [GeoDaxFile.cs](https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/src/Common/Plugins/GeoDax/GeoDaxFile.cs) (`ProcessBlocks`), [GeoWallRecord.cs](https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/src/Common/Plugins/GeoDax/GeoWallRecord.cs), and [GeoMapRecord.cs](https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/src/Common/Plugins/GeoDax/GeoMapRecord.cs) | **MIT**, Bil Simser, 2018; upstream revision `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f`. MIT notice preserved at [licenses/gold-box-explorer-MIT.txt](licenses/gold-box-explorer-MIT.txt) | Adapted map-cell plane indices and wall/event splitting to bounded standalone C++20 `formats/src/geo.cpp` and `formats/include/goldbox/formats/geo.hpp`. Removed Windows/System.Drawing coupling and game-derived map-name list; added checked coordinates, trailing-byte metadata, explicit ECL archive+record binding, read-only CLI and synthetic tests. No original game data, pictures or map names incorporated. |
 
 **Status:** GEO/ECL binding associates a caller-selected existing ECL *record*, not a decoded ECL dispatch-table address. Per-title validation is still required. See [docs/formats/geo-v1.md](docs/formats/geo-v1.md).
+
+## Dispatch, DAX comparison and bounded runtime (2026-10-12)
+
+SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` was consulted for
+`VirtualMachine.java`, `VirtualMemory.java`, `EngineConfiguration.java`,
+`Engine.java`, `data/script/EclProgram.java`, `data/dungeon/DungeonMap.java`,
+`data/DAXFile.java`, and the Pool/Curse properties.
+Its root license is GPLv3; these files do not establish an or-later grant.
+These are **research references**, not adapted Java implementations. The C++
+dispatch resolver and bounded VM were written independently without Java/Vavr
+dependencies. The numeric code-base and square-info configuration facts are
+recorded in the unverified game profiles. No title checks enter the runtime.
+
+Gold Box Explorer at `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` (MIT,
+Bil Simser) was consulted for `src/Common/Plugins/Dax/DaxFile.cs` and
+`src/Common/Plugins/DaxEcl/Program.cs`. Both it and SSI Engine agree that the
+DAX header word excludes the leading two bytes. Our bounded RLE implementation
+was retained; only index interpretation was corrected, with compatibility for
+the previously distributed synthetic fixtures. Gold Box Explorer's pattern
+search for event tables was not adopted.
+
+The exact immutable paths and research/adaptation distinction remain in
+`attribution/sources.json`. Existing MIT adaptations and their notices remain
+unchanged. Synthetic success does not establish original-game compatibility.

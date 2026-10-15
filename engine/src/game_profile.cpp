@@ -14,7 +14,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto parsed = j::read_json(file);
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
-        "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns"}, "game profile");
+        "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -26,7 +26,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "eventDialect", "game profile"), "profile.eventDialect"),
         j::string(j::field(root, "rulesProfile", "game profile"), "profile.rulesProfile"),
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
-        {}
+        {}, std::nullopt
     };
     static const std::regex id_pattern(R"(^[a-z0-9][a-z0-9._-]{0,127}$)");
     if (!std::regex_match(profile.id, id_pattern) || profile.id.find("..") != std::string::npos ||
@@ -45,6 +45,29 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
             throw std::runtime_error("unsafe or invalid resource pattern");
         }
         profile.resource_patterns.push_back(pattern);
+    }
+    if (const auto* value = root.if_contains("eventDispatch")) {
+        const auto& dispatch = j::object(*value, "eventDispatch");
+        j::fields_only(dispatch, {"dialect", "codeBase", "squareInfoAddress", "positionAddresses"}, "eventDispatch");
+        const auto dialect = j::string(j::field(dispatch, "dialect", "eventDispatch"), "dispatch.dialect");
+        const auto base = j::integer(j::field(dispatch, "codeBase", "eventDispatch"), "dispatch.codeBase");
+        const auto square = j::integer(j::field(dispatch, "squareInfoAddress", "eventDispatch"), "dispatch.squareInfoAddress");
+        if (dialect != "ssi-five-entry-v1" || base < 0 || base > 65535 || square < 0 || square > 65535) {
+            throw std::runtime_error("unsupported or invalid ECL dispatch configuration");
+        }
+        profile.event_dispatch = GameProfile::EventDispatch{dialect,
+            static_cast<std::uint16_t>(base), static_cast<std::uint16_t>(square), std::nullopt};
+        if (const auto* positions = dispatch.if_contains("positionAddresses")) {
+            const auto& values = j::array(*positions, "positionAddresses");
+            if (values.size() != 3) throw std::runtime_error("positionAddresses requires X/Y/direction");
+            std::array<std::uint16_t, 3> addresses{};
+            for (std::size_t i = 0; i < 3; ++i) {
+                const auto address = j::integer(values[i], "position address");
+                if (address < 0 || address > 65535) throw std::runtime_error("Invalid position address");
+                addresses[i] = static_cast<std::uint16_t>(address);
+            }
+            profile.event_dispatch->position_addresses = addresses;
+        }
     }
     return profile;
 }

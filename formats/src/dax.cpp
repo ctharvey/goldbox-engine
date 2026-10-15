@@ -57,7 +57,16 @@ DaxArchive DaxArchive::parse(std::span<const std::uint8_t> bytes) {
     if (bytes.size() > max_file_size) throw std::runtime_error("DAX archive exceeds 64 MiB limit");
     if (bytes.size() < 2) throw std::runtime_error("DAX archive is truncated");
     DaxArchive archive;
-    archive.data_offset_ = u16(bytes, 0);
+    const auto header_word = u16(bytes, 0);
+    // OSS readers agree that SSI stores the index byte count, excluding the
+    // leading word. Retain the old synthetic absolute-offset convention:
+    // modulo nine distinguishes the two without guessing at payload bytes.
+    const auto data_offset = header_word % 9 == 0
+        ? static_cast<std::size_t>(header_word) + 2 : header_word;
+    if (data_offset > std::numeric_limits<std::uint16_t>::max()) {
+        throw std::runtime_error("DAX index exceeds supported offset range");
+    }
+    archive.data_offset_ = static_cast<std::uint16_t>(data_offset);
     if (archive.data_offset_ < 2 || archive.data_offset_ > bytes.size() ||
         (archive.data_offset_ - 2) % 9 != 0) {
         throw std::runtime_error("invalid DAX index size");

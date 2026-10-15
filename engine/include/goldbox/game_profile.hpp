@@ -1,6 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <cstdint>
+#include <array>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,6 +20,13 @@ struct GameProfile {
     std::string rules_profile;
     std::string validation_status;
     std::vector<std::string> resource_patterns;
+    struct EventDispatch {
+        std::string dialect;
+        std::uint16_t code_base{};
+        std::uint16_t square_info_address{};
+        std::optional<std::array<std::uint16_t, 3>> position_addresses;
+    };
+    std::optional<EventDispatch> event_dispatch;
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

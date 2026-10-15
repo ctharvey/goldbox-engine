@@ -3,6 +3,7 @@
 #include "goldbox/game_profile.hpp"
 #include "goldbox/formats/dax.hpp"
 #include "goldbox/formats/geo.hpp"
+#include "goldbox/formats/ecl_dispatch.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -24,6 +25,7 @@ struct Options {
     fs::path save_meta;
     fs::path scan_dax;
     fs::path scan_geo;
+    fs::path scan_ecl;
     fs::path ecl_dax;
     fs::path profile;
     std::optional<std::uint8_t> geo_record;
@@ -37,6 +39,7 @@ void usage() {
                  "Usage: goldbox_cli --content <journals.json> [--mods <directory>]\n"
                  "        [--journal <positive-id>] [--mode classic|enhanced] [--save-meta <file>]\n"
                  "       goldbox_cli --scan-dax <archive.DAX> [--game-profile <profile.json>]\n"
+                 "       goldbox_cli --scan-ecl <ECL.DAX> --game-profile <profile.json>\n"
                  "       goldbox_cli --scan-geo <GEO.DAX> [--geo-record <id>]\n"
                  "           [--game-profile <profile.json>]\n"
                  "           [--ecl-dax <ECL.DAX> --ecl-record <id> --geo-record <id>]\n";
@@ -54,6 +57,7 @@ Options parse(int argc, char** argv) {
         else if (arg == "--save-meta") opts.save_meta = value;
         else if (arg == "--scan-dax") opts.scan_dax = value;
         else if (arg == "--scan-geo") opts.scan_geo = value;
+        else if (arg == "--scan-ecl") opts.scan_ecl = value;
         else if (arg == "--ecl-dax") opts.ecl_dax = value;
         else if (arg == "--geo-record" || arg == "--ecl-record") {
             std::size_t consumed = 0;
@@ -83,14 +87,15 @@ Options parse(int argc, char** argv) {
             opts.entry = static_cast<goldbox::JournalId>(id);
         } else throw std::runtime_error("unknown argument: " + arg);
     }
-    if (!opts.scan_dax.empty() && !opts.scan_geo.empty()) {
-        throw std::runtime_error("--scan-dax and --scan-geo are mutually exclusive");
+    if (static_cast<int>(!opts.scan_dax.empty()) + static_cast<int>(!opts.scan_geo.empty()) +
+        static_cast<int>(!opts.scan_ecl.empty()) > 1) {
+        throw std::runtime_error("resource scan modes are mutually exclusive");
     }
-    if (!opts.scan_dax.empty() || !opts.scan_geo.empty()) {
+    if (!opts.scan_dax.empty() || !opts.scan_geo.empty() || !opts.scan_ecl.empty()) {
         if (!opts.content.empty() || !opts.mods.empty() || !opts.save_meta.empty()) {
             throw std::runtime_error("resource scans cannot be combined with content/mod options");
         }
-        if (!opts.scan_dax.empty() && (opts.geo_record || !opts.ecl_dax.empty() || opts.ecl_record)) {
+        if (opts.scan_geo.empty() && (opts.geo_record || !opts.ecl_dax.empty() || opts.ecl_record)) {
             throw std::runtime_error("GEO/ECL record options require --scan-geo");
         }
         if (opts.ecl_dax.empty() != !opts.ecl_record.has_value()) {
@@ -99,6 +104,7 @@ Options parse(int argc, char** argv) {
         if (!opts.ecl_dax.empty() && !opts.geo_record) {
             throw std::runtime_error("ECL pairing requires a specific --geo-record");
         }
+        if (!opts.scan_ecl.empty() && opts.profile.empty()) throw std::runtime_error("--scan-ecl requires --game-profile");
         return opts;
     }
     if (!opts.profile.empty() || !opts.ecl_dax.empty() || opts.geo_record || opts.ecl_record) {
@@ -114,14 +120,36 @@ int main(int argc, char** argv) {
     try {
         if (argc == 1) { usage(); return 0; }
         const auto opts = parse(argc, argv);
-        if (!opts.scan_dax.empty() || !opts.scan_geo.empty()) {
+        if (!opts.scan_dax.empty() || !opts.scan_geo.empty() || !opts.scan_ecl.empty()) {
+            std::optional<goldbox::GameProfile> selected_profile;
             if (!opts.profile.empty()) {
                 const auto profile = goldbox::read_game_profile(opts.profile);
+                selected_profile = profile;
                 if (profile.archive_format != "dax-v1") {
                     throw std::runtime_error("game profile requires a different archive decoder");
                 }
                 std::cout << "Game profile: " << profile.title
                           << " [" << profile.validation_status << "]\n";
+            }
+            if (!opts.scan_ecl.empty()) {
+                if (!selected_profile->event_dispatch) throw std::runtime_error("profile has no ECL dispatch configuration");
+                const auto& config = *selected_profile->event_dispatch;
+                const goldbox::formats::EclDispatchDialect dialect{config.dialect, config.code_base, config.square_info_address};
+                const auto opcodes = goldbox::formats::routing_ecl_opcodes();
+                const auto archive = goldbox::formats::DaxArchive::from_file(opts.scan_ecl);
+                std::size_t failed = 0;
+                for (const auto& record : archive.records()) {
+                    try {
+                        (void)goldbox::formats::decode_ecl_program_entries(archive.extract(record.id), dialect, opcodes);
+                        std::cout << "ECL #" << static_cast<unsigned>(record.id) << ": five lifecycle entries checked\n";
+                    } catch (const std::exception& error) {
+                        ++failed;
+                        std::cout << "ECL #" << static_cast<unsigned>(record.id) << ": " << error.what() << "\n";
+                    }
+                }
+                std::cout << "ECL scan: " << archive.records().size() << " records, " << failed
+                          << " failures (unverified; no whole-program validation)\n";
+                return failed == 0 ? 0 : 1;
             }
             if (!opts.scan_geo.empty()) {
                 const auto archive = goldbox::formats::DaxArchive::from_file(opts.scan_geo);
@@ -143,8 +171,22 @@ int main(int argc, char** argv) {
                               << ", " << flagged << " flagged cells"
                               << ", " << map.trailing_bytes << " trailing bytes";
                     if (ecl_archive) {
-                        std::cout << ", paired ECL #" << static_cast<unsigned>(*opts.ecl_record)
-                                  << " (entry addresses unresolved)";
+                        std::cout << ", paired ECL #" << static_cast<unsigned>(*opts.ecl_record);
+                        if (selected_profile && selected_profile->event_dispatch) {
+                            const auto& config = *selected_profile->event_dispatch;
+                            const goldbox::formats::EclDispatchDialect dialect{config.dialect, config.code_base, config.square_info_address};
+                            const auto resolved = goldbox::formats::resolve_geo_events(map, *ecl_archive,
+                                *opts.ecl_record, goldbox::formats::EclEventKind::move, dialect,
+                                goldbox::formats::routing_ecl_opcodes());
+                            const auto count = std::count_if(resolved.begin(), resolved.end(),
+                                [](const auto& event) { return event.bytecode_offset.has_value(); });
+                            std::cout << " (" << count << " move routes resolved, " << resolved.size() - count << " unresolved)";
+                            for (const auto& event : resolved) {
+                                if (!event.diagnostic.empty()) std::cerr << "Event " <<
+                                    goldbox::formats::geo_event_id(selected_profile->id, opts.scan_geo.filename().string(), event.source)
+                                    << ": " << event.diagnostic << "\n";
+                            }
+                        } else std::cout << " (entry addresses unresolved: no dispatch profile)";
                     }
                     std::cout << "\n";
                     ++scanned;
@@ -159,6 +201,8 @@ int main(int argc, char** argv) {
             std::cout << "DAX index: " << archive.records().size() << " records"
                       << " (data offset " << archive.data_offset() << ")\n";
             for (const auto& record : archive.records()) {
+                // Exercise bounded RLE as well as the index; never print payload.
+                (void)archive.extract(record.id);
                 std::cout << "  #" << static_cast<unsigned>(record.id)
                           << " offset=" << record.relative_offset
                           << " packed=" << record.stored_size

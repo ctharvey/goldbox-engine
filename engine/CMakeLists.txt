@@ -7,9 +7,12 @@ add_library(goldbox_core STATIC
     src/content.cpp
     src/mods.cpp
     src/game_profile.cpp
+    src/ecl_vm.cpp
+    src/exploration.cpp
 )
 target_include_directories(goldbox_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${Boost_INCLUDE_DIRS})
 target_compile_features(goldbox_core PUBLIC cxx_std_20)
+target_link_libraries(goldbox_core PUBLIC goldbox_formats)
 if(MSVC)
     target_compile_options(goldbox_core PRIVATE /W4)
 else()

@@ -1,6 +1,9 @@
 # GEO 16×16 decoder pilot (M2)
 
-**Status:** implemented with synthetic tests; **unverified against original SSI installations**. The code decodes map geometry and raw event selectors but **does not resolve event entry-point addresses or run events**.
+**Status:** implemented with synthetic tests and layout checks on 29 local Pool
+of Radiance GEO records. Wall/door semantics and full game compatibility remain
+unverified. A separate bounded resolver handles supported selector routes;
+unknown game-state dependencies remain unresolved.
 
 ## Format source and provenance
 
@@ -56,6 +59,18 @@ Outputs per-record map dimensions, count of nonzero raw event bytes, count of hi
 - Record layouts, variant trailers, doorway semantics, event dispatch addresses, and game compatibility remain unverified until local game-file checks.
 
 ## Next gates
+
+The `ecl_dispatch.hpp` API decodes the five lifecycle instructions at known
+boundaries and follows GOTO, WRITE_MEM and AND routing to a typed ON_GOTO or
+ON_GOSUB table. It checks every table address and reports state-dependent,
+unsupported, malformed or cyclic routes. `ResolvedGeoEvent` preserves GEO
+coordinates, raw selector, paired ECL ID, lifecycle kind, dialect, table offset
+and target offset. Offsets exclude an optional 5000 record prefix. The full raw
+square-info byte is used until an actual AND masks it; high-bit semantics are
+not assumed. `geo_event_id` namespaces coordinates by game and archive identity.
+
+The CLI's explicit GEO/ECL pairing additionally reports how many **move** routes
+resolve when a profile supplies `eventDispatch`. No record pairing is inferred.
 
 1. Test against the user's local Pool of Radiance and Curse of the Azure Bonds archives, without committing source data.
 2. Compare actual cells with independently viewed maps and discover which platform/title variants diverge from this fixed layout.

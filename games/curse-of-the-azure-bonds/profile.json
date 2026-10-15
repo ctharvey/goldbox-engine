@@ -5,6 +5,8 @@
   "formatFamily": "goldbox-dos",
   "archiveFormat": "dax-v1",
   "eventDialect": "unverified",
+  "eventDispatch": {"dialect": "ssi-five-entry-v1", "codeBase": 32768, "squareInfoAddress": 49231,
+    "positionAddresses": [49227, 49228, 49229]},
   "rulesProfile": "adnd-first-edition-unimplemented",
   "validationStatus": "unverified",
   "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"]

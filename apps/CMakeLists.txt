@@ -1,2 +1,4 @@
 add_executable(goldbox_cli main.cpp)
 target_link_libraries(goldbox_cli PRIVATE goldbox_core goldbox_formats)
+add_executable(goldbox_explore explore.cpp)
+target_link_libraries(goldbox_explore PRIVATE goldbox_core)

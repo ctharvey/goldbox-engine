@@ -37,3 +37,20 @@ add_test(NAME goldbox_ecl_tests COMMAND goldbox_ecl_tests)
 add_executable(goldbox_geo_tests geo_test.cpp)
 target_link_libraries(goldbox_geo_tests PRIVATE goldbox_formats)
 add_test(NAME goldbox_geo_tests COMMAND goldbox_geo_tests)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_executable(goldbox_ecl_dispatch_tests ecl_dispatch_test.cpp)
+target_link_libraries(goldbox_ecl_dispatch_tests PRIVATE goldbox_formats)
+add_test(NAME goldbox_ecl_dispatch_tests COMMAND goldbox_ecl_dispatch_tests)
+add_executable(goldbox_ecl_vm_tests ecl_vm_test.cpp)
+target_link_libraries(goldbox_ecl_vm_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_ecl_vm_tests COMMAND goldbox_ecl_vm_tests)
+add_executable(goldbox_exploration_tests exploration_test.cpp)
+target_link_libraries(goldbox_exploration_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_exploration_tests COMMAND goldbox_exploration_tests)
+add_test(NAME goldbox_exploration_cli_tests COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/exploration_cli_test.py $<TARGET_FILE:goldbox_explore>
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
+add_test(NAME goldbox_installation_scanner_tests COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/installation_scanner_test.py $<TARGET_FILE:goldbox_cli>
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)

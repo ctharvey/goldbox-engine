@@ -2,7 +2,12 @@
 
 An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playing and enhancing classic SSI Gold Box RPGs **using original resources supplied by the player**.
 
-**Status: M2 parser pilots — M1 journal mods, a shared DAX reader, ECL lexical decoding, GEO map/event decoding, and two data-driven game profiles. Not a playable Gold Box game.** Full original SSI game import, event dispatch/execution, combat, renderer, and embedded JS runtime remain unimplemented.
+**Status: bounded exploration pilot.** M1 journal mods, installation scanning,
+DAX/GEO/ECL decoding, selector routing, a minimal ECL VM, and terminal exploration
+with state persistence are implemented. A standalone Pool of Radiance map/event
+has been exercised against user-owned Steam resources. Full campaign startup,
+combat, rendering, and embedded JS remain unimplemented; game compatibility is
+still unverified. See the [local validation scope](docs/research/local-validation-2026-10-15.md).
 
 ## What actually works today
 
@@ -14,9 +19,11 @@ An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playi
 - Output session metadata with game identifier, mode, and applied mod IDs/versions; **not a full savegame**.
 - TypeScript types for mod authoring; **compiled JS execution is not implemented**.
 - Reject symlinked mod directories/manifests, invalid IDs, oversized JSON files, and unknown manifest fields.
-- Shared read-only DAX archive scanner and bounded RLE extraction, tested only on synthetic files.
-- **ECL lexical decoder pilot:** bounded six-bit text, typed operands, and caller-selected opcode tables (synthetic tests only; no VM/gameplay execution).
-- **GEO map decoder pilot:** read-only 16×16 map cell/wall/door/event planes and explicit ECL record pairing (synthetic tests only; no event address resolution).
+- Read-only installation inventory with filenames, sizes, SHA-256, resource families and decoder diagnostics.
+- Shared DAX index/RLE and GEO16 decoders exercised against one local Pool of Radiance installation; public tests remain synthetic.
+- ECL typed operands, five lifecycle entries and bounded selector-table routing; unsupported/state-dependent static routes remain unresolved.
+- Minimal deterministic ECL VM with typed memory, conditional branches, subroutines, text, menus, indexed memory reads and combat host callbacks.
+- Terminal map movement and local save/restore, including original-event output and persisted menu state in one standalone map/ECL pair.
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run
@@ -33,6 +40,10 @@ ctest --test-dir build --output-on-failure
 ```
 
 On Windows, install Boost through vcpkg or another supported CMake environment, then configure with your chosen generator and toolchain. The program presently has no SDL/UI dependencies.
+
+For WSL builds, use `bash scripts/wsl-build.sh --no-tests=error` after configuring.
+The wrapper serializes builds, uses `-j2`, and bounds build/test duration. Put a
+wall-clock timeout on interactive or piped binaries; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 From the repository root, after building:
 
@@ -66,7 +77,33 @@ For a read-only summary of map records and raw event counts, without printing co
   --ecl-dax /path/to/ECL1.DAX --ecl-record 4
 ```
 
-The identifiers above are illustrative, not verified against a real installation. Scans do not alter source assets. ECL event addresses remain unresolved; original game compatibility has not been established.
+The identifiers above are illustrative. Scans do not alter source assets.
+With a dispatch profile, explicit GEO/ECL pairing reports resolved move routes
+and diagnostics for unresolved routes. Full original-game compatibility has not
+been established.
+
+Inventory an installation without writing extracted assets:
+
+```bash
+python scripts/scan_installation.py /path/to/POOLRAD --cli build/apps/goldbox_cli \
+  --profile games/pool-of-radiance/profile.json > /outside/repository/inventory.json
+```
+
+Start the terminal pilot with a verified, explicitly selected map/ECL pair:
+
+```bash
+timeout 60 ./build/apps/goldbox_explore games/pool-of-radiance/profile.json \
+  /path/to/GEO1.DAX 18 /path/to/ECL1.DAX 18 /outside/repository/state.json
+```
+
+Commands are `north`, `east`, `south`, `west`, `search`, `rest`, `init`, `save`,
+`load`, and `quit`; menus accept their displayed numeric index. The pilot starts
+at `(0,0)` with empty state and does not simulate full campaign initialization.
+Nonzero walls block movement; doors and map transitions are not modeled. Saves
+refuse overwrite and reject changed source pairs on load. Choose a fresh save
+path for each run and keep saves, reports and captured game text outside this
+repository. `timeout` is a WSL/Linux example; native Windows callers must also
+bound the process lifetime in their launcher.
 
 Optional: add `--save-meta session.json` to create non-overwriting session metadata. This records only **the startup configuration**, not gameplay state.
 

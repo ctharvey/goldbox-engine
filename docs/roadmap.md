@@ -35,7 +35,7 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 - [x] Identify pilot reuse targets and avoid-code-copy licensing blockers: [source audit](research/oss-reuse-audit-2026-10-12.md)
 - [x] Port and attribute bounded ECL lexical/opcode decoding from MIT Gold Box Explorer behavior; synthetic unit tests pass (unvalidated on SSI resources)
 - [x] Adapt MIT Gold Box Explorer GEO 16×16 map/wall/event decoder with preserved upstream license and synthetic tests (not SSI validated)
-- [ ] Cross-check the existing DAX parser against other OSS implementations and owned-game archives
+- [x] Cross-check the existing DAX parser against other OSS implementations and owned-game archives
 - [ ] Review SSI Engine ECL VM source and version-specific GPL terms before any translation
 - [ ] Clarify OpenUA's GPLv2-root/MIT-design-document mismatch prior to any code reuse
 
@@ -44,18 +44,22 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 - [x] Data-driven, unverified DOS profiles for Pool of Radiance and Curse of the Azure Bonds
 - [x] Read-only CLI scan mode (no original assets or resources committed)
 - [ ] Implement GLB decoder for later variants; identify further title-specific ECL dialects
-- [ ] User-selected original installation and format version fingerprinting
-- [ ] Complete and validate original SSI decoders (GEO 16×16 and ECL lexical pilots implemented; sprites, journal dispatch and executable event VM pending)
-- [ ] Resolve GEO event selectors to validated ECL dispatch entry points and normalize journal/event semantics (GEO→ECL record association only implemented)
-- [ ] Expand test suite with synthetic/reverse-engineered behavioral fixtures
-- [ ] Never include original assets in repository, build, or tests
+- [x] User-selected installation inventory, SHA-256 fingerprints and decoder diagnostics
+- [ ] Complete original SSI decoder coverage (DAX/GEO layout and ECL lifecycle checks completed on one Pool installation; sprites and complete ECL dialect coverage pending)
+- [ ] Complete selector-to-entry-point coverage across original records (bounded selector routes and typed runtime selections implemented; state-dependent static routes remain unresolved)
+- [x] Expand synthetic tests for dispatch, bounded execution, exploration and persistence
+- [x] Keep original assets and local derived content out of public code and tests
 
 ## M3 — Playable vertical slice
-- [ ] Navigate one imported map
-- [ ] Execute its original events and state transitions
+- [x] Navigate one imported map in the standalone terminal pilot
+- [x] Execute a supported original menu event and persist its resulting state (narrow map-18 validation only)
 - [ ] Display journal text sourced from user-provided materials
 - [ ] Toggle external mod without corrupting imported content
-- [ ] Save and restore deterministic progression
+- [x] Save and restore prototype position and event state; full campaign/mod save compatibility remains pending
+
+Evidence: [local validation, 2026-10-15](research/local-validation-2026-10-15.md).
+This standalone slice uses empty initial state and an explicit map/ECL pairing;
+it does not establish original campaign startup or gameplay parity.
 
 ## M4 — Gameplay parity
 - [ ] Party management, AD&D spell lists, combat, inventory, encounters

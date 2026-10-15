@@ -9,6 +9,8 @@
 .DS_Store
 .vscode/
 .idea/
+__pycache__/
+*.pyc
 *.log
 game-data/
 originals/

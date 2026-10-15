@@ -8,7 +8,7 @@
 
 namespace goldbox::formats {
 
-// Original SSI archives use a 2-byte little-endian data offset followed by
+// Original SSI archives use a 2-byte little-endian index byte count followed by
 // fixed 9-byte record index entries. All offsets/sizes are validated on parse.
 struct DaxRecord {
     std::uint8_t id;
