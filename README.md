@@ -333,6 +333,42 @@ on Windows, actual message delivery to synthetic reference windows, shared
 movement/menu input, disarmed/missing-map rejection, hung-window cancellation,
 and an unrelated SDL window receiving no keys. CTest registers the same suite.
 
+#### Verified Steam startup without a manual lookup
+
+Local runtime validation on 2026-10-16 reached the original Pool of Radiance
+party menu with Enter and loaded the supplied save into 3D exploration. The
+code-wheel screen in this installed build did **not** require looking up an
+answer. No original executable or installed configuration was modified.
+Community reports of the same behavior were a research lead, not the validation:
+[Steam startup discussion](https://steamcommunity.com/app/1882280/discussions/0/3185741160902745033/).
+
+With the reference launched from a private copy, leave shared input disarmed
+and send each command only after observing the indicated screen:
+
+1. At the startup/credits screen, send `reference ENTER`. If the wheel prompt
+   remains, send Enter at that prompt and verify the party menu before continuing.
+2. At the party menu, send `reference L` for Load Saved Game.
+3. At the save-slot prompt, send `reference A`. Slot A in the inspected private
+   copy loaded a party into 3D exploration at the displayed `(15,4)`, facing west.
+
+The three-command route was repeated through the harness on a fresh private
+copy. This is a recipe with observed checkpoints, not a blind startup macro or
+a claim that every edition accepts Enter. Save availability and content can
+vary. Keep the supplied digital wheel/manuals for editions or in-game content
+that need them; do not add proprietary answers or assets to this repository.
+
+Build fingerprints for the local observation (SHA-256):
+
+- `START.EXE`, 65,231 bytes:
+  `d825df2b174675c9088ba1489488bdeebe66ad2a22943f17d3a198e60b6a07bd`
+- `DOSBox.exe` 0.74-3, 3,745,792 bytes:
+  `dcfd46fa521f5ce89dce3bf026056f3a1d15533f80321ee887403e30d7949f5e`
+
+Successful original startup does not establish an equivalent engine baseline.
+The prototype engine still starts with independently initialized state; do not
+arm shared gameplay merely because the original save has loaded. Map identity,
+coordinates, facing, party and event state still need independent alignment.
+
 For TypeScript mod SDK authoring (requires Node.js and npm):
 
 ```bash

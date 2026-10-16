@@ -2,6 +2,11 @@
 
 ## 2026-10-16
 
+- Verify and document the inspected Steam build's startup path: Enter reaches
+  the original party menu without a manual/code-wheel lookup; Load Saved Game,
+  slot A reaches 3D exploration. Repeat through harness staging on a fresh
+  private copy, record build fingerprints, and keep startup evidence separate
+  from matching engine state or gameplay parity. No game binary is patched.
 - Add opt-in shared input for the comparison controller: one ordered action
   stream concurrently drives the engine and a directly launched owned SDL 1.2
   reference window. Add explicit action/menu mappings, relative-facing movement
