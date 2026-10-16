@@ -6,7 +6,7 @@ An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playi
 DAX/GEO/ECL decoding, selector routing, a minimal ECL VM, and terminal exploration
 with state persistence are implemented. A standalone Pool of Radiance map/event
 has been exercised against user-owned Steam resources. Full campaign startup,
-combat, rendering, and embedded JS remain unimplemented; game compatibility is
+combat, original-asset rendering, and embedded JS remain unimplemented; game compatibility is
 still unverified. See the [local validation scope](docs/research/local-validation-2026-10-15.md).
 
 ## What actually works today
@@ -24,6 +24,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - ECL typed operands, five lifecycle entries and bounded selector-table routing; unsupported/state-dependent static routes remain unresolved.
 - Minimal deterministic ECL VM with typed memory, conditional branches, subroutines, text, menus, indexed memory reads and combat host callbacks.
 - Terminal map movement and local save/restore, including original-event output and persisted menu state in one standalone map/ECL pair.
+- Optional SDL3 exploration window with procedural walls, map overview, event text/menus and save/load; see [renderer controls and limits](runtime/README.md).
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run
@@ -39,7 +40,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-On Windows, install Boost through vcpkg or another supported CMake environment, then configure with your chosen generator and toolchain. The program presently has no SDL/UI dependencies.
+On Windows, install Boost through vcpkg or another supported CMake environment, then configure with your chosen generator and toolchain. Headless builds have no SDL/UI dependencies; enable `GOLDBOX_BUILD_RENDERER` and supply SDL3 >=3.2 for the exploration window.
 
 For WSL builds, use `bash scripts/wsl-build.sh --no-tests=error` after configuring.
 The wrapper serializes builds, uses `-j2`, and bounds build/test duration. Put a

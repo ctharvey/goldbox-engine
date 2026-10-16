@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Add an optional SDL3 exploration renderer: procedural first-person walls,
+  revealed map overview, movement/turning, ECL text and menus, save/load, and
+  event-driven redraw. Keep headless builds and the JSONL protocol available.
+  Add synthetic geometry and SDL event-loop tests and dependency attribution.
+  Original artwork, full campaign startup and graphical parity remain unverified.
+
 - Verify and document the inspected Steam build's startup path: Enter reaches
   the original party menu without a manual/code-wheel lookup; Load Saved Game,
   slot A reaches 3D exploration. Repeat through harness staging on a fresh

@@ -39,6 +39,13 @@ target_link_libraries(goldbox_geo_tests PRIVATE goldbox_formats)
 add_test(NAME goldbox_geo_tests COMMAND goldbox_geo_tests)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+if(GOLDBOX_BUILD_RENDERER)
+    add_executable(goldbox_renderer_tests renderer_test.cpp)
+    target_link_libraries(goldbox_renderer_tests PRIVATE goldbox_runtime SDL3::SDL3)
+    add_test(NAME goldbox_renderer_tests COMMAND goldbox_renderer_tests ${CMAKE_CURRENT_BINARY_DIR}/renderer-save.json)
+    set_tests_properties(goldbox_renderer_tests PROPERTIES TIMEOUT 20
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
+endif()
 add_executable(goldbox_ecl_dispatch_tests ecl_dispatch_test.cpp)
 target_link_libraries(goldbox_ecl_dispatch_tests PRIVATE goldbox_formats)
 add_test(NAME goldbox_ecl_dispatch_tests COMMAND goldbox_ecl_dispatch_tests)

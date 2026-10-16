@@ -1,0 +1,17 @@
+Bundled font notice from SDL3 src/render/SDL_render_debug_font.h
+Revision: 7f3ae3d57459e59943a4ecfefc8f6277ec6bf540
+No font bitmap data is vendored here.
+
+; Summary: font8_8.asm
+; 8x8 monochrome bitmap fonts for rendering
+;
+; Author:
+;     Marcel Sondaar
+;     International Business Machines (public domain VGA fonts)
+;
+; License:
+;     Public Domain
+;
+
+The surrounding SDL source code carries the zlib notice preserved separately
+in SDL3-zlib.txt.

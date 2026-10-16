@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "goldbox/exploration.hpp"
 #include "goldbox/game_profile.hpp"
+#ifdef GOLDBOX_RENDERER
+#include "view.hpp"
+#endif
 
 #include <filesystem>
 #include <fstream>
@@ -253,12 +256,18 @@ int run_harness(goldbox::ExplorationSession& session, const std::string& source_
 } // namespace
 
 int main(int argc, char** argv) {
+    const bool window = argc > 1 && std::string_view(argv[1]) == "--window";
+    if (window) { --argc; ++argv; }
     const bool harness = argc > 1 && std::string_view(argv[1]) == "--harness";
     if (harness) { --argc; ++argv; }
     try {
+        if (window && harness) throw std::runtime_error("Window and harness modes are separate");
+#ifndef GOLDBOX_RENDERER
+        if (window) throw std::runtime_error("Build with GOLDBOX_BUILD_RENDERER=ON for --window");
+#endif
         if (argc != 7) {
             if (harness) throw ProtocolError("Harness mode requires six resource/save arguments");
-            std::cout << "Usage: goldbox_explore [--harness] <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id> <local-save.json>\n"
+            std::cout << "Usage: goldbox_explore [--harness|--window] <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id> <local-save.json>\n"
                          "Explicit map/ECL pairing required. Unverified exploration pilot; no complete game support.\n"
                          "With --harness as the first argument, the same six arguments run the JSONL protocol instead.\n";
             return argc == 1 ? 0 : 1;
@@ -289,6 +298,9 @@ int main(int argc, char** argv) {
         if (harness) {
             return run_harness(session, source_identity, save);
         }
+#ifdef GOLDBOX_RENDERER
+        if (window) return goldbox::run_exploration_window(session, source_identity, save);
+#endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {
             const auto result = session.trigger(kind, host);

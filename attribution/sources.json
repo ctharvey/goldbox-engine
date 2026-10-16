@@ -101,7 +101,10 @@
       "project": "Gold Box Explorer",
       "upstreamRepository": "https://github.com/bsimser/Gold-Box-Explorer",
       "upstreamRevision": "eac30abaa6ee66aea6f5d65ebe6d676b10015a8f",
-      "upstreamFiles": ["src/Common/Plugins/Dax/DaxFile.cs", "src/Common/Plugins/DaxEcl/Program.cs"],
+      "upstreamFiles": [
+        "src/Common/Plugins/Dax/DaxFile.cs",
+        "src/Common/Plugins/DaxEcl/Program.cs"
+      ],
       "license": "MIT",
       "licenseFile": "licenses/gold-box-explorer-MIT.txt",
       "licenseUrl": "https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/LICENSE",
@@ -120,16 +123,62 @@
       "upstreamFiles": [
         "src/Engine/ModInfo.cpp",
         "src/Mod/Mod.cpp",
-        "src/Engine/Options.cpp"
+        "src/Engine/Options.cpp",
+        "src/Engine/SurfaceSet.h"
       ],
       "license": "GPL-3.0-or-later",
       "licenseFile": null,
       "licenseUrl": "https://github.com/OpenXcom/OpenXcom/blob/master/LICENSE.txt",
       "copyrightNotice": "Copyright 2010-2016 OpenXcom Developers (as in source-file notices)",
       "localFiles": [],
-      "purpose": "Research master mod, extension metadata, ruleset overlays and configuration conventions",
+      "purpose": "Research master mod, extension metadata, ruleset overlays and configuration conventions; evaluate indexed sprite surfaces for the SDL3 view",
       "modifications": "No OpenXcom source copied; only architectural conventions inform Goldbox Engine design.",
-      "reviewed": "2026-10-12"
+      "reviewed": "2026-10-16"
+    },
+    {
+      "id": "sdl3",
+      "kind": "dependency",
+      "project": "Simple DirectMedia Layer",
+      "upstreamRepository": "https://github.com/libsdl-org/SDL",
+      "upstreamRevision": "7f3ae3d57459e59943a4ecfefc8f6277ec6bf540",
+      "version": "3.2.28 validated locally; SDL >=3.2 supplied by builder",
+      "upstreamFiles": [
+        "include/SDL3/SDL.h",
+        "include/SDL3/SDL_render.h",
+        "include/SDL3/SDL_events.h",
+        "LICENSE.txt"
+      ],
+      "license": "Zlib",
+      "licenseFile": "licenses/SDL3-zlib.txt",
+      "licenseUrl": "https://github.com/libsdl-org/SDL/blob/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/LICENSE.txt",
+      "copyrightNotice": "Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>",
+      "localFiles": [
+        "runtime/window.cpp",
+        "runtime/CMakeLists.txt"
+      ],
+      "purpose": "Optional window, input, software/accelerated geometry and temporary ASCII debug font",
+      "modifications": "Unmodified external library, linked via SDL3::SDL3; no SDL source or font copied. Independent GEO ray casting and application UI. Preserve supplied SDL notices when distributing its binaries.",
+      "reviewed": "2026-10-16"
+    },
+    {
+      "id": "sdl3-debug-font",
+      "kind": "dependency",
+      "project": "SDL3 bundled debug font",
+      "upstreamRepository": "https://github.com/libsdl-org/SDL",
+      "upstreamRevision": "7f3ae3d57459e59943a4ecfefc8f6277ec6bf540",
+      "upstreamFiles": [
+        "src/render/SDL_render_debug_font.h"
+      ],
+      "license": "Public Domain (upstream font notice)",
+      "licenseFile": "licenses/SDL3-debug-font-PD.txt",
+      "licenseUrl": "https://github.com/libsdl-org/SDL/blob/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/src/render/SDL_render_debug_font.h",
+      "copyrightNotice": "Marcel Sondaar; International Business Machines (public domain VGA fonts)",
+      "localFiles": [
+        "runtime/window.cpp"
+      ],
+      "purpose": "Temporary ASCII font through SDL_RenderDebugText",
+      "modifications": "Unmodified resource embedded by external SDL3; no glyph data copied into the repository. Header has SDL zlib code notice plus a separate public-domain font notice.",
+      "reviewed": "2026-10-16"
     }
   ]
 }

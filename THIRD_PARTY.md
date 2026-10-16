@@ -7,6 +7,20 @@
 | Library | License | Use | Distribution |
 |---|---|---|---|
 | Boost.JSON (Boost 1.75+, tested with 1.83) | Boost Software License 1.0 | JSON parsing/serialization | Supplied by package manager; not vendored |
+| SDL3 (>=3.2, tested with 3.2.28) | zlib | Optional exploration window, input, rendering and temporary debug font | External unmodified library; preserve its notices with binary distributions |
+
+SDL3 was validated at `7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`.
+Copyright (C) 1997-2025 Sam Lantinga. The exact notice is preserved in
+[licenses/SDL3-zlib.txt](licenses/SDL3-zlib.txt). Integration lives in
+`runtime/window.cpp` and `runtime/CMakeLists.txt`; no upstream implementation or
+font files are copied. SDL replaces platform backend work; GEO view geometry and
+application UI are independent project code. Its embedded debug font has a
+separate **Public Domain** notice naming Marcel Sondaar and International
+Business Machines in `src/render/SDL_render_debug_font.h`; preserved in
+[licenses/SDL3-debug-font-PD.txt](licenses/SDL3-debug-font-PD.txt) and separately
+registered as a dependency. No glyph data is vendored. OpenXcom `src/Engine/SurfaceSet.h`
+was additionally examined at `4a4bae5fa2e5a09282928e84943fc84b093e34ff` as
+research only (GPL-3.0-or-later); its sprite surfaces were not adopted.
 
 Upstream: https://github.com/boostorg/json
 License: https://www.boost.org/LICENSE_1_0.txt
