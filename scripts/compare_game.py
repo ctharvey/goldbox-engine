@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Bounded single-comparison preview controller; unpaired/inconclusive slice.
 
-Runs one engine JSONL harness session beside one reference process, renders
-engine events for a human operator, and never claims parity. See README.md
+Runs one engine JSONL harness session beside one reference process, optionally
+mirrors mapped input to an owned SDL window, and never claims parity. See README.md
 for the version-1 session configuration and its prerequisites.
 """
 import ctypes
@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 import uuid
+from reference_input import ReferenceInputError, WindowsMessages, key_sequence, validate_config
 
 if os.name == "nt":
     import ctypes.wintypes
@@ -151,7 +152,7 @@ def parse_config(path):
                            if backend == "wsl" else {"backend", "command", "cwd"})
     if extra:
         raise ControlledError(f"unsupported engine fields: {sorted(extra)}")
-    extra = set(reference) - {"command", "cwd"}
+    extra = set(reference) - {"command", "cwd", "input"}
     if extra:
         raise ControlledError(f"unsupported reference fields: {sorted(extra)}")
     if backend == "wsl":
@@ -171,6 +172,14 @@ def parse_config(path):
     reference_cwd = _absolute_dir(reference.get("cwd"), "reference.cwd")
     if not _contains(private_root, reference_cwd):
         raise ControlledError("reference.cwd must be inside privateRoot")
+    reference_input = reference.get("input")
+    if "input" in reference:
+        try:
+            validate_config(reference_input)
+        except ReferenceInputError as error:
+            raise ControlledError(str(error)) from error
+        if os.name != "nt":
+            raise ControlledError("reference.input windows-messages requires Windows")
 
     timeout = _number_field(config, "timeoutSeconds", DEFAULT_TIMEOUT,
                             MIN_TIMEOUT, MAX_TIMEOUT, "configuration")
@@ -181,7 +190,7 @@ def parse_config(path):
         "engine": {"argv": _argv_field(engine, "command", "engine"),
                    "cwd": engine_cwd, "backend": backend, "distribution": distribution},
         "reference": {"argv": _argv_field(reference, "command", "reference"),
-                      "cwd": reference_cwd},
+                      "cwd": reference_cwd, "input": reference_input},
         "timeout": float(timeout),
         "checkpoint": float(checkpoint),
     }
@@ -433,13 +442,13 @@ class OwnedProcess:
         self.killed = False
 
     @classmethod
-    def launch(cls, argv, cwd):
+    def launch(cls, argv, cwd, env=None):
         if os.name == "nt":
-            return cls._launch_windows(argv, cwd)
-        return cls._launch_posix(argv, cwd)
+            return cls._launch_windows(argv, cwd, env=env)
+        return cls._launch_posix(argv, cwd, env=env)
 
     @classmethod
-    def _launch_windows(cls, argv, cwd, allow_wsl=False):
+    def _launch_windows(cls, argv, cwd, allow_wsl=False, env=None):
         if not allow_wsl:
             _reject_wsl(argv)
         kernel32 = _KERNEL32
@@ -459,7 +468,7 @@ class OwnedProcess:
         try:
             process = subprocess.Popen(
                 argv, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, creationflags=CREATE_SUSPENDED)
+                stderr=subprocess.PIPE, creationflags=CREATE_SUSPENDED, env=env)
         except OSError as error:
             kernel32.CloseHandle(ctypes.wintypes.HANDLE(job))
             raise ControlledError(f"cannot launch {argv[0]!r}: {error}") from error
@@ -507,11 +516,11 @@ class OwnedProcess:
         return cls(job, process, None)
 
     @classmethod
-    def _launch_posix(cls, argv, cwd):
+    def _launch_posix(cls, argv, cwd, env=None):
         try:
             process = subprocess.Popen(
                 argv, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, start_new_session=True)
+                stderr=subprocess.PIPE, start_new_session=True, env=env)
         except OSError as error:
             raise ControlledError(f"cannot launch {argv[0]!r}: {error}") from error
         return cls(None, process, process.pid)
@@ -898,7 +907,7 @@ class EngineStdoutReader(threading.Thread):
 USAGE = "usage: compare_game.py <session-config.json>"
 
 
-def _render_ready(document):
+def _render_ready(document, dual=False):
     if document.get("type") != "ready":
         raise ControlledError(
             f"engine protocol violation: first event type {document.get('type')!r}, not ready")
@@ -920,8 +929,9 @@ def _render_ready(document):
     print(f"  protocol 1; source_identity={identity[:64]}")
     print("  " + ", ".join(parts) + "; baseline unverified-empty")
     print("[note] this comparison is unpaired and inconclusive; no parity result is produced.")
-    print("[note] the reference window is driven manually; this console only drives the")
-    print("[note] rebuilt engine side. Do not paste proprietary original text here.")
+    if not dual:
+        print("[note] the reference window is driven manually; this console only drives the")
+        print("[note] rebuilt engine side. Do not paste proprietary original text here.")
 
 
 def _render_text(document):
@@ -1016,6 +1026,11 @@ class Session:
         self.last_menu_id = 0
         self.end_notes = []
         self.drain_watch = []
+        self.reference_input = None
+        self.armed = False
+        self.facing = None
+        if config["reference"].get("input") is not None:
+            self.reference_input = WindowsMessages(reference.process, config["reference"]["input"])
 
     def run(self):
         self._await_ready()
@@ -1089,7 +1104,10 @@ class Session:
 
     def _await_ready(self):
         document = self._next_event("engine never became ready")
-        _render_ready(document)
+        _render_ready(document, self.reference_input is not None)
+        self.facing = document["facing"]
+        if self.reference_input is not None:
+            print("[dual input] disarmed. Use 'reference KEY ...' to stage the original, then 'arm'.")
         self.last_summary = "ready"
 
     def _heartbeat(self):
@@ -1100,8 +1118,11 @@ class Session:
             self.last_checkpoint = time.monotonic()
             print(f"[checkpoint {self.config['timeout'] - remaining:0.0f}s elapsed; "
                   f"{remaining:0.0f}s remain; last engine event: {self.last_summary}]")
-            print("[note] original-side manual tiling: issue the corresponding action in the "
-                  "reference window's own console; this controller never sends it keys.")
+            if self.reference_input is None:
+                print("[note] original-side manual tiling: issue the corresponding action in the "
+                      "reference window's own console; this controller never sends it keys.")
+            else:
+                print("[dual input] one action stream; reference state remains independently unverified")
 
     def _next_event(self, timeout_note):
         while True:
@@ -1147,8 +1168,27 @@ class Session:
         if not item:
             return
         verb = item.lower()
+        if verb in ("arm", "disarm") or verb.startswith("reference "):
+            if self.reference_input is None:
+                raise ControlledError("reference input is not configured")
+            if verb == "arm":
+                self.reference_input.window()
+                self.armed = True
+                print("[dual input] armed; action/menu keys go to both sides. Baseline remains unverified.")
+            elif verb == "disarm":
+                self.armed = False
+                print("[dual input] disarmed")
+            else:
+                if self.armed:
+                    raise ControlledError("disarm before sending reference-only staging keys")
+                keys = key_sequence(item.upper().split()[1:])
+                self._send(None, keys)
+                print("[reference] staging keys delivered")
+            return
         if verb == "help":
             print("accepted engine commands: " + ", ".join(COMMANDS))
+            if self.reference_input is not None:
+                print("dual input: reference KEY ..., arm, disarm; quit closes both owned trees")
             print("[note] menus accept a zero-based choice number shown alongside each entry.")
             return
         if verb not in COMMANDS:
@@ -1175,39 +1215,55 @@ class Session:
     def _dispatch(self, command):
         """Issue the semantic request with the next strictly increasing id."""
         self._pump_idle_events()
+        keys = None
+        if self.reference_input is not None and command != "quit":
+            if not self.armed:
+                raise ControlledError("dual input is disarmed; stage both sides before 'arm'")
+            keys = self.reference_input.mapping.action(command, self.facing)
         action_id = self.next_id
         self.next_id += 1
-        self._send({"id": action_id, "action": command})
+        self._send({"id": action_id, "action": command}, keys)
         self.pending_id = action_id
         self.last_event_seen = time.monotonic()
         if command == "quit":
             self.quit_requested = True
-        else:
+        elif self.reference_input is None:
             print("[note] manual original-side step: issue the same action in the "
                   "reference window; this console only drives the rebuilt engine side.")
         print(f"[engine] sent action id {action_id}: {command}")
+        if keys is not None:
+            print(f"[dual input id={action_id}] delivered to both sides (baseline unverified)")
 
-    def _send(self, document):
+    def _send(self, document, reference_keys=None):
         failures = []
-        finished = threading.Event()
+        gate = threading.Event()
+        limit = min(self.deadline, time.monotonic() + self.config["checkpoint"])
 
         def write():
-            try:
-                self.engine.process.stdin.write((json.dumps(document) + "\n").encode("utf-8"))
-                self.engine.process.stdin.flush()
-            except (OSError, ValueError) as error:
-                failures.append(error)
-            finally:
-                finished.set()
+            self.engine.process.stdin.write((json.dumps(document) + "\n").encode("utf-8"))
+            self.engine.process.stdin.flush()
 
-        threading.Thread(target=write, daemon=True).start()
-        limit = min(self.deadline, time.monotonic() + self.config["checkpoint"])
-        while not finished.wait(EVENT_WAIT_SLICE):
+        def worker(action):
+            gate.wait()
+            try:
+                action()
+            except Exception as error:  # A failed worker must never look like delivered input.
+                failures.append(error)
+
+        actions = [write] if document is not None else []
+        if reference_keys is not None:
+            actions.append(lambda: self.reference_input.send(reference_keys, limit))
+        threads = [threading.Thread(target=worker, args=(action,), daemon=True) for action in actions]
+        for thread in threads:
+            thread.start()
+        gate.set()
+        while any(thread.is_alive() for thread in threads):
             self._check_housekeeping()
             if time.monotonic() >= limit:
-                raise ControlledError("engine input write exceeded its bounded deadline")
+                raise ControlledError("input dispatch exceeded its bounded deadline; delivery may be partial")
+            time.sleep(0.01)
         if failures:
-            raise ControlledError(f"cannot write to the engine stdin: {failures[0]}")
+            raise ControlledError(f"input dispatch failed; delivery may be partial, do not retry: {failures[0]}")
 
     def _serve_action(self):
         document = self._next_event(f"action {self.pending_id} never completed")
@@ -1239,11 +1295,16 @@ class Session:
             print(f"[ignored] menu choice {choice} lies outside the offered range "
                   f"[0, {len(choices) - 1}]; re-enter it")
             return
+        keys = None
+        if self.reference_input is not None:
+            keys = self.reference_input.mapping.choice(menu_id, choice, len(choices))
         self.pending_menu = None
         self.last_event_seen = time.monotonic()
-        self._send({"id": action_id, "menu_id": menu_id, "choice": choice})
+        self._send({"id": action_id, "menu_id": menu_id, "choice": choice}, keys)
         print(f"[engine] sent menu response: action id {action_id}, menu id {menu_id}, "
               f"choice {choice}")
+        if keys is not None:
+            print(f"[dual input id={action_id} menu={menu_id}] delivered to both sides")
 
     def _consume(self, document):
         event_type = document.get("type")
@@ -1283,6 +1344,9 @@ class Session:
             return
         if event_type == "complete":
             _render_complete(document)
+            self.facing = document["facing"]
+            if self.reference_input is not None and document["status"] == "unsupported":
+                raise ControlledError("engine action unsupported; dual input stopped before another action")
             if self.quit_requested and document["status"] != "ok":
                 raise ControlledError("engine did not successfully acknowledge quit")
             self.last_summary = f"complete status {document.get('status')!r} (id {event_id})"
@@ -1319,8 +1383,11 @@ def run_session(config):
         stderr_reader = _BoundedDrain(engine.process.stderr, "engine stderr",
                                       REFERENCE_OUTPUT_LIMIT)
         stderr_reader.start()
+        reference_env = None
+        if config["reference"].get("input") is not None:
+            reference_env = dict(os.environ, SDL_VIDEODRIVER="windib")
         reference = OwnedProcess.launch(config["reference"]["argv"],
-                                        config["reference"]["cwd"])
+                                        config["reference"]["cwd"], env=reference_env)
         ref_drains = [_BoundedDrain(reference.process.stdout, "reference stdout",
                                     REFERENCE_OUTPUT_LIMIT),
                       _BoundedDrain(reference.process.stderr, "reference stderr",
@@ -1381,6 +1448,9 @@ def main(argv):
         _announce(notes)
         return code
     except ControlledError as error:
+        print(f"compare_game: {error}", file=sys.stderr)
+        return 1
+    except ReferenceInputError as error:
         print(f"compare_game: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:

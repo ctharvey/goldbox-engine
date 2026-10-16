@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Add opt-in shared input for the comparison controller: one ordered action
+  stream concurrently drives the engine and a directly launched owned SDL 1.2
+  reference window. Add explicit action/menu mappings, relative-facing movement
+  translation, disarmed reference staging, bounded key delivery and failure
+  handling without global keyboard injection. Add synthetic mapping/Windows
+  integration tests; synchronized input does not claim equivalent game state.
 - Add an explicit Windows-to-WSL engine backend to the comparison controller.
   A bounded Linux supervisor forwards the existing protocol and enforces a
   renewable controller lease, independent deadline, reserved process-group

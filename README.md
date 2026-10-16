@@ -194,9 +194,9 @@ Operational prerequisites and rules:
 - The operator console renders engine `text`, ordered numbered menu choices,
   position/facing and unsupported diagnostics; raw protocol JSON stays out of
   the normal display. Requests carry strict positive increasing ids; menu
-  responses reuse the exact pending action/menu ids. The reference side
-  stays **fully manual** (its own window/console; the controller never sends
-  keys to other windows); checkpoint notes remind you to mirror each action.
+  responses reuse the exact pending action/menu ids. Reference input is manual
+  by default. The optional shared-input mode below sends mapped keys only to
+  the reference process's owned SDL window.
 - Engine `error` events, malformed/out-of-order events, unexpected engine EOF,
   early reference exit, stdout flood (>64 MiB), overlong lines (>8 MiB) and the
   session deadline are all explicit failures that terminate the owned trees;
@@ -256,10 +256,82 @@ Linux CI runs `goldbox_wsl_supervisor_tests`. On a Windows machine with Ubuntu,
 operator idle lease renewal, controller crashes and unrelated Linux-session
 survival. Optionally pass the absolute Linux engine executable and profile paths
 as two arguments to include compiled-engine synthetic event/save validation.
-These tests launch synthetic children only. This adapter does not automate the
-original game or establish parity. The implementation uses the Python standard
+These tests launch synthetic children only. The WSL adapter does not establish
+parity; original-game input is handled by the separate opt-in mode below.
+The implementation uses the Python standard
 library and documented [Linux process-group behavior](https://man7.org/linux/man-pages/man2/setsid.2.html);
 no third-party source was copied or adapted.
+
+#### Shared input for both sides (Windows, SDL 1.2 reference)
+
+Add `input` to the existing `reference` object. Launch the reference DOSBox
+executable directly, using a private working copy and configuration that mounts
+only that copy. Batch/Steam launchers are not supported for shared input: the
+SDL window must belong to the exact launched reference PID.
+
+```json
+"input": {
+  "backend": "windows-messages",
+  "relativeMovement": {
+    "forward": ["UP"], "left": ["LEFT"], "right": ["RIGHT"]
+  },
+  "actions": {"search": ["S"]},
+  "menus": {"1": [["Y"], ["N"]]}
+}
+```
+
+This is a mapping example, not a verified Pool event/menu profile. Supply the
+actual original-game hotkeys for each supported action and exact engine menu
+ID/choice ordering. Mapping `1` above is usable only for an independently
+identified two-choice menu. Missing mappings or mismatched choice counts stop
+before either side is dispatched. `save`, `load` and `init` also need explicit
+reference mappings; engine saves are not SSI saves. `quit` is controller shutdown
+and closes both owned process trees without needing an in-game quit mapping.
+
+The controller launches both sides disarmed. The same stdin command stream can
+be written by a person or an LLM driver:
+
+```text
+reference ENTER
+arm
+east
+search
+1
+quit
+```
+
+Use `reference KEY ...` only while disarmed to stage the original from observed
+screens. Supported keys include letters, digits, arrows, `ENTER`, `ESC`, `SPACE`,
+`TAB`, `HOME`, `END`, `BACKSPACE`, and `KP_0`..`KP_9`; sequences are bounded to
+16 keys. `arm` asserts that both sides are ready with matching facing; it does
+not verify their state. `disarm` returns to staging. Relative movement computes
+turns from the last engine facing before sending forward; alternatively, omit
+`relativeMovement` and provide explicit absolute direction action mappings.
+Unsupported engine actions stop shared input before another action is sent.
+
+Each mapped action or menu response starts engine and reference delivery from
+one dispatch gate and waits for both deliveries before accepting the next.
+This is concurrent ordered delivery, not atomic execution or a shared emulator
+clock. Failure can occur after one side receives input; the controller stops
+both sides, reports possible partial delivery, and never retries automatically.
+Win32 acknowledgment means the window processed keyboard messages, not that
+the original game completed an action or reached an equivalent state. Reference
+observation and gameplay parity remain separate work.
+
+The backend forces `SDL_VIDEODRIVER=windib` only for the reference child. It uses
+bounded key-down/up messages to exactly one visible `SDL_app` window of that
+owned PID, rechecks ownership for each key, and never broadcasts, changes
+foreground focus, or injects global keyboard input. Ambiguous or missing windows
+fail closed. This is an SDL 1.2 backend, not generic support for SDL 2 or arbitrary
+emulators. Research used documented
+[Win32 messages](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw)
+and the upstream [SDL 1.2 message handler](https://github.com/libsdl-org/SDL-1.2/blob/main/src/video/windib/SDL_dibevents.c);
+no upstream implementation was copied.
+
+`python tests/reference_input_test.py` checks mapping on every platform and,
+on Windows, actual message delivery to synthetic reference windows, shared
+movement/menu input, disarmed/missing-map rejection, hung-window cancellation,
+and an unrelated SDL window receiving no keys. CTest registers the same suite.
 
 For TypeScript mod SDK authoring (requires Node.js and npm):
 
