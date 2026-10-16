@@ -135,6 +135,89 @@ protocol instead of the terminal prompt:
 
 Optional: add `--save-meta session.json` to create non-overwriting session metadata. This records only **the startup configuration**, not gameplay state.
 
+### Bounded side-by-side preview controller (experimental, inconclusive)
+
+`python scripts/compare_game.py <session-config.json>` drives **one** engine
+harness session (the child engine command already carries `--harness` and its
+explicit resource/save arguments) next to **one** reference process, renders
+engine events for a human operator, and **never claims parity**: the session is
+unpaired/inconclusive by design and no MATCH result is produced.
+
+Version-1 session configuration (trusted local execution input; the controller
+spawns with `shell=False` and never interpolates shell text; validated fully
+before anything is spawned):
+
+```json
+{
+  "schemaVersion": 1,
+  "privateRoot": "C:/outside/the/repository/compare-work",
+  "engine": {"command": ["build/apps/goldbox_explore.exe", "--harness",
+                         "games/pool-of-radiance/profile.json", "..."],
+             "cwd": "C:/abs/engine/dir"},
+  "reference": {"command": ["C:/abs/reference/launcher.exe"],
+                "cwd": "C:/outside/the/repository/compare-work/reference-copy"},
+  "timeoutSeconds": 60,
+  "checkpointSeconds": 10
+}
+```
+
+Operational prerequisites and rules:
+
+- Prepare a **private reference working copy** yourself; the controller never
+  copies installed games or edits their config files. Point the reference
+  command at that prepared copy and its graphical game/emulator window.
+  Keep saves, captures and reports outside the repository. Any
+  runnable reference command can still escape its `cwd` on its own; the
+  controller does not claim sandboxing of arbitrary reference programs.
+- `privateRoot` must be an existing absolute directory outside the repository;
+  `reference.cwd` is required inside `privateRoot`. `timeoutSeconds` (default
+  60, range 1..600) bounds the whole session; `checkpointSeconds` (default 10,
+  positive, at most the total) prints known session state periodically and
+  bounds inactivity while waiting for engine startup or an action response.
+  Operator/menu input may wait until the total deadline.
+- The controller holds an OS-backed single-session lock in `privateRoot`
+  (`goldbox-compare.lock`; released on exit, no stale-lock deletion), then
+  launches **both children as fully owned trees**:
+  - Windows: a session Job Object with kill-on-close; the child is started
+    suspended, assigned to the job, then resumed (no spawn-before-assignment
+    escape race). Job Objects support killing every member on close or on
+    explicit termination (see
+    [Microsoft Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)).
+  - POSIX: a dedicated session (`setsid`), so the descendant process group is
+    killed via `killpg` at cleanup, even when the leader already exited.
+    Trusted children must remain in that group; this is not containment for
+    programs that deliberately detach into new sessions.
+  - **WSL is explicitly rejected on Windows** (`wsl.exe`/`wslg.exe`, and the
+    `System32\bash.exe` WSL redirector): a Job Object cannot own a `wsl.exe`
+    launcher's Linux children, so no Linux tree guarantee is possible yet. An
+    owned Linux-group adapter for Windows callers remains unfinished; use the
+    native POSIX path (or native Windows executables) instead.
+- The operator console renders engine `text`, ordered numbered menu choices,
+  position/facing and unsupported diagnostics; raw protocol JSON stays out of
+  the normal display. Requests carry strict positive increasing ids; menu
+  responses reuse the exact pending action/menu ids. The reference side
+  stays **fully manual** (its own window/console; the controller never sends
+  keys to other windows); checkpoint notes remind you to mirror each action.
+- Engine `error` events, malformed/out-of-order events, unexpected engine EOF,
+  early reference exit, stdout flood (>64 MiB), overlong lines (>8 MiB) and the
+  session deadline are all explicit failures that terminate the owned trees;
+  controller input waiting never blocks past the deadline. Graceful success
+  exists only through an acknowledged `quit`, clean engine exit, drained
+  output and verified cleanup. EOF/Ctrl-C/deadline exits fail inconclusively.
+  Original-side/reference output is drained
+  with hard byte bounds and never rendered or logged.
+- Synthetic tests run through the real CLI entry point (and are ctest-bound as
+  `goldbox_compare_game_tests`); they cover the valid
+  flow and exact id order, malformed configs/protocol, failures, deadline and
+  flood, owned-descendant cleanup with an unrelated sentinel surviving, lock
+  contention and release, spaced/metacharacter paths with no shell
+  interpretation, and an explicit absence of parity-MATCH claims. CTest also
+  runs the controller against the compiled engine with synthetic DAX/GEO/ECL
+  resources and verifies event state persistence. The controller-only suite
+  can run without a build: `python tests/compare_game_test.py`. Research on
+  the underlying APIs used [the Python subprocess docs](https://docs.python.org/3.12/library/subprocess.html)
+  and the Job Objects page above; no third-party code was adopted.
+
 For TypeScript mod SDK authoring (requires Node.js and npm):
 
 ```bash
