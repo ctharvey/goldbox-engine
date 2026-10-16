@@ -2,6 +2,13 @@
 
 ## 2026-10-16
 
+- Add an explicit Windows-to-WSL engine backend to the comparison controller.
+  A bounded Linux supervisor forwards the existing protocol and enforces a
+  renewable controller lease, independent deadline, reserved process-group
+  ownership, supervisor-loss cleanup and verified shutdown acknowledgment.
+  Existing native configurations and raw WSL-launcher rejection remain intact.
+  Add synthetic Linux and actual Windows/WSL transport/failure tests; no
+  original-game compatibility or parity is claimed.
 - Add the bounded, python-stdlib `scripts/compare_game.py` preview controller
   for one supervised engine JSONL session beside one manually driven reference
   process: version-1 validated session config, OS-backed session lock,

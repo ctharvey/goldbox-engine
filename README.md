@@ -187,11 +187,10 @@ Operational prerequisites and rules:
     killed via `killpg` at cleanup, even when the leader already exited.
     Trusted children must remain in that group; this is not containment for
     programs that deliberately detach into new sessions.
-  - **WSL is explicitly rejected on Windows** (`wsl.exe`/`wslg.exe`, and the
-    `System32\bash.exe` WSL redirector): a Job Object cannot own a `wsl.exe`
-    launcher's Linux children, so no Linux tree guarantee is possible yet. An
-    owned Linux-group adapter for Windows callers remains unfinished; use the
-    native POSIX path (or native Windows executables) instead.
+  - Windows callers can select the explicit WSL engine adapter described below.
+    Raw `wsl.exe`/`wslg.exe` and the `System32\bash.exe` redirector remain
+    rejected as native commands: a Windows Job Object alone cannot own their
+    Linux children.
 - The operator console renders engine `text`, ordered numbered menu choices,
   position/facing and unsupported diagnostics; raw protocol JSON stays out of
   the normal display. Requests carry strict positive increasing ids; menu
@@ -217,6 +216,50 @@ Operational prerequisites and rules:
   can run without a build: `python tests/compare_game_test.py`. Research on
   the underlying APIs used [the Python subprocess docs](https://docs.python.org/3.12/library/subprocess.html)
   and the Job Objects page above; no third-party code was adopted.
+
+#### Engine inside WSL, reference window on Windows
+
+Run the controller with Windows Python and replace only the `engine` object:
+
+```json
+"engine": {
+  "backend": "wsl",
+  "distribution": "Ubuntu",
+  "cwd": "/mnt/c/absolute/path/to/goldbox-engine",
+  "command": ["/mnt/c/absolute/path/to/goldbox-engine/build/apps/goldbox_explore",
+              "--harness", "games/pool-of-radiance/profile.json",
+              "/mnt/c/private/GEO.DAX", "7", "/mnt/c/private/ECL.DAX", "7",
+              "/mnt/c/private/state.json"]
+}
+```
+
+The record IDs above are placeholders for your independently verified local
+mapping. `privateRoot`, reference command and reference working directory remain
+Windows paths. Engine arguments and `cwd` are Linux paths; no automatic path
+translation is attempted. The selected distribution must already have
+`/usr/bin/python3` and `/proc`. No systemd user service, installation or network
+listener is needed. Existing configurations default to the native backend.
+
+The Linux supervisor relays the unchanged engine JSONL protocol over bounded
+pipes. A five-second renewable controller lease and an independent total
+deadline stop the session on disconnection or controller failure. Buffered stale
+heartbeats cannot extend that lease. An unreaped session anchor reserves the
+process-group ID until cleanup; it also kills its group if the supervisor dies.
+As with the native POSIX backend, trusted engine children must not deliberately
+detach into new sessions. Successful shutdown requires a session-specific
+Linux cleanup acknowledgment, drained output and clean launcher exit. A lost
+acknowledgment is an explicit failure even when the Linux deadline performs
+cleanup. No distribution-wide shutdown or process-name killing is used.
+
+Linux CI runs `goldbox_wsl_supervisor_tests`. On a Windows machine with Ubuntu,
+`python tests/wsl_engine_test.py` also checks actual WSL bridging, menu responses,
+operator idle lease renewal, controller crashes and unrelated Linux-session
+survival. Optionally pass the absolute Linux engine executable and profile paths
+as two arguments to include compiled-engine synthetic event/save validation.
+These tests launch synthetic children only. This adapter does not automate the
+original game or establish parity. The implementation uses the Python standard
+library and documented [Linux process-group behavior](https://man7.org/linux/man-pages/man2/setsid.2.html);
+no third-party source was copied or adapted.
 
 For TypeScript mod SDK authoring (requires Node.js and npm):
 

@@ -7,9 +7,11 @@ engine events for a human operator, and never claims parity. See README.md
 for the version-1 session configuration and its prerequisites.
 """
 import ctypes
+import base64
 import json
+import math
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import queue
 import shutil
 import stat
@@ -17,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 
 if os.name == "nt":
     import ctypes.wintypes
@@ -141,13 +144,30 @@ def parse_config(path):
 
     engine = _table_field(config, "engine", "configuration")
     reference = _table_field(config, "reference", "configuration")
-    extra = set(engine) - {"command", "cwd"}
+    backend = engine.get("backend", "native")
+    if backend not in ("native", "wsl"):
+        _reject(backend, "engine.backend (requires native or wsl)")
+    extra = set(engine) - ({"backend", "command", "cwd", "distribution"}
+                           if backend == "wsl" else {"backend", "command", "cwd"})
     if extra:
         raise ControlledError(f"unsupported engine fields: {sorted(extra)}")
     extra = set(reference) - {"command", "cwd"}
     if extra:
         raise ControlledError(f"unsupported reference fields: {sorted(extra)}")
-    engine_cwd = _absolute_dir(engine.get("cwd"), "engine.cwd")
+    if backend == "wsl":
+        if os.name != "nt":
+            raise ControlledError("engine.backend wsl requires a Windows controller")
+        engine_cwd = engine.get("cwd")
+        if not isinstance(engine_cwd, str) or not PurePosixPath(engine_cwd).is_absolute() \
+                or "\0" in engine_cwd:
+            raise ControlledError("WSL engine.cwd requires an absolute Linux path")
+        distribution = engine.get("distribution")
+        if not isinstance(distribution, str) or not distribution.strip() \
+                or distribution.startswith("-") or "\0" in distribution:
+            raise ControlledError("WSL engine.distribution requires a distribution name")
+    else:
+        engine_cwd = _absolute_dir(engine.get("cwd"), "engine.cwd")
+        distribution = None
     reference_cwd = _absolute_dir(reference.get("cwd"), "reference.cwd")
     if not _contains(private_root, reference_cwd):
         raise ControlledError("reference.cwd must be inside privateRoot")
@@ -159,7 +179,7 @@ def parse_config(path):
     return {
         "privateRoot": private_root,
         "engine": {"argv": _argv_field(engine, "command", "engine"),
-                   "cwd": engine_cwd},
+                   "cwd": engine_cwd, "backend": backend, "distribution": distribution},
         "reference": {"argv": _argv_field(reference, "command", "reference"),
                       "cwd": reference_cwd},
         "timeout": float(timeout),
@@ -419,8 +439,9 @@ class OwnedProcess:
         return cls._launch_posix(argv, cwd)
 
     @classmethod
-    def _launch_windows(cls, argv, cwd):
-        _reject_wsl(argv)
+    def _launch_windows(cls, argv, cwd, allow_wsl=False):
+        if not allow_wsl:
+            _reject_wsl(argv)
         kernel32 = _KERNEL32
         job = kernel32.CreateJobObjectW(None, None)
         if not job:
@@ -570,6 +591,142 @@ class OwnedProcess:
         raise ControlledError("owned process group members may still be alive")
 
 
+class WslEngine:
+    """Owned Windows launcher plus an independently bounded Linux supervisor."""
+
+    def __init__(self, native, config, duration):
+        self.native = native
+        self.process = native.process
+        self.pipe = self.process.stdin
+        self.process.stdin = self
+        self.nonce = uuid.uuid4().hex
+        self.frames = queue.Queue(maxsize=64)
+        self.failure = None
+        self.clock = None
+        self.received = None
+        self.last_renew = 0.0
+        self.closed = threading.Event()
+        self.clean = False
+        self.stopping = False
+        self.writer = threading.Thread(target=self._write_frames, daemon=True)
+        self._enqueue({"op": "start", "nonce": self.nonce, "command": config["argv"],
+                       "cwd": config["cwd"], "timeout": duration})
+        self.writer.start()
+
+    @classmethod
+    def launch(cls, config, duration):
+        source = Path(__file__).with_name("wsl_engine.py").read_text(encoding="utf-8")
+        # Pass source directly to Python; no shell expansion, path guessing,
+        # helper deployment, service installation or network listener is needed.
+        argv = ["wsl.exe", "--distribution", config["distribution"], "--exec",
+                "/usr/bin/python3", "-u", "-c", source]
+        native = OwnedProcess._launch_windows(argv, Path(__file__).resolve().parent, allow_wsl=True)
+        try:
+            return cls(native, config, duration)
+        except BaseException:
+            native.kill_tree()
+            raise
+
+    def _enqueue(self, frame):
+        data = (json.dumps(frame, allow_nan=False) + "\n").encode()
+        if len(data) > 128 * 1024:
+            raise ControlledError("WSL adapter input exceeded its bounded frame size")
+        try:
+            self.frames.put_nowait(data)
+        except queue.Full as error:
+            raise ControlledError("WSL adapter input queue exceeded its bound") from error
+
+    def _write_frames(self):
+        while True:
+            data = self.frames.get()
+            if data is None:
+                return
+            try:
+                remaining = memoryview(data)
+                while remaining:
+                    count = os.write(self.pipe.fileno(), remaining)
+                    remaining = remaining[count:]
+            except (OSError, ValueError) as error:
+                self.failure = ControlledError(f"WSL adapter input failed: {error}")
+                return
+
+    def write(self, data):
+        self._enqueue({"op": "input", "data": base64.b64encode(data).decode("ascii")})
+        return len(data)
+
+    def flush(self):
+        if self.failure is not None:
+            raise self.failure
+
+    def close(self):
+        # OwnedProcess closes this proxy only after killing the Windows job.
+        pass
+
+    def heartbeat(self):
+        if self.failure is not None:
+            raise self.failure
+        now = time.monotonic()
+        if self.clock is not None and not self.closed.is_set() and now - self.last_renew >= 0.5:
+            # An absolute Linux-clock expiry prevents buffered, stale heartbeats
+            # from extending a lease after the Windows controller has stalled.
+            until = self.clock + (now - self.received) + 5.0
+            self._enqueue({"op": "renew", "until": until})
+            self.last_renew = now
+
+    def filter_event(self, document):
+        if document.get("type") != "_goldbox_wsl":
+            return False
+        if document.get("nonce") != self.nonce:
+            raise ControlledError("WSL adapter session identity mismatch")
+        phase = document.get("phase")
+        if phase == "ready" and self.clock is None:
+            clock = document.get("clock")
+            if isinstance(clock, bool) or not isinstance(clock, (int, float)) or not math.isfinite(clock):
+                raise ControlledError("WSL adapter supplied an invalid clock")
+            self.received = time.monotonic()
+            self.clock = clock  # Publish only after the reader's clock anchor is complete.
+        elif phase == "closed" and self.clock is not None and not self.closed.is_set():
+            self.clean = document.get("clean") is True
+            self.closed.set()
+            if not self.clean:
+                raise ControlledError("WSL adapter could not verify Linux cleanup")
+            engine_exit = document.get("engine_exit")
+            if not self.stopping and (document.get("reason") != "engine exited"
+                    or isinstance(engine_exit, bool) or not isinstance(engine_exit, int) or engine_exit != 0):
+                raise ControlledError(f"WSL engine stopped: {document.get('reason')}; exit {engine_exit}")
+        else:
+            raise ControlledError("WSL adapter control event is out of order")
+        return True
+
+    def kill_tree(self):
+        self.stopping = True
+        errors = []
+        try:
+            if self.process.poll() is None:
+                try:
+                    self._enqueue({"op": "stop"})
+                except ControlledError:
+                    pass  # The independent Linux lease is still enforced.
+                try:
+                    self.process.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    errors.append("WSL adapter did not exit within its cleanup budget")
+            if not self.closed.wait(timeout=0.5) or not self.clean:
+                errors.append("Linux cleanup acknowledgment was not received")
+        finally:
+            try:
+                self.native.kill_tree()
+            finally:
+                self.pipe.close()
+                try:
+                    self.frames.put_nowait(None)
+                except queue.Full:
+                    pass
+                self.writer.join(timeout=1)
+        if errors:
+            raise ControlledError("; ".join(errors))
+
+
 class ConsoleInput(threading.Thread):
     """Bounded operator stdin reader; oversized or flooded input fails the
     session rather than being silently discarded."""
@@ -675,11 +832,12 @@ class _EventQueue:
 class EngineStdoutReader(threading.Thread):
     """Bounded JSONL reader: line-too-long and flood become failures."""
 
-    def __init__(self, stream, queue_bound):
+    def __init__(self, stream, queue_bound, filter_event=None):
         super().__init__(daemon=True)
         self.stream = stream
         self.queue = queue_bound
         self.total = 0
+        self.filter_event = filter_event
 
     def run(self):
         buffer = bytearray()
@@ -732,6 +890,8 @@ class EngineStdoutReader(threading.Thread):
                 ControlledError("engine emitted a non-object JSON document"))
             self.queue.put(("eof", None))
             return False
+        if self.filter_event is not None and self.filter_event(document):
+            return True
         return self.queue.put(("event", document))
 
 
@@ -873,6 +1033,8 @@ class Session:
             self._serve_operator()
 
     def _check_housekeeping(self):
+        if isinstance(self.engine, WslEngine):
+            self.engine.heartbeat()
         if self.engine_queue.failure is not None:
             raise self.engine_queue.failure
         for drain in self.drain_watch:
@@ -1145,16 +1307,20 @@ def run_session(config):
     session = None
     deadline = time.monotonic() + config["timeout"]
     try:
-        engine = OwnedProcess.launch(config["engine"]["argv"], config["engine"]["cwd"])
-        reference = OwnedProcess.launch(config["reference"]["argv"],
-                                        config["reference"]["cwd"])
+        if config["engine"].get("backend") == "wsl":
+            engine = WslEngine.launch(config["engine"], config["timeout"])
+        else:
+            engine = OwnedProcess.launch(config["engine"]["argv"], config["engine"]["cwd"])
         engine_queue = _EventQueue()
-        stdout_reader = EngineStdoutReader(engine.process.stdout, engine_queue)
+        stdout_reader = EngineStdoutReader(engine.process.stdout, engine_queue,
+            engine.filter_event if isinstance(engine, WslEngine) else None)
         engine_queue.reader = stdout_reader
         stdout_reader.start()
         stderr_reader = _BoundedDrain(engine.process.stderr, "engine stderr",
                                       REFERENCE_OUTPUT_LIMIT)
         stderr_reader.start()
+        reference = OwnedProcess.launch(config["reference"]["argv"],
+                                        config["reference"]["cwd"])
         ref_drains = [_BoundedDrain(reference.process.stdout, "reference stdout",
                                     REFERENCE_OUTPUT_LIMIT),
                       _BoundedDrain(reference.process.stderr, "reference stderr",

@@ -59,6 +59,11 @@ add_test(NAME goldbox_compare_game_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/compare_game_test.py $<TARGET_FILE:goldbox_explore>
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
 set_tests_properties(goldbox_compare_game_tests PROPERTIES TIMEOUT 300)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME goldbox_wsl_supervisor_tests COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/wsl_engine_test.py)
+    set_tests_properties(goldbox_wsl_supervisor_tests PROPERTIES TIMEOUT 120)
+endif()
 add_test(NAME goldbox_installation_scanner_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/installation_scanner_test.py $<TARGET_FILE:goldbox_cli>
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
