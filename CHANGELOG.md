@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-16
+
+- Add an opt-in `--harness` prefix to the exploration pilot that serves the
+  same session over flushed JSONL events (ready/text/menu/complete/error)
+  with bounded request lines, menu-response validation, and explicit
+  unsupported-status completion for unknown VM failures.
+- Preserve the human terminal pilot unchanged; harness mode reuses the shared
+  session, move/trigger paths and save/restore safeguards without a second VM.
+- Register synthetic protocol tests for state persistence, ordered menu choices,
+  unsupported instructions, malformed input, and bounded child-process cleanup.
+
 ## 2026-10-15
 
 - Integrate terminal movement, original-event output and local state persistence.

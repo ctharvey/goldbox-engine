@@ -105,6 +105,34 @@ path for each run and keep saves, reports and captured game text outside this
 repository. `timeout` is a WSL/Linux example; native Windows callers must also
 bound the process lifetime in their launcher.
 
+### Experimental JSONL parity-harness protocol
+
+`goldbox_explore --harness <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id>
+<local-save.json>` runs the same exploration session behind a flushed JSONL
+protocol instead of the terminal prompt:
+
+- Startup emits a `ready` event with `protocol=1`, the source identity, initial
+  position, and `baseline=unverified-empty`.
+- Requests use a positive, strictly increasing integer ID, for example
+  `{"id":1,"action":"search"}`. Actions are `north`, `east`, `south`, `west`,
+  `search`, `rest`, `init`, `save`, `load`, and `quit`. Each line is bounded to
+  64 KiB, and CRLF terminators are tolerated.
+- VM callbacks surface as `text` and `menu` events; a `menu` expects one
+  response such as `{"id":1,"menu_id":1,"choice":0}` with the pending action
+  and menu IDs and a zero-based choice. Invalid responses end the session.
+- Every accepted action answers with one `complete` event carrying
+  `ok`/`blocked`/`unsupported` status, steps and bytecode telemetry, dispatch
+  metadata, and the parsed save JSON as `state`; unknown VM failures are
+  `unsupported`, never success.
+- Protocol violations (malformed JSON, wrong id/action types or values, EOF
+  without quitting, overlong lines) emit an `error` event and exit nonzero;
+  `quit` completes and exits 0.
+- Save/load keep every terminal-pilot safeguard (overwrite refusal, symlink/
+  size checks, source-identity mismatch). No controller/emulator integration
+  or original-parity claim exists yet; the startup state is an empty,
+  unverified baseline. Stdout carries JSONL only, including protocol errors;
+  callers must enforce a wall-clock deadline even while a menu awaits input.
+
 Optional: add `--save-meta session.json` to create non-overwriting session metadata. This records only **the startup configuration**, not gameplay state.
 
 For TypeScript mod SDK authoring (requires Node.js and npm):

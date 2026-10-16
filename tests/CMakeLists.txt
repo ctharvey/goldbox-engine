@@ -51,6 +51,10 @@ add_test(NAME goldbox_exploration_tests COMMAND goldbox_exploration_tests)
 add_test(NAME goldbox_exploration_cli_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/exploration_cli_test.py $<TARGET_FILE:goldbox_explore>
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
+add_test(NAME goldbox_harness_tests COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/harness_test.py $<TARGET_FILE:goldbox_explore>
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
+set_tests_properties(goldbox_harness_tests PROPERTIES TIMEOUT 120)
 add_test(NAME goldbox_installation_scanner_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/installation_scanner_test.py $<TARGET_FILE:goldbox_cli>
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
