@@ -2,6 +2,19 @@
 
 ## 2026-10-17
 
+- Complete an original character-name event branch with declared authored party
+  and flag state, then verify exact save/restore in a fresh engine process.
+  The unset-flag route needs RANDOM; an alternate response needs DAMAGE.
+  A matching original-game checkpoint remains unverified.
+
+- Fix ECL AND to update the comparison flag from its zero/nonzero result;
+  previously subsequent conditions used stale comparison state.
+
+- Trace an original map-7 search event through its menus and WHO to a missing
+  character-status read. Add optional symbolic status in normalized parties and
+  saves, with profile-defined read-only script encoding. New characters start
+  okay; legacy status remains unknown. Original-event parity is unverified.
+
 - Add WHO party selection through existing SDL, terminal and automation menus.
   Update loaded-character and profile-configured selected-PC state only after
   a valid choice; preserve LOAD_CHAR's separate semantics and adjust selection

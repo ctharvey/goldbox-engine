@@ -3,6 +3,7 @@
 #include "goldbox/party_memory.hpp"
 #include <algorithm>
 #include <set>
+#include <regex>
 #include <stdexcept>
 
 namespace goldbox {
@@ -32,6 +33,17 @@ void validate_party_memory_layout(const PartyMemoryLayout& layout, const Creatio
             *rules.percentile_ability != static_cast<std::size_t>(found-rules.abilities.begin())))
             throw std::runtime_error("Invalid party percentile binding");
     }
+    if (layout.status) {
+        const auto& binding = *layout.status;
+        if (binding.offset >= layout.record_size || !offsets.insert(binding.offset).second ||
+            binding.values.empty() || binding.values.size() > 64)
+            throw std::runtime_error("Invalid/conflicting party status binding");
+        static const std::regex pattern("[a-z0-9][a-z0-9.-]{0,63}");
+        for (const auto& [name,value] : binding.values) {
+            (void)value;
+            if (!std::regex_match(name,pattern)) throw std::runtime_error("Invalid party status ID");
+        }
+    }
 }
 bool party_memory_intersects(const PartyMemoryLayout& layout, std::uint16_t address, std::size_t width) {
     if (!width || width > 65536u-address) throw std::runtime_error("Invalid party memory access width");
@@ -48,6 +60,12 @@ std::optional<std::uint8_t> party_memory_byte(const PartyMemoryLayout& layout, c
     if (!character_address(layout,address)) return std::nullopt;
     const auto& character = member(party,loaded);
     const auto offset = address-layout.record_base;
+    if (layout.status && offset == layout.status->offset) {
+        if (!character.status) throw std::runtime_error("Character status is unknown");
+        const auto value = layout.status->values.find(*character.status);
+        if (value == layout.status->values.end()) throw std::runtime_error("Unsupported character status ID");
+        return value->second;
+    }
     const auto field = std::find_if(layout.abilities.begin(),layout.abilities.end(),
         [&](const auto& b) { return b.offset == offset; });
     if (field == layout.abilities.end()) throw std::runtime_error("Unsupported character field at offset " + std::to_string(offset));

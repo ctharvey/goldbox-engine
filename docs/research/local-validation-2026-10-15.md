@@ -345,3 +345,59 @@ The subsequent WHO implementation passed all 23 CTest suites in 17.45 seconds,
 including SDL selection, JSONL automation, invalid choices and saved state.
 Hygiene and attribution checks also passed. This is synthetic behavior coverage,
 not original WHO event parity.
+
+### Executed map-7 character event and next blocker
+
+The candidate is now confirmed as an original search route in GEO5/ECL5 record 7
+at (8,5), whose raw selector 0x84 resolves through table offset 249, selector 4,
+to code offset 730. A bounded headless probe used authored two-character state,
+not the supplied original save. It chose option 0 in the initial two-choice menu,
+then character index 1 through WHO. The actual C++ VM reached offset 821 after
+13 steps and reported `Unsupported character field at offset 256`; both loaded
+and selected-PC indices were 1. Original text was suppressed from the report.
+
+Adding explicit symbolic `okay` status to the authored characters and the
+profile-defined readiness binding allowed the same original route to pass that
+read and advance to RANDOM (opcode 0x08) at offset 846 after 19 steps. RANDOM
+remains unsupported. This is execution of original bytecode with controlled
+authored inputs, not an equivalent original-game checkpoint or a parity result.
+
+The event also exposed a VM comparison issue: AND stored its result but did not
+update comparison state. The pinned SSI Engine sets the flag to zero for a zero
+result and one otherwise. A synthetic harness reproduction first compared equal
+values, computed AND=1, then incorrectly skipped an IF_NOT_EQUALS write (0 rather
+than the expected 42). The fix updates comparison after a successful store, with
+regressions for both zero/nonzero results replacing stale comparison state.
+
+The next execution requirement is explicit deterministic random-state handling
+with save/restore and bounded draws; do not use ambient time/randomness or claim
+SSI RNG parity. The actual original reference route and equivalent world/quest
+baseline still need to be established. Character status mutations, native status
+flags/ordinals and class-level reads remain outside this increment.
+
+### Completed controlled character-name branch
+
+A second probe explicitly authored bit 0x10 at memory 0x4A6C, following the
+decoded flag-controlled alternative around RANDOM. This is a declared test
+precondition, not a discovered native-save value or a modification to an installed
+game. With both authored characters `okay`, responses were initial menu index 0,
+WHO character index 1, and subsequent two-choice menu index 1.
+
+The original event displayed the chosen authored character's name and exited
+successfully after 30 steps at offset 1061 with no diagnostic. Loaded-character
+and selected-PC indices were both 1. The harness saved the resulting state, a
+fresh engine process loaded it, and the full serialized state matched exactly.
+Text content remained private; the public evidence records only byte counts,
+selection IDs, offsets and pass/fail results. Choosing index 0 in that later menu
+instead reached unsupported DAMAGE (0x2E) at offset 1103 after 36 steps.
+
+The final bounded build passed all 23 CTest suites in 19.16 seconds, including
+status persistence/unknown-state behavior and both AND flag regressions. The
+independent synthetic AND reproduction now performed the expected write of 42.
+Hygiene and attribution checks passed. Metadata reports and engine saves remain
+under the workspace's private `.cache/goldbox-validation/` directory.
+
+This establishes a completed original character-dependent branch with authored
+inputs and fresh-process persistence. It does not establish a naturally reached
+reference-game route, equivalent quest flags, original RNG/damage behavior, or
+side-by-side event parity. Those remain explicit acceptance gates.

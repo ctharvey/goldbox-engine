@@ -24,6 +24,11 @@
     "recordSize": 511,
     "countAddress": 28222,
     "selectedAddress": 28081,
+    "status": {
+      "offset": 256,
+      "values": {"okay": 1, "animated": 0, "temporarily-gone": 0, "running": 0,
+        "unconscious": 0, "dying": 0, "dead": 0, "petrified": 0, "gone": 0}
+    },
     "abilities": [
       {
         "offset": 16,

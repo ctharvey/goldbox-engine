@@ -203,3 +203,9 @@ engine/input/MenuHandler for the single SELECT action and resumption behavior,
 plus VirtualMemory's distinction between loading and selecting a character.
 The C++ implementation reuses this project's menu host and updates configured
 state after validation; no Java handler or UI implementation was copied/ported.
+
+The symbolic status binding also consults the pinned
+`character/forgottenrealms/CharacterStatusForgottenRealms.java` and CharacterValues
+for the distinction between native status ordinals and script-facing readiness.
+The optional normalized status, JSON persistence and configurable byte mapping
+are independently implemented; no Java enum or status implementation was ported.

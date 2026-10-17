@@ -47,6 +47,9 @@ instruction. ON_GOTO/ON_GOSUB select checked addresses and retain a typed
 `DispatchSelection` trace. Code-address numeric reads use imported bytes;
 numeric writes into the program region are rejected. Other opcode semantics,
 unresolved string pointers and absent menu/combat hosts fail explicitly.
+AND stores the bitwise result and sets comparison to zero for a zero result,
+one otherwise; subsequent IF instructions use that flag rather than an earlier
+COMPARE. Comparison is updated only after a successful store.
 
 State changes made before an error remain visible; execution is not
 transactional. The host owns input and combat behavior. Determinism assumes

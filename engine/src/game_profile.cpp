@@ -145,7 +145,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     if (const auto* value = root.if_contains("partyMemory")) {
         if (!profile.character_rules) throw std::runtime_error("Party memory requires character creation rules");
         const auto& o = j::object(*value,"party memory");
-        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities","selectedAddress"},"party memory");
+        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities","selectedAddress","status"},"party memory");
         const auto address = [&](const char* key) {
             const auto n = j::integer(j::field(o,key,"party memory"),key);
             if (n < 0 || n > 65535) throw std::runtime_error("Invalid party memory address");
@@ -154,6 +154,21 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         PartyMemoryLayout layout{j::string(j::field(o,"dialect","party memory"),"party dialect"),
             address("recordBase"),address("recordSize"),address("countAddress"),{}};
         if (o.if_contains("selectedAddress")) layout.selected_address = address("selectedAddress");
+        if (const auto* value = o.if_contains("status")) {
+            const auto& status = j::object(*value,"party status binding");
+            j::fields_only(status,{"offset","values"},"party status binding");
+            const auto offset = j::integer(j::field(status,"offset","party status binding"),"status offset");
+            if (offset < 0 || offset > 65535) throw std::runtime_error("Invalid party status offset");
+            PartyStatusBinding binding{static_cast<std::uint16_t>(offset),{}};
+            const auto& values = j::object(j::field(status,"values","party status binding"),"status values");
+            if (values.size() > 64) throw std::runtime_error("Too many status encodings");
+            for (const auto& entry : values) {
+                const auto code = j::integer(entry.value(),"status code");
+                if (code < 0 || code > 255) throw std::runtime_error("Invalid status code");
+                binding.values.emplace(std::string(entry.key()),static_cast<std::uint8_t>(code));
+            }
+            layout.status = std::move(binding);
+        }
         const auto& fields = j::array(j::field(o,"abilities","party memory"),"party ability bindings");
         if (fields.size() > 64) throw std::runtime_error("Too many party ability bindings");
         for (const auto& field : fields) {

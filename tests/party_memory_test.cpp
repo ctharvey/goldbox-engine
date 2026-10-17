@@ -57,6 +57,16 @@ int main(int argc, char** argv) {
     assert(session.state.memory[0x4a00] == 2 && session.state.memory[0x4a01] == 17);
     assert(session.state.memory[0x4a02] == 17 && session.state.memory[0x4a03] == 14);
     assert(session.state.memory[0x4a04] == 14 && session.state.memory[0x6db1] == 0);
+    assert(layout.status && layout.status->offset == 256);
+    assert(!run({9,1,0,0x6c,1,5,0x4a,0}).exited); // Unknown legacy state cannot become healthy silently.
+    session.party[0].status = "okay"; session.party[1].status = "unconscious";
+    assert(run({9,1,0,0x6c,1,5,0x4a,0}).exited && session.state.memory[0x4a05] == 0);
+    assert(run({0x0a,0,0,9,1,0,0x6c,1,5,0x4a,0}).exited && session.state.memory[0x4a05] == 1);
+    session.party[0].status = "other-condition";
+    assert(!run({9,1,0,0x6c,1,5,0x4a,0}).exited);
+    session.party[0].status = "okay";
+    assert(!run({9,0,135,1,0,0x6c,0}).exited && session.party[0].status == "okay");
+    assert(run({0x0a,0,1,0}).exited);
     assert(layout.selected_address == 0x6db1);
     host.selected = 1; host.output.clear();
     assert(run({0x39,0x80,1,4,0x11,0x81,0,0x6b,0}).exited);
@@ -109,9 +119,18 @@ int main(int argc, char** argv) {
     assert(!run({0x0a,0,0,0}).exited && !run({0x11,0x81,0,0x6b,0}).exited);
     auto other = layout; other.record_base = 0x5000; other.record_size = 256; other.count_address = 0x4fff;
     other.selected_address = 0x4ffe;
+    other.status = PartyStatusBinding{0x45,{{"okay",7},{"unconscious",9}}};
     other.abilities = {{0x44,"intelligence",false}};
     validate_party_memory_layout(other,rules);
     assert(party_memory_byte(other,rules,Party{borin},0,0x5044) == 14);
+    borin.status = "unconscious";
+    assert(party_memory_byte(other,rules,Party{borin},0,0x5045) == 9);
+    auto bad_status = layout; bad_status.status->offset = bad_status.abilities.front().offset;
+    rejects([&] { validate_party_memory_layout(bad_status,rules); });
+    bad_status = layout; bad_status.status->values.clear();
+    rejects([&] { validate_party_memory_layout(bad_status,rules); });
+    bad_status = layout; bad_status.status->values.emplace("Invalid ID",1);
+    rejects([&] { validate_party_memory_layout(bad_status,rules); });
     auto alternate = session; alternate.party = {ada,borin}; alternate.party_memory = other;
     alternate.ecl_record = program({0x39,0x80,1,4,0}); host.selected = 1;
     assert(alternate.trigger(EclEventKind::move,host).exited && alternate.loaded_character == 1);

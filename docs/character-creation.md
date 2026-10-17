@@ -3,7 +3,9 @@
 The engine stores a party independently of ECL memory and original character
 records. Each character has a name, race ID, gender ID, single-class ID,
 alignment ID and ordered ability values with optional percentiles. Creation
-rules supply the ability names/count, option labels, race/gender bounds, legal
+also records a symbolic status (`okay` on completion); status is independent of
+ability values. An absent status in older saves remains unknown.
+Creation rules supply the ability names/count, option labels, race/gender bounds, legal
 classes/alignments, class minima, percentile policy and party/name limits.
 The shared model and SDL creator do not branch on a game ID or filename.
 
@@ -71,6 +73,9 @@ defines `recordBase`, `recordSize`, `countAddress` and `abilities` bindings
 (`offset`, normalized `ability` ID, `percentile`). It requires creation rules.
 An optional `selectedAddress` enables WHO's selected-PC RAM update; Pool uses
 0x6DB1. It must be outside the character window/count, event context and program.
+An optional `status: {offset, values}` maps symbolic status IDs to script bytes.
+Offsets must not collide with ability fields; encodings have at most 64 bounded
+IDs and byte-valued codes. Several conditions may share a script code.
 The shared adapter contains no title-specific addresses or ability ordering.
 Unknown dialects, overlapping count/record ranges, duplicate offsets and invalid
 ability references fail validation. Event-context and program overlaps fail
@@ -94,6 +99,13 @@ interface in SDL, the terminal and JSONL automation. Roster removal adjusts both
 indices. The selected-PC byte retains ordinary RAM semantics: a direct script
 write to it does not implicitly perform LOAD_CHAR. Original WHO interaction,
 focus/default selection and matched-event parity remain unverified.
+
+Pool's researched status binding uses offset 0x100: `okay` maps to 1; animated,
+temporarily-gone, running, unconscious, dying, dead, petrified and gone map to 0.
+This is the script-facing readiness byte, not the native character file's status
+ordinal at offset 0x10C. Unknown/unsupported symbolic conditions fail explicitly.
+Status writes remain unsupported: no native ordinal/flag decoding, damage,
+revival or spell effects are implied. Other games can supply different encodings.
 
 Unsupported fields and all script writes to this window/count report errors,
 including word writes crossing a boundary. They never fall back to stale RAM

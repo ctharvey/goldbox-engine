@@ -169,6 +169,7 @@ std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string
     throw std::runtime_error("No eligible ability roll within 256 attempts");
 }
 void validate_character(const CreationRules& rules, const Character& c) {
+    if (c.status) (void)id(bj::value(*c.status));
     require(!c.name.empty() && c.name.size() <= rules.name_limit && c.name.front() != ' ' && c.name.back() != ' ' &&
         std::all_of(c.name.begin(),c.name.end(),[](unsigned char b) { return b >= 32 && b < 127; }),"Invalid character name");
     const auto eligible = eligible_classes(rules,c); const auto& choice = find(rules.classes,c.character_class);
@@ -185,6 +186,7 @@ void validate_character(const CreationRules& rules, const Character& c) {
     }
 }
 Character finish_character(const CreationRules& rules, Character draft, std::mt19937& random) {
+    draft.status = "okay";
     (void)find(rules.genders,draft.gender);
     const auto& choice = find(rules.classes,draft.character_class);
     for (auto& score : draft.abilities) score.percentile = 0;
@@ -206,8 +208,10 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
     for (const auto& c : party) {
         add_character(validated,rules,c); bj::array abilities;
         for (const auto& a : c.abilities) abilities.push_back(bj::object{{"value",a.value},{"percentile",a.percentile}});
-        members.push_back(bj::object{{"name",c.name},{"race",c.race},{"gender",c.gender},
-            {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}});
+        bj::object member{{"name",c.name},{"race",c.race},{"gender",c.gender},
+            {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}};
+        if (c.status) member["status"] = *c.status;
+        members.push_back(std::move(member));
     }
     return bj::serialize(bj::object{{"rulesId",rules.id},{"characters",std::move(members)}});
 }
@@ -219,9 +223,10 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     require(members.size() <= rules.party_limit,"Saved party is full"); Party result;
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
-        j::fields_only(o,{"name","race","gender","class","alignment","abilities"},"character");
+        j::fields_only(o,{"name","race","gender","class","alignment","abilities","status"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
+        if (const auto* value = o.if_contains("status")) c.status = id(*value);
         const auto& abilities = j::array(j::field(o,"abilities","character"),"abilities");
         require(abilities.size() == rules.abilities.size(),"Saved ability count mismatch");
         for (const auto& value : abilities) {

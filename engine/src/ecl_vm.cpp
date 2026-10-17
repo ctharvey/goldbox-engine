@@ -192,7 +192,12 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                     if (!host.write_string(address,value)) state.strings[address] = value;
                 } else store(args[1], numeric(args[0]));
                 break;
-            case 0x2f: store(args[2], numeric(args[0]) & numeric(args[1])); break;
+            case 0x2f: {
+                const auto value = numeric(args[0]) & numeric(args[1]);
+                store(args[2],value);
+                state.comparison = value == 0 ? 0 : 1;
+                break;
+            }
             case 0x2a: {
                 auto source = args[0];
                 require(source.type == 1 || source.type == 3 || source.type == 5, "Invalid COPY_MEM source");

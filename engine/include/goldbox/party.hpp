@@ -37,6 +37,8 @@ struct AbilityValue { int value{}, percentile{}; };
 struct Character {
     std::string name, race, gender, character_class, alignment;
     std::vector<AbilityValue> abilities;
+    // Symbolic condition; absent means unknown (including legacy engine saves).
+    std::optional<std::string> status{};
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);

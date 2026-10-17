@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
     validate_character(rules,hero);
     Character fighter = hero; fighter.character_class = "fighter"; fighter.abilities[0].value = 18;
     const auto exceptional = finish_character(rules,fighter,random);
+    assert(exceptional.status == "okay");
     assert(exceptional.abilities[0].percentile >= 1 && exceptional.abilities[0].percentile <= 50);
     rejects([&] { validate_character(rules,fighter); }); // Missing exceptional score is not silently accepted.
     for (int failure = 0; failure < 6; ++failure) {
@@ -60,6 +61,13 @@ int main(int argc, char** argv) {
     rejects([&] { add_character(party,rules,duplicate); });
     for (int i = 1; i < 6; ++i) { auto c = hero; c.name = "Hero"+std::to_string(i); add_character(party,rules,c); }
     const auto json = serialize_party(party,rules);
+    assert(!read_party(json,rules)[0].status); // Legacy party records remain explicitly unknown.
+    auto conditioned = party; conditioned[0].status = "unconscious";
+    assert(read_party(serialize_party(conditioned,rules),rules)[0].status == "unconscious");
+    conditioned[0].status = "Invalid Status";
+    rejects([&] { (void)serialize_party(conditioned,rules); });
+    rejects([&] { (void)read_party(changed(serialize_party(party,rules),"\"name\":\"Ada\"",
+        "\"name\":\"Ada\",\"status\":null"),rules); });
     assert(serialize_party(read_party(json,rules),rules) == json);
     rejects([&] { add_character(party,rules,hero); }); assert(serialize_party(party,rules) == json);
     rejects([&] { (void)read_party(changed(json,rules.id,"other-rules"),rules); });

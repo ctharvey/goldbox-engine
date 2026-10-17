@@ -107,5 +107,14 @@ int main() {
     // Jump into an already decoded operand must fail, rather than decode it as EXIT.
     result = run(program({9,0,7,1,0,0x4a,1,1,21,0x99}), state, host);
     assert(!result.exited && result.diagnostic == "ECL branch inside operand data");
+    // AND replaces stale comparison flags with zero/nonzero, after storing its result.
+    Host bit_host; state = {};
+    result = run(program({3,0,0,0,0,0x2f,0,1,0,1,1,0,0x4a,
+        0x17,0x11,0x80,1,4,0}),state,bit_host);
+    assert(result.exited && state.memory[0x4a00] == 1 && bit_host.output == std::vector<std::string>{"A"});
+    bit_host.output.clear();
+    result = run(program({3,0,1,0,0,0x2f,0,1,0,0,1,0,0x4a,
+        0x16,0x11,0x80,1,4,0}),state,bit_host);
+    assert(result.exited && state.memory[0x4a00] == 0 && bit_host.output == std::vector<std::string>{"A"});
     return 0;
 }

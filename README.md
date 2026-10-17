@@ -31,6 +31,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - Startup party creation with data-selected races/classes/alignments, bounded ability rolling, roster review/removal and engine-save persistence; see [supported creation rules and limits](docs/character-creation.md).
 - Profile-selected read-only ECL party access: loaded-character selection, names, ability scores and party count; unsupported fields/writes fail explicitly. Original character-access parity remains unverified.
 - WHO party-selection prompts use existing window/terminal/automation menus and update the profile-configured selected-PC byte as well as the loaded character. Original interaction parity remains unverified.
+- Optional symbolic character status persists in engine saves and maps to script bytes through profile data; unknown legacy state and unsupported status writes fail explicitly.
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run
