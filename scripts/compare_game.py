@@ -14,6 +14,7 @@ import os
 from pathlib import Path, PurePosixPath
 import queue
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -51,7 +52,6 @@ if os.name == "nt":
         WAS_SUSPENDED_ERROR, INVALID_HANDLE_VALUE)
 else:
     import fcntl
-    import signal
 
 USAGE = "usage: compare_game.py <session-config.json>"
 
@@ -110,20 +110,38 @@ def run_session(config):
         notes = session.end_notes
         return code, notes
     finally:
+        primary = sys.exc_info()[1]
         cleanup_errors = []
+        interrupted = None
+        # A second Ctrl-C must not skip the other tree or the lock release: each
+        # step records any BaseException, an interrupted kill is retried once.
         for owned in (engine, reference):
-            if owned is not None:
+            if owned is None:
+                continue
+            for attempt in (1, 2):
                 try:
                     owned.kill_tree()
+                    break
+                except KeyboardInterrupt as error:
+                    interrupted = interrupted or error
                 except Exception as error:
                     cleanup_errors.append(str(error))
-        _wait_bounded(stdout_reader)
-        _wait_bounded(stderr_reader)
-        for drain in ref_drains:
-            _wait_bounded(drain)
+                    break
+        for waiter in (stdout_reader, stderr_reader, *ref_drains):
+            try:
+                _wait_bounded(waiter)
+            except KeyboardInterrupt as error:
+                interrupted = interrupted or error
         lock.release()
         if cleanup_errors:
-            raise ControlledError("cleanup failed: " + "; ".join(cleanup_errors))
+            detail = "cleanup failed: " + "; ".join(cleanup_errors)
+            if primary is None:
+                raise ControlledError(detail)
+            if isinstance(primary, ControlledError):
+                raise ControlledError(f"{primary}; {detail}") from primary
+            print(f"compare_game: {detail}", file=sys.stderr)
+        if interrupted is not None and primary is None:
+            raise interrupted
 
 
 def _announce(notes):
@@ -131,11 +149,28 @@ def _announce(notes):
         print(note)
 
 
+def _raise_interrupt(signum, frame):
+    raise KeyboardInterrupt
+
+
+def _install_termination_handlers():
+    """Turn SIGTERM/SIGHUP (POSIX) and SIGBREAK (Windows) into the Ctrl-C path so
+    run_session's finally kills the owned trees; returns the previous handlers."""
+    names = ("SIGBREAK",) if os.name == "nt" else ("SIGTERM", "SIGHUP")
+    previous = {}
+    for name in names:
+        number = getattr(signal, name, None)
+        if number is not None:
+            previous[number] = signal.signal(number, _raise_interrupt)
+    return previous
+
+
 def main(argv):
     if len(argv) != 2:
         print(USAGE, file=sys.stderr)
         return 2
     try:
+        _install_termination_handlers()
         config = parse_config(Path(argv[1]))
         code, notes = run_session(config)
         _announce(notes)

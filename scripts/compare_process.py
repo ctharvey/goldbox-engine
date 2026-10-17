@@ -14,6 +14,25 @@ else:
     import signal
 
 
+if os.name != "nt":
+    class _PeekPopen(subprocess.Popen):
+        """poll() reports exit without reaping the group leader. An unreaped
+        zombie leader keeps its pid, and so the pgid, from being reused before
+        kill_tree signals the group; only kill_tree's wait() reaps."""
+
+        def poll(self):
+            if self.returncode is not None:
+                return self.returncode
+            try:
+                info = os.waitid(os.P_PID, self.pid,
+                                 os.WEXITED | os.WNOHANG | os.WNOWAIT)
+            except ChildProcessError:
+                return super().poll()
+            if info is None or info.si_pid == 0:
+                return None
+            return info.si_status if info.si_code == os.CLD_EXITED else -info.si_status
+
+
 if os.name == "nt":
     CREATE_SUSPENDED = 0x00000004
     THREAD_SUSPEND_RESUME = 0x0002
@@ -295,7 +314,7 @@ class OwnedProcess:
     @classmethod
     def _launch_posix(cls, argv, cwd, env=None):
         try:
-            process = subprocess.Popen(
+            process = _PeekPopen(
                 argv, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, start_new_session=True, env=env)
         except OSError as error:

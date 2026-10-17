@@ -9,6 +9,7 @@ import ctypes
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
@@ -680,6 +681,114 @@ def test_launcher_and_containment_bypasses(fixture):
     check(marker.read_bytes() == b"synthetic fixture only\n", "fixture modified")
 
 
+def test_termination_signals(fixture):
+    # F5: a termination signal must run the cleanup path, not skip it. Windows
+    # delivers CTRL_BREAK_EVENT; POSIX delivers SIGTERM and SIGHUP.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    if os.name == "nt":
+        deliveries = [("CTRL_BREAK", lambda p: p.send_signal(signal.CTRL_BREAK_EVENT),
+                       subprocess.CREATE_NEW_PROCESS_GROUP)]
+    else:
+        deliveries = [("SIGTERM", lambda p: p.send_signal(signal.SIGTERM), 0),
+                      ("SIGHUP", lambda p: p.send_signal(signal.SIGHUP), 0)]
+    for label, deliver, flags in deliveries:
+        config = fixture.config("hang", name=f"signal-{label}.json", timeout=30)
+        process = subprocess.Popen(
+            [sys.executable, "-u", str(CONTROLLER), str(config)], stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=flags)
+        try:
+            deadline = time.monotonic() + 15
+            ready = False
+            while time.monotonic() < deadline and not ready:
+                ready = "[engine ready]" in process.stdout.readline()
+            check(ready, f"{label}: controller never reached ready")
+            deliver(process)
+            try:
+                code = process.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                code = None
+            check(code == 1, f"{label}: exit status {code!r}")
+            check("cancelled by operator" in process.stderr.read(),
+                  f"{label}: cleanup path not taken")
+            compare_game.SessionLock(fixture.private).acquire().release()
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
+
+def test_posix_leader_not_reaped(fixture):
+    # F4: poll() on a POSIX leader must not reap it; a reaped leader frees the
+    # pgid for reuse before killpg runs. Only meaningful on POSIX.
+    if os.name == "nt":
+        print("test_posix_leader_not_reaped: not testable on Windows; skipped")
+        return
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    owned = compare_game.OwnedProcess.launch([sys.executable, "-c", "pass"], fixture.private)
+    deadline = time.monotonic() + 10
+    while owned.process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.05)
+    check(owned.process.poll() == 0, "leader exit not observed")
+    check(os.path.exists(f"/proc/{owned.process.pid}") or sys.platform != "linux",
+          "leader was reaped by poll()")
+    os.killpg(owned.posix_group, 0)  # group still exists: pgid not reusable yet
+    owned.kill_tree()
+    try:
+        os.waitid(os.P_PID, owned.process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        reaped = False
+    except ChildProcessError:
+        reaped = True
+    check(reaped, "kill_tree did not reap the leader")
+
+
+def test_cleanup_failure_handling(fixture):
+    # F6: a second interrupt during kill_tree must not skip the other tree or the
+    # lock release. F7: a cleanup failure must not replace the session failure.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    original = compare_game.OwnedProcess.kill_tree
+    seen = []
+
+    def interrupted_once(self):
+        seen.append(self)
+        if seen.count(self) == 1:
+            raise KeyboardInterrupt
+        original(self)
+
+    def failing(self):
+        seen.append(self)
+        original(self)
+        raise OSError("synthetic kill failure")
+
+    try:
+        for label, patched in (("interrupt", interrupted_once), ("failure", failing)):
+            del seen[:]
+            compare_game.OwnedProcess.kill_tree = patched
+            config = compare_game.parse_config(
+                fixture.config("hang", name=f"cleanup-{label}.json", timeout=2))
+            message = ""
+            try:
+                compare_game.run_session(config)
+            except compare_game.ControlledError as error:
+                message = str(error)
+            # In-process the console hits EOF (or the deadline): either is the
+            # session failure that must stay visible.
+            check(message and not message.startswith("cleanup failed"),
+                  f"{label}: session failure lost: {message!r}")
+            if label == "failure":
+                check("synthetic kill failure" in message,
+                      f"{label}: cleanup failure not reported: {message!r}")
+            check(len({id(owned) for owned in seen}) == 2,
+                  f"{label}: not every tree was cleaned: {len(seen)} calls")
+            check(all(owned.process.poll() is not None for owned in seen),
+                  f"{label}: an owned process survived")
+            compare_game.SessionLock(config["privateRoot"]).acquire().release()
+    finally:
+        compare_game.OwnedProcess.kill_tree = original
+
+
 def main():
     with tempfile.TemporaryDirectory() as temp:
         fixture = Fixture(temp)
@@ -695,6 +804,9 @@ def main():
         test_paths_with_spaces(fixture)
         test_no_writes_no_match_claim(fixture)
         test_launcher_and_containment_bypasses(fixture)
+        test_cleanup_failure_handling(fixture)
+        test_termination_signals(fixture)
+        test_posix_leader_not_reaped(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])
     print("compare_game tests passed")

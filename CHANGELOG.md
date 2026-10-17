@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Controller cleanup hardening: SIGTERM/SIGHUP (POSIX) and CTRL_BREAK (Windows) now run
+  the same cleanup path as Ctrl-C; POSIX `poll()` no longer reaps the owned group
+  leader before `killpg`; a second interrupt during cleanup no longer skips the
+  other tree or the lock release; a cleanup failure is appended to, not a
+  replacement for, the session failure.
+
 - Harden the comparison controller: reject WSL launchers (bash, wsl, distro
   launchers) by name and by the OS-resolved image of the suspended child, and
   compare `privateRoot`/`reference.cwd` by file identity so UNC, `\\?\` aliases
