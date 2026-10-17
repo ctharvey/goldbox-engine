@@ -133,7 +133,8 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     unique(r.classes);
     for (const auto& v : j::array(field("races"),"races")) {
         const auto& o = j::object(v,"race");
-        j::fields_only(o,{"id","label","minimum","maximum","percentileMaximum","classes","adjustments"},"race");
+        j::fields_only(o,{"id","label","minimum","maximum","percentileMaximum","classes","adjustments",
+            "startingAge"},"race");
         CreationRace race; race.id = id(j::field(o,"id","race")); race.label = label(j::field(o,"label","race"));
         race.minimum = scores(j::field(o,"minimum","race"),r.abilities.size());
         if (const auto* value = o.if_contains("adjustments")) {
@@ -143,6 +144,18 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
         }
         race.classes = ids(j::field(o,"classes","race"));
         for (const auto& c : race.classes) (void)find(r.classes,c);
+        if (const auto* value = o.if_contains("startingAge")) {
+            const auto& ages = j::object(*value,"starting age");
+            require(ages.size() == race.classes.size(),"Starting age class count mismatch");
+            for (const auto& c : race.classes) {
+                const auto& dice = j::object(j::field(ages,c,"starting age"),"starting age dice");
+                j::fields_only(dice,{"base","count","sides"},"starting age dice");
+                StartingAgeDice age{number(j::field(dice,"base","age"),0,65535),
+                    number(j::field(dice,"count","age"),1,10),number(j::field(dice,"sides","age"),2,100)};
+                require(age.base+age.count*age.sides <= 65535,"Starting age overflows uint16");
+                race.starting_ages.emplace(c,age);
+            }
+        }
         const auto& maxima = j::object(j::field(o,"maximum","race"),"maximum");
         const auto& percentile = j::object(j::field(o,"percentileMaximum","race"),"percentile maximum");
         require(maxima.size() == r.genders.size() && percentile.size() == r.genders.size(),"Gender limits mismatch");
@@ -156,6 +169,31 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
         r.races.push_back(std::move(race));
     }
     unique(r.races); return r;
+}
+template<class Random>
+std::optional<std::uint16_t> roll_starting_age_impl(const CreationRules& rules, std::string_view race,
+    std::string_view character_class, Random& random) {
+    const auto& choice = find(rules.races,race);
+    (void)find(rules.classes,character_class);
+    require(std::find(choice.classes.begin(),choice.classes.end(),character_class) != choice.classes.end(),
+        "Race cannot use class");
+    if (choice.starting_ages.empty()) return std::nullopt;
+    const auto it = choice.starting_ages.find(std::string(character_class));
+    require(it != choice.starting_ages.end(),"Starting age unavailable for class");
+    const auto& dice = it->second;
+    require(dice.base >= 0 && dice.count >= 1 && dice.count <= 10 && dice.sides >= 2 && dice.sides <= 100 &&
+        dice.base <= 65535-dice.count*dice.sides,"Invalid starting age dice");
+    int age = dice.base;
+    for (int i = 0; i < dice.count; ++i) age += die(random,dice.sides);
+    return static_cast<std::uint16_t>(age);
+}
+std::optional<std::uint16_t> roll_starting_age(const CreationRules& rules, std::string_view race,
+    std::string_view character_class, std::mt19937& random) {
+    return roll_starting_age_impl(rules,race,character_class,random);
+}
+std::optional<std::uint16_t> roll_starting_age(const CreationRules& rules, std::string_view race,
+    std::string_view character_class, HighWordLcg32& random) {
+    return roll_starting_age_impl(rules,race,character_class,random);
 }
 namespace {
 std::vector<std::size_t> class_choices(const CreationRules& rules, const Character& c, bool creation) {
@@ -225,6 +263,7 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
     throw std::runtime_error("No eligible ability roll within 256 attempts");
 }
 void validate_character(const CreationRules& rules, const Character& c) {
+    require(!c.age || *c.age > 0,"Invalid character age");
     if (c.status) (void)id(bj::value(*c.status));
     require(!c.name.empty() && c.name.size() <= rules.name_limit && c.name.front() != ' ' && c.name.back() != ' ' &&
         std::all_of(c.name.begin(),c.name.end(),[](unsigned char b) { return b >= 32 && b < 127; }),"Invalid character name");
@@ -290,6 +329,7 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
         bj::object member{{"name",c.name},{"race",c.race},{"gender",c.gender},
             {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}};
         if (c.status) member["status"] = *c.status;
+        if (c.age) member["age"] = *c.age;
         members.push_back(std::move(member));
     }
     return bj::serialize(bj::object{{"rulesId",rules.id},{"characters",std::move(members)}});
@@ -302,10 +342,11 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     require(members.size() <= rules.party_limit,"Saved party is full"); Party result;
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
-        j::fields_only(o,{"name","race","gender","class","alignment","abilities","status"},"character");
+        j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
         if (const auto* value = o.if_contains("status")) c.status = id(*value);
+        if (const auto* value = o.if_contains("age")) c.age = static_cast<std::uint16_t>(number(*value,1,65535));
         const auto& abilities = j::array(j::field(o,"abilities","character"),"abilities");
         require(abilities.size() == rules.abilities.size(),"Saved ability count mismatch");
         for (const auto& value : abilities) {

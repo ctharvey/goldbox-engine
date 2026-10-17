@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Generate, display and save optional starting age from configurable race/class
+  dice using the shared RNG. Verify 102 isolated original cases across all 17
+  supported pairs. Select class before age/abilities for configured creators;
+  preserve unknown ages in legacy saves. Age-based ability modifiers and full
+  creation draw alignment remain unfinished.
+
 - Apply optional class-specific creation floors and offer supported classes that
   can meet their requirements through those floors. Verify 216 isolated original
   class-floor cases without RNG consumption; cover completion, incompatible caps

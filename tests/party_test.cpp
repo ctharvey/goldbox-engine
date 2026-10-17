@@ -61,6 +61,12 @@ int main(int argc, char** argv) {
     rejects([&] { add_character(party,rules,duplicate); });
     for (int i = 1; i < 6; ++i) { auto c = hero; c.name = "Hero"+std::to_string(i); add_character(party,rules,c); }
     const auto json = serialize_party(party,rules);
+    assert(!read_party(json,rules)[0].age); // Legacy ages remain unknown.
+    auto with_age = party; with_age[0].age = 22;
+    const auto age_json = serialize_party(with_age,rules);
+    assert(read_party(age_json,rules)[0].age == 22);
+    for (const auto& value : {"0","65536","true","null"})
+        rejects([&] { (void)read_party(changed(age_json,"\"age\":22",std::string("\"age\":")+value),rules); });
     assert(!read_party(json,rules)[0].status); // Legacy party records remain explicitly unknown.
     auto conditioned = party; conditioned[0].status = "unconscious";
     assert(read_party(serialize_party(conditioned,rules),rules)[0].status == "unconscious");
@@ -128,7 +134,11 @@ int main(int argc, char** argv) {
         changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6]"),
         changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, -1, 0, 0, 0]"),
         changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, true, 0, 0, 0]"),
-        changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, 1001, 0, 0, 0]")}) {
+        changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, 1001, 0, 0, 0]"),
+        changed(original,"\"count\": 5","\"count\": 0"),
+        changed(original,"\"base\": 40","\"base\": 65535"),
+        changed(original,"\"sides\": 4","\"sides\": true"),
+        changed(original,"\"fighter\": {\"base\": 40","\"unknown\": {\"base\": 40")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

@@ -315,6 +315,7 @@ int main(int argc, char** argv) {
     creation.alignments = {{"neutral","Neutral"}};
     creation.classes = {{"adventurer","Adventurer",{12},{"neutral"},false,{12}}};
     creation.races = {{"visitor","Visitor",{3},{{"any",{18}}},{{"any",0}},{"adventurer"}}};
+    creation.races[0].starting_ages = {{"adventurer",{20,1,2}}};
     session.character_rules = creation;
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.party.empty() && session.state.memory[0x4a00] == 0); // Cannot begin with an empty party.
@@ -326,10 +327,13 @@ int main(int argc, char** argv) {
     assert(session.party.size() == 1 && session.party[0].name == "ALICE");
     assert(session.party[0].abilities.size() == 1 && session.state.memory[0x4a00] == 42);
     assert(session.party[0].abilities[0].value == 12); // Creation-only floor permits this class from a raw 3.
+    assert(session.party[0].age && *session.party[0].age >= 21 && *session.party[0].age <= 22);
+    const auto created_age = session.party[0].age;
     session.party.clear();
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.party.size() == 1 && session.party[0].name == "ALICE");
     assert(session.party[0].abilities[0].value == 12);
+    assert(session.party[0].age == created_age);
     auto second_member = session.party.front(); second_member.name = "BOB";
     session.party.push_back(second_member); session.loaded_character = 1;
     session.party_memory = PartyMemoryLayout{"ssi-selected-character-v1",0x5000,256,0x4fff,

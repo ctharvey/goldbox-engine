@@ -192,6 +192,10 @@
     {
       "id": "dwarf",
       "label": "Dwarf",
+      "startingAge": {
+        "fighter": {"base": 40, "count": 5, "sides": 4},
+        "thief": {"base": 75, "count": 3, "sides": 6}
+      },
       "adjustments": [0, 0, 0, 0, 1, -1],
       "minimum": [
         8,
@@ -231,6 +235,11 @@
     {
       "id": "elf",
       "label": "Elf",
+      "startingAge": {
+        "fighter": {"base": 130, "count": 5, "sides": 6},
+        "magic-user": {"base": 150, "count": 5, "sides": 6},
+        "thief": {"base": 100, "count": 5, "sides": 6}
+      },
       "adjustments": [0, 0, 0, 1, -1, 0],
       "minimum": [
         3,
@@ -271,6 +280,10 @@
     {
       "id": "gnome",
       "label": "Gnome",
+      "startingAge": {
+        "fighter": {"base": 60, "count": 5, "sides": 4},
+        "thief": {"base": 80, "count": 5, "sides": 4}
+      },
       "minimum": [
         6,
         7,
@@ -309,6 +322,12 @@
     {
       "id": "half-elf",
       "label": "Half-elf",
+      "startingAge": {
+        "cleric": {"base": 40, "count": 2, "sides": 4},
+        "fighter": {"base": 22, "count": 3, "sides": 4},
+        "magic-user": {"base": 30, "count": 2, "sides": 8},
+        "thief": {"base": 22, "count": 3, "sides": 8}
+      },
       "minimum": [
         3,
         4,
@@ -349,6 +368,10 @@
     {
       "id": "halfling",
       "label": "Halfling",
+      "startingAge": {
+        "fighter": {"base": 20, "count": 3, "sides": 4},
+        "thief": {"base": 40, "count": 2, "sides": 4}
+      },
       "adjustments": [-1, 0, 0, 1, 0, 0],
       "minimum": [
         6,
@@ -388,6 +411,12 @@
     {
       "id": "human",
       "label": "Human",
+      "startingAge": {
+        "cleric": {"base": 18, "count": 1, "sides": 4},
+        "fighter": {"base": 15, "count": 1, "sides": 4},
+        "magic-user": {"base": 24, "count": 2, "sides": 4},
+        "thief": {"base": 18, "count": 1, "sides": 4}
+      },
       "minimum": [
         3,
         3,

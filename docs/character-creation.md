@@ -5,6 +5,7 @@ records. Each character has a name, race ID, gender ID, single-class ID,
 alignment ID and ordered ability values with optional percentiles. Creation
 also records a symbolic status (`okay` on completion); status is independent of
 ability values. An absent status in older saves remains unknown.
+Optional age is stored in years; older saves without age remain unknown.
 Creation rules supply the ability names/count, option labels, race/gender bounds, legal
 classes/alignments, class minima, percentile policy and party/name limits.
 The shared model and SDL creator do not branch on a game ID or filename.
@@ -36,6 +37,11 @@ its ordinary requirements without exceeding racial/gender maxima. Finishing
 the draft raises scores before exceptional strength; it consumes no extra draws
 for the floors. Absent configuration retains strict score-based eligibility.
 Saved-party validation still uses `minimum` and never applies creation floors.
+Optional race `startingAge` maps each supported class ID to `{base, count, sides}`.
+Generation adds the configured dice to the base (count 1..10, sides 2..100), with
+a result bounded to 1..65535. Missing age configuration consumes no draws.
+Every supported class must have a valid entry when a race opts in; unknown,
+missing, malformed and overflowing entries fail explicitly.
 
 ## Current AD&D profile
 
@@ -53,8 +59,16 @@ original human raw-score loop. Five seeded sets and final RNG states are public
 numeric regression fixtures from 540 original runtime draws. The selected rules
 now clamp racial/gender bounds, matching the isolated original bound blocks.
 Rolls without a usable creation class still retry at most 256 times. Verified
-class creation floors now apply at completion; the prototype's class-choice
-order still differs from the original.
+class creation floors now apply at completion. With starting-age configuration,
+the UI selects class before rolling age and abilities; other profiles retain
+their existing roll-then-class flow. Reroll keeps the selected age and class.
+
+The supplied rules define independently verified starting-age dice for all
+17 supported race/class pairs. For seed 0x12345678, a human fighter starts at
+19 years (15+1d4), an elf fighter at 148 (130+5d6), and a dwarf fighter at 52
+(40+5d4). Age is displayed in the character summary and saved beside abilities.
+**Age-based ability modifiers are not yet applied.** Matching the age generator
+does not make the current ability scores match the complete original creator.
 
 Pool's `random` profile selects `algorithm: lcg32-high16-mod-v1`, multiplier
 134775813, increment 1 and startup seed 1. Character rolls, rerolls, exceptional
@@ -76,7 +90,7 @@ verify legal scores of 19 and their party save roundtrip. Modifiers consume no
 additional random draws. The original also draws before the raw
 ability loop, applies age processing before the racial clamps and class floors
 afterward; complete
-character-creation draw alignment is unverified. Multi-classing, HP/AC, portraits, equipment,
+character-creation draw alignment and age modifiers are unverified. Multi-classing, HP/AC, portraits, equipment,
 spells, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
 

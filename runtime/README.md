@@ -200,6 +200,12 @@ and alignment, enter a name, and confirm Add to party. Escape cancels the curren
 selection/draft; F10 resets the entire launch session. View and Remove character
 operate on the current roster, with confirmation before removal.
 
+When a race configures starting-age dice (including Pool's supported races),
+class selection precedes age and ability rolling. Age uses the shared session
+RNG, remains fixed during score rerolls, appears in the summary, and survives
+save/load. Age-based ability adjustments remain unimplemented; exact original
+creation scores and draw ordering are not yet reproduced.
+
 Pool uses its profile-selected compatibility RNG for creation and ECL RANDOM.
 Each ability keeps the best of six 3d6 trials. The default startup seed is 1;
 `--seed <decimal-or-0x-uint32>` selects another reproducible stream. Engine saves

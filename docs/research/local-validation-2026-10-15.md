@@ -766,3 +766,43 @@ passed. The SDL regression creates a class requiring 12 from a raw ability of 3,
 then verifies the raised value survives save/load. Synthetic tests also cover
 all four floor vectors, unchanged RNG state, impossible caps, malformed rules,
 legacy rules without floors and existing saved characters below creation floors.
+
+### Starting-age generation (2026-10-17)
+
+The original single-class creator generates age after class selection and before
+ability rolls. A bounded private probe enters GAME.OVR offset 0x1A862 and stops
+before 0x1AB60, using the original dice/runtime routines and synthetic character
+records. Across all 17 supported race/class pairs and six initial states
+(0, 1, FFFFFFFF, 12345678, 2E4D0932 and 23), **102 cases** complete with exactly
+the configured number of runtime draws: **318 total**. The method excludes
+earlier setup and subsequent ability/age-modifier processing.
+
+The observed model is a class/race-specific base plus NdS. Examples from state
+0x12345678 are dwarf fighter 40+5d4 = 52, elf fighter 130+5d6 = 148, human
+fighter 15+1d4 = 19, and human magic-user 24+2d4 = 32. Corresponding final states
+are 3859354085, 3859354085, 3411775577 and 2046801342. The private reproduction
+and numeric report are `.cache/goldbox-validation/emulate_original_starting_age.py`
+and `original-starting-age-report.json`; per-case limits remain 10,000
+instructions/100 ms, with ten-second total and 15-second outer process bounds.
+
+The independent implementation adds optional `startingAge` data to existing
+race rules and optional normalized age to party records. It reuses the existing
+dice mapping and shared RNG; no upstream code or original character bytes are
+copied. Seventeen public numeric fixtures check age and final state, plus
+synthetic persistence, invalid-input and legacy-unknown-age cases. Configured
+UI creation selects a class before generating age, then rolls abilities;
+unconfigured creators preserve their old flow and consume no age draws.
+
+Age-based ability modifiers are not implemented in this milestone. The original
+applies those before racial clamps; applying them at completion to already
+clamped scores would be incorrect. Reroll/native UI behavior, the earlier
+Random(256) draw, alignment sequencing and exceptional-strength draw timing
+also remain unverified or unfinished. This verifies age generation and storage,
+not complete original character-creation or gameplay parity.
+
+Verification: the bounded serialized two-job build and all 26 public CTest
+suites passed in 20.38 seconds. The optional private integration suite skipped
+for unconfigured inputs. Hygiene, attribution and whitespace checks passed.
+Synthetic tests cover all 17 seeded age fixtures, exact final RNG states,
+continuation after restore, unknown legacy ages, rejected age values/dice/class
+references, and SDL creation with age preserved through save/load.

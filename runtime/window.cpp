@@ -257,6 +257,7 @@ public:
     std::string character_summary(const Character& c) {
         const auto& rules = *session.character_rules;
         std::string result = c.name + " / " + c.race + " / " + c.character_class + " / " + c.alignment + "\n";
+        if (c.age) result += "AGE " + std::to_string(*c.age) + "\n";
         for (std::size_t i = 0; i < c.abilities.size(); ++i) {
             result += rules.abilities[i].label + " " + std::to_string(c.abilities[i].value);
             if (c.abilities[i].percentile) result += "/" + (c.abilities[i].percentile == 100 ?
@@ -300,20 +301,40 @@ public:
         c.race = rules.races[*race].id;
         const auto gender = pick_option(rules.genders,"CREATE CHARACTER / GENDER"); if (!gender) return;
         c.gender = rules.genders[*gender].id;
+        std::optional<std::size_t> class_index;
+        std::vector<std::string> labels;
+        const auto pick_class = [&] {
+            const auto available = creation_classes(rules,c);
+            labels.clear();
+            for (const auto i : available) labels.push_back(rules.classes[i].label);
+            const auto selected = pick(labels,"CREATE CHARACTER / CLASS");
+            if (!selected) return false;
+            class_index = available[*selected]; c.character_class = rules.classes[*class_index].id;
+            return true;
+        };
+        if (!rules.races[*race].starting_ages.empty()) {
+            for (const auto value : rules.races[*race].maximum.at(c.gender)) c.abilities.push_back({value,0});
+            if (!pick_class()) return;
+            if (session.initial_random && !session.state.random)
+                throw std::runtime_error("This legacy save has no random state; start a new seeded game");
+            c.age = session.state.random ? roll_starting_age(rules,c.race,c.character_class,*session.state.random) :
+                roll_starting_age(rules,c.race,c.character_class,creation_random);
+        }
         while (true) {
             if (session.initial_random && !session.state.random)
                 throw std::runtime_error("This legacy save has no random state; start a new seeded game to roll characters");
             c.abilities = session.state.random ? roll_abilities(rules,c.race,c.gender,*session.state.random) :
                 roll_abilities(rules,c.race,c.gender,creation_random);
-            const auto choice = pick({"KEEP SCORES","REROLL","CANCEL"},character_summary(c));
-            if (!choice || *choice == 2) return;
-            if (*choice == 0) break;
+            const auto available = creation_classes(rules,c);
+            const bool qualifies = !class_index ||
+                std::find(available.begin(),available.end(),*class_index) != available.end();
+            const auto choice = qualifies ? pick({"KEEP SCORES","REROLL","CANCEL"},character_summary(c)) :
+                pick({"REROLL","CANCEL"},character_summary(c)+"\nCLASS REQUIREMENTS NOT MET");
+            if (!choice || (qualifies ? *choice == 2 : *choice == 1)) return;
+            if (qualifies && *choice == 0) break;
         }
-        const auto available = creation_classes(rules,c);
-        std::vector<std::string> labels;
-        for (const auto i : available) labels.push_back(rules.classes[i].label);
-        const auto selected_class = pick(labels,"CREATE CHARACTER / CLASS"); if (!selected_class) return;
-        const auto& class_rule = rules.classes[available[*selected_class]]; c.character_class = class_rule.id;
+        if (!class_index && !pick_class()) return;
+        const auto& class_rule = rules.classes[*class_index];
         labels.clear();
         for (const auto& a : class_rule.alignments) {
             const auto it = std::find_if(rules.alignments.begin(),rules.alignments.end(),[&](const auto& v) { return v.id == a; });

@@ -11,6 +11,7 @@
 
 namespace goldbox {
 struct CreationChoice { std::string id, label; };
+struct StartingAgeDice { int base{}, count{}, sides{}; };
 struct CreationRace {
     std::string id, label;
     std::vector<int> minimum;
@@ -19,6 +20,7 @@ struct CreationRace {
     std::vector<std::string> classes;
     // Empty preserves legacy unadjusted rolling; otherwise one signed value per ability.
     std::vector<int> adjustments;
+    std::map<std::string,StartingAgeDice> starting_ages{};
 };
 struct CreationClass {
     std::string id, label;
@@ -47,9 +49,14 @@ struct Character {
     std::vector<AbilityValue> abilities;
     // Symbolic condition; absent means unknown (including legacy engine saves).
     std::optional<std::string> status{};
+    std::optional<std::uint16_t> age{}; // Unknown for legacy parties; no automatic inference on load.
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);
+std::optional<std::uint16_t> roll_starting_age(const CreationRules& rules, std::string_view race,
+    std::string_view character_class, std::mt19937& random);
+std::optional<std::uint16_t> roll_starting_age(const CreationRules& rules, std::string_view race,
+    std::string_view character_class, HighWordLcg32& random);
 // Explicit generator, bounded rejection and fixed dice mapping: reproducible across STL implementations.
 std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
     std::string_view gender, std::mt19937& random);

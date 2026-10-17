@@ -52,6 +52,44 @@ int main(int argc, char** argv) {
     assert(profile.random && profile.random->state() == 1);
     assert(profile.random_dialect == EclRandomDialect::byte_upper);
     const auto& rules = *profile.character_rules;
+    struct AgeObservation { const char* race; const char* character_class; int age; std::uint32_t after; };
+    const AgeObservation ages[]{
+        {"dwarf","fighter",52,3859354085u},{"dwarf","thief",82,3651437751u},
+        {"elf","fighter",148,3859354085u},{"elf","magic-user",168,3859354085u},
+        {"elf","thief",118,3859354085u},{"gnome","fighter",72,3859354085u},
+        {"gnome","thief",92,3859354085u},{"half-elf","cleric",48,2046801342},
+        {"half-elf","fighter",31,3651437751u},{"half-elf","magic-user",42,2046801342},
+        {"half-elf","thief",39,3651437751u},{"halfling","fighter",29,3651437751u},
+        {"halfling","thief",48,2046801342},{"human","cleric",22,3411775577u},
+        {"human","fighter",19,3411775577u},{"human","magic-user",32,2046801342},
+        {"human","thief",22,3411775577u}
+    };
+    for (const auto& observed : ages) {
+        HighWordLcg32 rng(0x12345678,profile.random->multiplier(),1);
+        assert(roll_starting_age(rules,observed.race,observed.character_class,rng) == observed.age);
+        assert(rng.state() == observed.after);
+    }
+    auto no_age = rules;
+    for (auto& race : no_age.races) race.starting_ages.clear();
+    HighWordLcg32 no_age_rng(1,profile.random->multiplier(),1);
+    assert(!roll_starting_age(no_age,"human","fighter",no_age_rng) && no_age_rng.state() == 1);
+    rejects([&] { (void)roll_starting_age(rules,"dwarf","magic-user",no_age_rng); });
+    assert(no_age_rng.state() == 1);
+    auto invalid_age = rules;
+    invalid_age.races[0].starting_ages["fighter"].count = 0;
+    rejects([&] { (void)roll_starting_age(invalid_age,"dwarf","fighter",no_age_rng); });
+    assert(no_age_rng.state() == 1);
+    auto aged = session_for(profile);
+    Character aged_pc{"Aged","human","male","fighter","lawful-good",std::vector<AbilityValue>(6,{15,0})};
+    aged_pc.age = roll_starting_age(rules,"human","fighter",*aged.state.random);
+    add_character(aged.party,rules,finish_character(rules,aged_pc,*aged.state.random));
+    const auto age_save = serialize_exploration(aged,"synthetic-age");
+    const auto next_age = roll_starting_age(rules,"human","fighter",*aged.state.random);
+    auto age_restored = session_for(profile);
+    restore_exploration(age_restored,age_save,"synthetic-age");
+    assert(age_restored.party[0].age == aged_pc.age);
+    assert(roll_starting_age(rules,"human","fighter",*age_restored.state.random) == next_age);
+    assert(age_restored.state.random->state() == aged.state.random->state());
     assert(rules.bounds == CreationBounds::clamp && rules.percentile_roll_maximum == 100);
     assert(rules.dice_count == 3 && rules.dice_sides == 6 && rules.drop_lowest == 0 && rules.keep_best_of == 6);
     std::ifstream source(argv[1]);
