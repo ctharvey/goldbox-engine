@@ -2,6 +2,15 @@
 
 ## 2026-10-16
 
+- Harden the comparison controller: reject WSL launchers (bash, wsl, distro
+  launchers) by name and by the OS-resolved image of the suspended child, and
+  compare `privateRoot`/`reference.cwd` by file identity so UNC, `\\?\` aliases
+  and ancestors of the repository no longer pass. Split `scripts/compare_game.py`
+  into `compare_*` modules (config, lock, process, WSL, streams, session) with the
+  CLI entry point and names unchanged. Replace the README-only `importers/` and
+  `gameplay/` stubs with a documented target layout in `docs/architecture.md`.
+  Remaining controller findings are in the 2026-10-16 controller review.
+
 - Connect an opt-in three-operand ECL image dialect to typed host callbacks and
   SDL picture/sprite display from explicitly selected archives. Add transient
   presentation state, wall-clamped sprite distances, clearing and resource-error
