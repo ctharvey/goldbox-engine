@@ -24,6 +24,11 @@ the headless build and JSONL harness without an SDL dependency.
 Arrows or WASD move forward/backward and turn. Space searches, R rests, I runs
 initialization explicitly, F5 saves to a new file, F9 restores, Escape closes.
 Menus use Up/Down and Enter; map actions are suspended until a choice is made.
+F10 restarts from the launch state in exploration, event menus, or startup. It
+returns to the first title when `--startup` is active; otherwise it resets the
+exploration preview without automatically initializing it. Current unsaved
+progress, image/animation state and event menus are discarded; save files are
+untouched. Original launch map, facing, memory and wall bindings are restored.
 Turning alone does not execute an ECL movement event. Backward movement preserves
 facing. Resizing letterboxes a 960x640 logical view; the window sleeps until an
 input/window event rather than rendering continuously.

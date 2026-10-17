@@ -37,6 +37,7 @@ public:
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> font_texture{nullptr,SDL_DestroyTexture};
     bool running{true};
+    bool restart_requested{};
     std::deque<std::string> lines;
     std::vector<std::string> choices;
     std::size_t selected{};
@@ -163,7 +164,7 @@ public:
                 }
             }
             color(220,220,220);
-            label(24,608,menu ? "UP / DOWN, ENTER TO SELECT - ESC TO QUIT" : "ENTER / SPACE TO CONTINUE - ESC TO QUIT");
+            label(24,608,menu ? "UP / DOWN, ENTER TO SELECT - ESC TO QUIT - F10 RESTART" : "ENTER / SPACE TO CONTINUE - ESC TO QUIT - F10 RESTART");
             if (!error.empty()) { color(255,160,140); label(24,624,error.substr(0,114)); }
             checked(SDL_RenderPresent(renderer));
             SDL_Event event;
@@ -172,6 +173,7 @@ public:
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) return 0;
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
             const auto key = event.key.key;
+            if (key == SDLK_F10) { restart_requested = true; return 0; }
             if (!menu) {
                 if (key == SDLK_RETURN || key == SDLK_SPACE) ++screen;
             } else {
@@ -303,13 +305,13 @@ public:
         label(664,390,std::string("FACING ") + directions[facing]);
         color(145,157,167);
         label(24,448,"ARROWS/WASD move + turn | SPACE search | R rest | I initialize");
-        label(24,464,"F5 save | F9 load | ESC quit | starts at (0,0), empty state");
+        label(24,464,"F5 save | F9 load | F10 restart | ESC quit");
         color(222,221,204);
         const auto first = lines.size() > 7 ? lines.size() - 7 : 0;
         for (std::size_t i = first; i < lines.size(); ++i) label(24,492 + float(i-first)*16,lines[i]);
         if (!choices.empty()) {
             color(22,29,37); rectangle(50,118,548,280);
-            color(207,176,112); label(66,134,"CHOOSE / UP + DOWN, ENTER");
+            color(207,176,112); label(66,134,"CHOOSE / UP + DOWN, ENTER / F10 RESTART");
             const auto start = selected >= 8 ? selected - 7 : 0;
             for (std::size_t i = start; i < choices.size() && i < start + 8; ++i) {
                 color(i == selected ? 233 : 160,i == selected ? 194 : 171,i == selected ? 104 : 180);
@@ -334,6 +336,11 @@ public:
                 break;
             }
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
+            if (event.key.key == SDLK_F10) {
+                restart_requested = true;
+                choices.clear();
+                throw std::runtime_error("Restart requested during event menu");
+            }
             if (event.key.key == SDLK_UP) selected = (selected + choices.size()-1) % choices.size();
             if (event.key.key == SDLK_DOWN) selected = (selected+1) % choices.size();
             if (event.key.key == SDLK_RETURN) {
@@ -373,74 +380,81 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const auto create_host = [&] {
         return std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
     };
-    auto window_host = create_host();
-    if (!startup_screens.empty()) {
-        const auto initial_session = session;
-        std::string error;
-        while (true) {
-            const auto action = window_host->startup(startup_screens,error);
-            if (!action) return 0;
+    const auto initial_session = session;
+    while (true) {
+        auto window_host = create_host();
+        if (!startup_screens.empty()) {
+            std::string error;
+            while (true) {
+                const auto action = window_host->startup(startup_screens,error);
+                if (window_host->restart_requested) break;
+                if (!action) return 0;
+                try {
+                    if (action == 1) {
+                        const auto result = session.trigger(formats::EclEventKind::initialize,*window_host);
+                        if (window_host->restart_requested) break;
+                        if (!window_host->running) return 0;
+                        if (!result.exited) throw std::runtime_error("Initialization stopped: " + result.diagnostic);
+                    } else window_host->load_save(save,identity);
+                    break;
+                } catch (const std::exception& failure) {
+                    error = failure.what();
+                    window_host.reset();
+                    session = initial_session;
+                    window_host = create_host();
+                }
+            }
+        }
+        auto& host = *window_host;
+        host.text(startup_screens.empty() ?
+            "Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented." :
+            "Exploration ready. Arrows move, Space searches, F5 saves, F9 loads; I reruns initialization.",false);
+        const auto trigger = [&](formats::EclEventKind kind) {
+            const auto result = session.trigger(kind,host);
+            if (!result.exited && !host.restart_requested) host.text("Event stopped: " + result.diagnostic,false);
+        };
+        while (host.running && !host.restart_requested) {
+            host.animate();
+            host.draw();
+            SDL_Event event;
+            if (!host.wait(event)) continue;
+            if (event.type == SDL_EVENT_QUIT) break;
+            if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
+            const auto key = event.key.key;
+            if (key == SDLK_ESCAPE) break;
+            if (key == SDLK_F10) { host.restart_requested = true; break; }
             try {
-                if (action == 1) {
-                    const auto result = session.trigger(formats::EclEventKind::initialize,*window_host);
-                    if (!window_host->running) return 0;
-                    if (!result.exited) throw std::runtime_error("Initialization stopped: " + result.diagnostic);
-                } else window_host->load_save(save,identity);
-                break;
-            } catch (const std::exception& failure) {
-                error = failure.what();
-                window_host.reset();
-                session = initial_session;
-                window_host = create_host();
+                if (key == SDLK_LEFT || key == SDLK_A || key == SDLK_RIGHT || key == SDLK_D) {
+                    const int turn = key == SDLK_LEFT || key == SDLK_A ? 3 : 1;
+                    session.facing = static_cast<Direction>((unsigned(session.facing)+turn)%4);
+                } else if (key == SDLK_UP || key == SDLK_W || key == SDLK_DOWN || key == SDLK_S) {
+                    const auto facing = session.facing;
+                    const bool backwards = key == SDLK_DOWN || key == SDLK_S;
+                    const bool moved = session.move(static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4));
+                    session.facing = facing;
+                    if (moved) trigger(formats::EclEventKind::move);
+                    else host.text("Movement blocked.",false);
+                } else if (key == SDLK_SPACE) trigger(formats::EclEventKind::search);
+                else if (key == SDLK_R) trigger(formats::EclEventKind::rest);
+                else if (key == SDLK_I) trigger(formats::EclEventKind::initialize);
+                else if (key == SDLK_F5) {
+                    if (std::filesystem::exists(save) || std::filesystem::is_symlink(save))
+                        throw std::runtime_error("Refusing to overwrite an existing save");
+                    std::ofstream output(save,std::ios::binary);
+                    output << serialize_exploration(session,identity) << '\n';
+                    if (!output) throw std::runtime_error("Failed writing save");
+                    host.text("State saved.",false);
+                } else if (key == SDLK_F9) {
+                    host.load_save(save,identity);
+                    host.text("State restored.",false);
+                }
+            } catch (const std::exception& error) {
+                host.text(error.what(),false);
             }
         }
+        if (!host.restart_requested) return 0;
+        window_host.reset();
+        session = initial_session;
     }
-    auto& host = *window_host;
-    host.text(startup_screens.empty() ?
-        "Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented." :
-        "Exploration ready. Arrows move, Space searches, F5 saves, F9 loads; I reruns initialization.",false);
-    const auto trigger = [&](formats::EclEventKind kind) {
-        const auto result = session.trigger(kind,host);
-        if (!result.exited) host.text("Event stopped: " + result.diagnostic,false);
-    };
-    while (host.running) {
-        host.animate();
-        host.draw();
-        SDL_Event event;
-        if (!host.wait(event)) continue;
-        if (event.type == SDL_EVENT_QUIT) break;
-        if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
-        const auto key = event.key.key;
-        if (key == SDLK_ESCAPE) break;
-        try {
-            if (key == SDLK_LEFT || key == SDLK_A || key == SDLK_RIGHT || key == SDLK_D) {
-                const int turn = key == SDLK_LEFT || key == SDLK_A ? 3 : 1;
-                session.facing = static_cast<Direction>((unsigned(session.facing)+turn)%4);
-            } else if (key == SDLK_UP || key == SDLK_W || key == SDLK_DOWN || key == SDLK_S) {
-                const auto facing = session.facing;
-                const bool backwards = key == SDLK_DOWN || key == SDLK_S;
-                const bool moved = session.move(static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4));
-                session.facing = facing;
-                if (moved) trigger(formats::EclEventKind::move);
-                else host.text("Movement blocked.",false);
-            } else if (key == SDLK_SPACE) trigger(formats::EclEventKind::search);
-            else if (key == SDLK_R) trigger(formats::EclEventKind::rest);
-            else if (key == SDLK_I) trigger(formats::EclEventKind::initialize);
-            else if (key == SDLK_F5) {
-                if (std::filesystem::exists(save) || std::filesystem::is_symlink(save))
-                    throw std::runtime_error("Refusing to overwrite an existing save");
-                std::ofstream output(save,std::ios::binary);
-                output << serialize_exploration(session,identity) << '\n';
-                if (!output) throw std::runtime_error("Failed writing save");
-                host.text("State saved.",false);
-            } else if (key == SDLK_F9) {
-                host.load_save(save,identity);
-                host.text("State restored.",false);
-            }
-        } catch (const std::exception& error) {
-            host.text(error.what(),false);
-        }
-    }
-    return 0;
 }
 } // namespace goldbox

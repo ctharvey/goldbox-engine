@@ -2,6 +2,10 @@
 
 ## 2026-10-16
 
+- Add F10 restart from exploration, event menus and startup. Restore launch
+  state and recreate presentation resources, return to titles when enabled,
+  and leave save files untouched.
+
 - Add opt-in profile-selected title screens and an exploration startup menu.
   Initialize the paired map before movement, load engine saves without rerunning
   initialization, and return to the menu with rolled-back state on failures.

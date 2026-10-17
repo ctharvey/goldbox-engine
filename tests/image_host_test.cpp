@@ -249,16 +249,30 @@ int main(int argc, char** argv) {
     assert(!std::filesystem::exists(startup_save));
     session = {}; session.dialect = dialect; session.opcodes = ops;
     session.ecl_record = program({9,0,42,1,0,0x4a,0});
-    const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys) {
+    const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true) {
         SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
         for (const auto code : keys) {
             SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = code;
             assert(SDL_PushEvent(&event));
         }
         assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,nullptr,nullptr,{},
-            nullptr,nullptr,screens) == 0);
+            nullptr,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{}) == 0);
         SDL_Quit();
     };
+    const auto initial_startup = serialize_exploration(session,"startup-synthetic");
+    startup_window({SDLK_F10,SDLK_F10,SDLK_ESCAPE});
+    startup_window({SDLK_RETURN,SDLK_F10,SDLK_ESCAPE});
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RIGHT,SDLK_F10,SDLK_ESCAPE});
+    assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
+    startup_window({SDLK_SPACE,SDLK_RIGHT,SDLK_F10,SDLK_ESCAPE},false);
+    assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
+    const auto initial_program = session.ecl_record;
+    session.ecl_record = program({9,0,77,1,0,0x4a,0x2b,1,3,0x4a,0,2,0x80,1,4,0x80,1,8,0});
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_F10,SDLK_ESCAPE}); // Restart inside initialization menu.
+    assert(session.state.memory[0x4a00] == 0 && session.state.memory[0x4a03] == 0);
+    startup_window({SDLK_SPACE,SDLK_F10,SDLK_ESCAPE},false); // Restart inside exploration event menu.
+    assert(session.state.memory[0x4a00] == 0 && session.state.memory[0x4a03] == 0);
+    session.ecl_record = initial_program;
     startup_window({SDLK_ESCAPE});
     assert(session.state.memory[0x4a00] == 0); // Title escape does not initialize.
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN});
@@ -270,6 +284,14 @@ int main(int argc, char** argv) {
     session.state.memory[0x4a00] = 99;
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.state.memory[0x4a00] == 42); // Load uses saved state.
+    const auto read_startup_save = [&] {
+        std::ifstream input(startup_save);
+        return std::string{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
+    };
+    const auto saved_startup = read_startup_save();
+    session.state.memory[0x4a00] = 99;
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_F10,SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 99 && read_startup_save() == saved_startup);
     session.ecl_record = program({9,0,73,1,0,0x4a,0xff});
     session.state.memory[0x4a00] = 11;
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE});
@@ -321,6 +343,8 @@ int main(int argc, char** argv) {
     };
     session = {}; session.dialect = dialect; session.opcodes = ops;
     session.ecl_record = program({0x37,0,7,0,255,0,255,9,0,42,1,1,0x4a,0});
+    window({SDLK_SPACE,SDLK_F10,SDLK_ESCAPE},walls);
+    assert(!session.wall_banks && session.state.memory[0x4a01] == 0);
     window({SDLK_SPACE,SDLK_F5,SDLK_ESCAPE},walls);
     assert((session.wall_banks == std::array<std::uint8_t,3>{7,255,255}));
     assert(session.state.memory[0x4a01] == 42);
