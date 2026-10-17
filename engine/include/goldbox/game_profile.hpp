@@ -1,6 +1,7 @@
 #pragma once
 #include "goldbox/formats/graphics.hpp"
 #include "goldbox/party.hpp"
+#include "goldbox/party_memory.hpp"
 
 #include <filesystem>
 #include <cstdint>
@@ -43,6 +44,7 @@ struct GameProfile {
     std::uint32_t picture_period_ms{};
     std::vector<std::uint8_t> startup_title_records; // Ordered screens; last is the menu backdrop.
     std::optional<CreationRules> character_rules{};
+    std::optional<PartyMemoryLayout> party_memory{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

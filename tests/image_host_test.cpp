@@ -89,12 +89,15 @@ int main(int argc, char** argv) {
         };
         const auto geo = DaxArchive::from_file(argv[3]);
         ExplorationSession context;
+        context.character_rules = profile.character_rules;
+        context.party_memory = profile.party_memory;
         context.map = extract_geo16_map(geo,id(argv[4]));
         context.ecl_record = DaxArchive::from_file(argv[5]).extract(id(argv[6]));
         const auto& config = *profile.event_dispatch;
         context.dialect = {config.dialect,config.code_base,config.square_info_address,true,config.position_addresses};
         context.opcodes = minimal_vm_opcodes(profile.image_dialect == "ssi-images-3-v1" ? EclImageDialect::sprite3 : EclImageDialect::disabled,
-            profile.area_dialect == "ssi-area-map3-v1" ? EclAreaDialect::map3 : EclAreaDialect::disabled);
+            profile.area_dialect == "ssi-area-map3-v1" ? EclAreaDialect::map3 : EclAreaDialect::disabled,
+            profile.party_memory ? EclPartyDialect::load_character : EclPartyDialect::disabled);
         context.maps = MapResources{[geo](std::uint8_t record) { return extract_geo16_map(geo,record); },"read-only-local-probe"};
         struct Probe : EclHost {
             ExplorationSession& session;
@@ -325,6 +328,11 @@ int main(int argc, char** argv) {
     session.party.clear();
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.party.size() == 1 && session.party[0].name == "ALICE");
+    auto second_member = session.party.front(); second_member.name = "BOB";
+    session.party.push_back(second_member); session.loaded_character = 1;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,
+        SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
+    assert(session.party.size() == 1 && session.party.front().name == "BOB" && session.loaded_character == 0);
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,
         SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
     assert(session.party.empty()); // Remove member, return to startup, quit.

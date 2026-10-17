@@ -26,7 +26,52 @@ class SessionHost final : public EclHost {
     ExplorationSession& session;
     EclHost& delegate;
 public:
-    SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {}
+    SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {
+        if (session.party_memory) {
+            if (!session.character_rules) throw std::runtime_error("Party memory requires creation rules");
+            const auto& layout = *session.party_memory;
+            validate_party_memory_layout(layout,*session.character_rules);
+            if (party_memory_intersects(layout,session.dialect.square_info_address,1))
+                throw std::runtime_error("Party memory overlaps event context");
+            if (session.dialect.position_addresses) for (const auto address : *session.dialect.position_addresses)
+                if (party_memory_intersects(layout,address,1))
+                    throw std::runtime_error("Party memory overlaps event position");
+            const auto begin = std::size_t(session.dialect.code_base);
+            const auto end = begin+session.ecl_record.size(); // Conservative program footprint including headers.
+            if ((layout.record_base < end && std::size_t(layout.record_base)+layout.record_size > begin) ||
+                (layout.count_address >= begin && layout.count_address < end))
+                throw std::runtime_error("Party memory overlaps ECL program");
+        }
+    }
+    void load_character(std::uint8_t index) override {
+        if (!session.party_memory) { delegate.load_character(index); return; }
+        if (index >= session.party.size()) throw std::runtime_error("Character index outside current party");
+        session.loaded_character = index;
+    }
+    std::optional<std::uint8_t> memory_byte(std::uint16_t address) override {
+        if (session.party_memory) {
+            if (const auto value = party_memory_byte(*session.party_memory,*session.character_rules,
+                session.party,session.loaded_character,address)) return value;
+        }
+        return delegate.memory_byte(address);
+    }
+    bool write_memory(std::uint16_t address, std::uint32_t value, std::size_t width) override {
+        if (session.party_memory && party_memory_intersects(*session.party_memory,address,width))
+            throw std::runtime_error("Script writes to party memory are unsupported");
+        return delegate.write_memory(address,value,width);
+    }
+    std::optional<std::string> string_at(std::uint16_t address) override {
+        if (session.party_memory) {
+            if (const auto value = party_memory_string(*session.party_memory,session.party,
+                session.loaded_character,address)) return value;
+        }
+        return delegate.string_at(address);
+    }
+    bool write_string(std::uint16_t address, std::string_view value) override {
+        if (session.party_memory && party_memory_intersects(*session.party_memory,address,1))
+            throw std::runtime_error("Script writes to party strings are unsupported");
+        return delegate.write_string(address,value);
+    }
     void text(std::string_view value, bool clear) override { delegate.text(value,clear); }
     std::size_t menu(std::span<const std::string> choices, std::string_view prompt, bool vertical) override {
         return delegate.menu(choices,prompt,vertical);
@@ -93,8 +138,12 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
         state.memory[addresses[1]] = row;
         state.memory[addresses[2]] = static_cast<std::uint8_t>(facing);
     }
-    SessionHost session_host(*this,host);
-    return execute_ecl(ecl_record, kind, dialect, opcodes, state, session_host, limits);
+    try {
+        SessionHost session_host(*this,host);
+        return execute_ecl(ecl_record, kind, dialect, opcodes, state, session_host, limits);
+    } catch (const std::exception& error) {
+        EclExecution failure; failure.diagnostic = error.what(); return failure;
+    }
 }
 
 std::string serialize_exploration(const ExplorationSession& session, std::string_view source_identity) {
@@ -112,6 +161,12 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
     if (session.character_rules) {
         object["party"] = bj::parse(serialize_party(session.party,*session.character_rules));
     } else if (!session.party.empty()) throw std::runtime_error("Party requires creation rules");
+    if (session.party_memory) {
+        if ((session.party.empty() && session.loaded_character != 0) ||
+            (!session.party.empty() && session.loaded_character >= session.party.size()))
+            throw std::runtime_error("Invalid loaded character in save");
+        object["loadedCharacter"] = session.loaded_character;
+    } else if (session.loaded_character) throw std::runtime_error("Loaded character requires party memory adapter");
     if (session.wall_banks) {
         bj::array banks;
         for (const auto id : *session.wall_banks) banks.push_back(id);
@@ -138,7 +193,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
     j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks",
-        "area", "mapRecord", "mapSource", "party"}, "save");
+        "area", "mapRecord", "mapSource", "party", "loadedCharacter"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -197,6 +252,13 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
         if (!session.character_rules) throw std::runtime_error("Saved party requires matching creation rules");
         party = read_party(boost::json::serialize(*value),*session.character_rules);
     }
+    std::uint8_t loaded_character = 0;
+    if (const auto* value = root.if_contains("loadedCharacter")) {
+        if (!session.party_memory) throw std::runtime_error("Saved loaded character requires party memory adapter");
+        loaded_character = static_cast<std::uint8_t>(bounded(*value,255));
+        if ((party.empty() && loaded_character != 0) || (!party.empty() && loaded_character >= party.size()))
+            throw std::runtime_error("Saved loaded character outside current party");
+    }
     (void)map.cell(row,column);
     // Publish only after validating the entire save; failed loads change nothing.
     if (!session.initial_map_record) session.initial_map_record = session.map.dax_record_id;
@@ -205,6 +267,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     session.wall_banks = banks;
     session.state = std::move(state);
     session.party = std::move(party);
+    session.loaded_character = loaded_character;
     session.row = static_cast<std::uint8_t>(row);
     session.column = static_cast<std::uint8_t>(column);
     session.facing = static_cast<Direction>(facing);

@@ -17,5 +17,48 @@
   "rulesProfile": "adnd-first-edition-creation-v1",
   "characterCreationRules": "../../rules/adnd-first-edition-creation.json",
   "validationStatus": "unverified",
-  "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"]
+  "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"],
+  "partyMemory": {
+    "dialect": "ssi-selected-character-v1",
+    "recordBase": 27392,
+    "recordSize": 511,
+    "countAddress": 28222,
+    "abilities": [
+      {
+        "offset": 16,
+        "ability": "strength",
+        "percentile": false
+      },
+      {
+        "offset": 17,
+        "ability": "intelligence",
+        "percentile": false
+      },
+      {
+        "offset": 18,
+        "ability": "wisdom",
+        "percentile": false
+      },
+      {
+        "offset": 19,
+        "ability": "dexterity",
+        "percentile": false
+      },
+      {
+        "offset": 20,
+        "ability": "constitution",
+        "percentile": false
+      },
+      {
+        "offset": 21,
+        "ability": "charisma",
+        "percentile": false
+      },
+      {
+        "offset": 22,
+        "ability": "strength",
+        "percentile": true
+      }
+    ]
+  }
 }

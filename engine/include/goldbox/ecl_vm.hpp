@@ -5,6 +5,7 @@
 
 #include <array>
 #include <map>
+#include <optional>
 
 namespace goldbox {
 
@@ -15,6 +16,7 @@ struct EclState {
 };
 enum class EclImageDialect { disabled, sprite3 };
 enum class EclAreaDialect { disabled, map3 };
+enum class EclPartyDialect { disabled, load_character };
 struct EclSpriteRequest {
     std::uint8_t sprite{}, distance{}, replacement_picture{};
 };
@@ -32,6 +34,12 @@ public:
     virtual void clear_images();
     virtual void wall_banks(std::array<std::uint8_t,3> banks);
     virtual void load_area(std::array<std::uint8_t,3> values);
+    virtual void load_character(std::uint8_t index);
+    // Optional virtual memory overlays. Unhandled accesses retain ordinary RAM/string semantics.
+    virtual std::optional<std::uint8_t> memory_byte(std::uint16_t address);
+    virtual bool write_memory(std::uint16_t address, std::uint32_t value, std::size_t width);
+    virtual std::optional<std::string> string_at(std::uint16_t address);
+    virtual bool write_string(std::uint16_t address, std::string_view value);
 };
 
 struct EclLimits {
@@ -60,6 +68,6 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEvent
     EclState& state, EclHost& host, EclLimits limits = {});
 
 std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
-    EclAreaDialect area = EclAreaDialect::disabled);
+    EclAreaDialect area = EclAreaDialect::disabled, EclPartyDialect party = EclPartyDialect::disabled);
 
 } // namespace goldbox

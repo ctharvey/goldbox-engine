@@ -341,7 +341,11 @@ public:
                 if (*action == 1) (void)pick({"BACK"},summary);
                 else {
                     const auto remove = pick({"REMOVE FROM PARTY","CANCEL"},summary);
-                    if (remove && *remove == 0) session.party.erase(session.party.begin()+*member);
+                    if (remove && *remove == 0) {
+                        session.party.erase(session.party.begin()+*member);
+                        if (session.loaded_character == *member) session.loaded_character = 0;
+                        else if (session.loaded_character > *member) --session.loaded_character;
+                    }
                 }
             } catch (const std::exception& error) {
                 if (restart_requested || !running) throw;

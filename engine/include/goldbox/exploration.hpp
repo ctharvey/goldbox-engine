@@ -2,6 +2,7 @@
 #pragma once
 #include "goldbox/ecl_vm.hpp"
 #include "goldbox/party.hpp"
+#include "goldbox/party_memory.hpp"
 #include <functional>
 
 namespace goldbox {
@@ -31,6 +32,8 @@ struct ExplorationSession {
     std::optional<std::uint8_t> initial_map_record{};
     std::optional<CreationRules> character_rules{};
     Party party;
+    std::optional<PartyMemoryLayout> party_memory{};
+    std::uint8_t loaded_character{};
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);

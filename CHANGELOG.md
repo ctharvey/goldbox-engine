@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-17
+
+- Connect normalized parties to ECL through an optional profile-selected,
+  read-only memory adapter: LOAD_CHAR, names, abilities, exceptional scores and
+  party count. Persist loaded-character selection; reject unsupported fields,
+  writes and conflicting layouts. Original character-access parity is unverified.
+
 ## 2026-10-16
 
 - Add startup character creation, rerolling, party review/removal and party-aware

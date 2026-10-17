@@ -349,6 +349,7 @@ int main(int argc, char** argv) {
         auto ecl = goldbox::formats::DaxArchive::from_file(argv[4]).extract(ecl_id);
         goldbox::ExplorationSession session;
         session.character_rules = profile.character_rules;
+        session.party_memory = profile.party_memory;
 #ifdef GOLDBOX_RENDERER
         session.wall_banks = initial_banks;
 #endif
@@ -361,7 +362,8 @@ int main(int argc, char** argv) {
         session.dialect = {config.dialect, config.code_base, config.square_info_address, true, config.position_addresses};
         session.opcodes = goldbox::minimal_vm_opcodes(profile.image_dialect == "ssi-images-3-v1" ?
             goldbox::EclImageDialect::sprite3 : goldbox::EclImageDialect::disabled,
-            profile.area_dialect == "ssi-area-map3-v1" ? goldbox::EclAreaDialect::map3 : goldbox::EclAreaDialect::disabled);
+            profile.area_dialect == "ssi-area-map3-v1" ? goldbox::EclAreaDialect::map3 : goldbox::EclAreaDialect::disabled,
+            profile.party_memory ? goldbox::EclPartyDialect::load_character : goldbox::EclPartyDialect::disabled);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
         std::ostringstream identity;
         identity << profile.id << ':' << fs::path(argv[2]).filename().string() << ':' << unsigned(geo_id) << ':'

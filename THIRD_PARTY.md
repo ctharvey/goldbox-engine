@@ -189,3 +189,11 @@ supported dungeon selectors. The C++ read-only resolver, atomic map transition
 and map-aware save binding are independently implemented, without upstream
 private virtual-memory addresses or filename-search policy. No Java source was
 copied or translated.
+
+The independent read-only party adapter consults the same pinned SSI Engine's
+VirtualMemory, VirtualMachine, EclOpCode, Pool configuration, CharacterValues
+and CharacterValueType for LOAD_CHAR, the selected-character memory window,
+name lookup and ability offsets. Address facts are explicit game-profile data;
+normalized party access, validation and saves are independent C++. No Java
+source was copied or translated. This remains a research-only reference, with
+original character-access parity unverified.

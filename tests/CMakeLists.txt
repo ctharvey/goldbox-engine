@@ -58,6 +58,10 @@ set_tests_properties(goldbox_image_host_tests PROPERTIES TIMEOUT 20
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_executable(goldbox_party_memory_tests party_memory_test.cpp)
+target_link_libraries(goldbox_party_memory_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_party_memory_tests COMMAND goldbox_party_memory_tests
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
 if(GOLDBOX_BUILD_RENDERER)
     add_executable(goldbox_renderer_tests renderer_test.cpp)
     target_link_libraries(goldbox_renderer_tests PRIVATE goldbox_runtime SDL3::SDL3)

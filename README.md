@@ -29,6 +29,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - SSI EGA tile and wall-definition decoding with explicit wall-bank rendering; original archive checks pass for one Pool installation, while automatic visual bindings and scene parity remain unverified.
 - Monochrome tile strips and independent/XOR-first picture/sprite decoding, with explicit palette policies; checked against local Pool picture, sprite and combat-image archives. An opt-in ECL host displays profile-timed pictures and non-replacement sprites from explicitly selected archives; original timing and scene parity remain unverified.
 - Startup party creation with data-selected races/classes/alignments, bounded ability rolling, roster review/removal and engine-save persistence; see [supported creation rules and limits](docs/character-creation.md).
+- Profile-selected read-only ECL party access: loaded-character selection, names, ability scores and party count; unsupported fields/writes fail explicitly. Original character-access parity remains unverified.
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run

@@ -16,7 +16,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
-        "characterCreationRules"}, "game profile");
+        "characterCreationRules", "partyMemory"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -141,6 +141,32 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         profile.area_dialect = j::string(*value,"areaDialect");
         if (profile.area_dialect != "disabled" && profile.area_dialect != "ssi-area-map3-v1")
             throw std::runtime_error("Unsupported area dialect");
+    }
+    if (const auto* value = root.if_contains("partyMemory")) {
+        if (!profile.character_rules) throw std::runtime_error("Party memory requires character creation rules");
+        const auto& o = j::object(*value,"party memory");
+        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities"},"party memory");
+        const auto address = [&](const char* key) {
+            const auto n = j::integer(j::field(o,key,"party memory"),key);
+            if (n < 0 || n > 65535) throw std::runtime_error("Invalid party memory address");
+            return static_cast<std::uint16_t>(n);
+        };
+        PartyMemoryLayout layout{j::string(j::field(o,"dialect","party memory"),"party dialect"),
+            address("recordBase"),address("recordSize"),address("countAddress"),{}};
+        const auto& fields = j::array(j::field(o,"abilities","party memory"),"party ability bindings");
+        if (fields.size() > 64) throw std::runtime_error("Too many party ability bindings");
+        for (const auto& field : fields) {
+            const auto& item = j::object(field,"party ability binding");
+            j::fields_only(item,{"offset","ability","percentile"},"party ability binding");
+            const auto offset = j::integer(j::field(item,"offset","party ability binding"),"party offset");
+            const auto& percentile = j::field(item,"percentile","party ability binding");
+            if (offset < 0 || offset > 65535 || !percentile.is_bool())
+                throw std::runtime_error("Invalid party ability binding");
+            layout.abilities.push_back({static_cast<std::uint16_t>(offset),
+                j::string(j::field(item,"ability","party ability binding"),"party ability"),percentile.as_bool()});
+        }
+        validate_party_memory_layout(layout,*profile.character_rules);
+        profile.party_memory = std::move(layout);
     }
     return profile;
 }

@@ -109,3 +109,14 @@ program loading. The resolver, session transition and save implementation are
 independent C++; no Java source was copied or ported.
 
 See [original-resource evidence and remaining gates](../research/local-validation-2026-10-15.md).
+
+## Optional party host
+
+The VM can opt into one-operand LOAD_CHAR (0x0A), with unique opcode metadata
+validated before execution. Numeric and string operands pass through optional
+host memory callbacks; unhandled addresses retain RAM/string semantics. The
+exploration host attaches the profile-selected read-only party adapter described
+in [character creation](../character-creation.md#read-only-script-adapter).
+Character mutation, numeric race/class encodings and native character import
+remain unsupported. Unsupported party access stops execution with a diagnostic;
+earlier script progress is retained under the existing VM failure policy.

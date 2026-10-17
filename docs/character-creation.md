@@ -41,8 +41,8 @@ shown as 00). This is a provisional distribution, not an original RNG claim.
 
 Racial stat adjustments are not yet applied; ordinary 4d6 rolls cannot generate
 19 even when a race cap permits it. Multi-classing, HP/AC, portraits, equipment,
-spells, experience/advancement, original character import and original ECL party
-memory are unfinished. Upstream placeholder HP and racial modifiers are not used.
+spells, experience/advancement and original character import are unfinished.
+Upstream placeholder HP and racial modifiers are not used.
 
 ## Saves and lifecycle
 
@@ -63,3 +63,43 @@ a named dwarf fighter was created, reviewed and added, map/ECL record 18
 initialized successfully, and the private engine save retained one character,
 six ability values, the creation rules ID, map 18 and wall banks 1/3/5. This
 checks the custom flow with original resources, not DOS creation parity.
+
+## Read-only script adapter
+
+An optional game-profile `partyMemory` selects `ssi-selected-character-v1` and
+defines `recordBase`, `recordSize`, `countAddress` and `abilities` bindings
+(`offset`, normalized `ability` ID, `percentile`). It requires creation rules.
+The shared adapter contains no title-specific addresses or ability ordering.
+Unknown dialects, overlapping count/record ranges, duplicate offsets and invalid
+ability references fail validation. Event-context and program overlaps fail
+before script execution.
+
+Pool selects the research window 0x6B00..0x6CFE, party count 0x6E3E, ordinary
+ability offsets 0x10..0x15, and exceptional strength 0x16. LOAD_CHAR (0x0A)
+selects the loaded character by zero-based party index. It does not change
+the game's separate selected-PC RAM index. Invalid indices fail explicitly,
+unlike SSI Engine's silent ignore. Numeric reads resolve configured fields;
+string references anywhere in the window resolve the loaded character's name.
+Byte/word reads and indexed COPY_MEM use the same adapter. Count remains
+readable for an empty party; character reads require a loaded member.
+
+Unsupported fields and all script writes to this window/count report errors,
+including word writes crossing a boundary. They never fall back to stale RAM
+or modify normalized characters. Current/natural abilities share the same
+read-only values; HP, race/class codes, equipment and mutable effects are not
+implemented. Ordinary addresses retain existing RAM/string behavior.
+
+Adapter-enabled engine saves preserve `loadedCharacter`; legacy saves default
+to index zero. Restore validates the index against the restored roster before
+publishing state. This is not an SSI character-file or save-file encoder.
+
+Synthetic tests cover selection, names, byte/word/indexed reads, count, read-only
+boundaries, unknown fields, alternate layouts, conflicting opcode metadata and
+atomic save validation. SSI Engine at the pinned attribution revision supplied
+research facts, not copied Java code. Original character-access parity remains
+unverified.
+
+On 2026-10-17 the adapter-enabled read-only probe initialized authorized Steam
+GEO/ECL record 18: exited in 15 steps at offset 184, retained map 18, and bound
+wall banks 1/3/5 once, with no text calls. This checks initialization regression
+only; it does not exercise or verify original character-dependent events.
