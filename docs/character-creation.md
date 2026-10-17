@@ -22,6 +22,10 @@ provide `minimum`, gender-keyed `maximum` and `percentileMaximum` maps and class
 IDs. Unknown fields, duplicate IDs, invalid references, inverted bounds and
 mismatched vector sizes fail before use. The supplied profile is the canonical
 example. Option counts, numeric ranges, dice and generated-party sizes are bounded.
+Each race can optionally supply `adjustments`, one signed integer (-100..100)
+per ability in the configured order. Absent adjustments preserve unmodified
+rolling. Modifiers apply once to rolled scores before eligibility checks; saves
+already contain adjusted values and do not reapply them on load.
 
 ## Current AD&D profile
 
@@ -50,8 +54,12 @@ receives a uniform percentile within the configured race/gender cap (100 is
 shown as 00). The human male Random(100)+1 primitive is verified, while native
 percentile timing and other race/gender policies remain provisional.
 
-Racial stat adjustments are not yet applied; ordinary 4d6 rolls cannot generate
-19 even when a race cap permits it. The original also draws before the raw
+The rules now apply independently verified racial modifiers: dwarf CON +1 and
+CHA -1; elf DEX +1 and CON -1; halfling STR -1 and DEX +1. Gnome, half-elf and
+human have no modifier in the tested original loop. Thirty seeded racial sets
+match the raw original scores and final states; additional dwarf/elf cases
+verify legal scores of 19 and their party save roundtrip. Modifiers consume no
+additional random draws. The original also draws before the raw
 ability loop and applies age/class/gender processing afterward; complete
 character-creation draw alignment is unverified. Multi-classing, HP/AC, portraits, equipment,
 spells, experience/advancement and original character import are unfinished.
@@ -72,7 +80,7 @@ unknown RNG state; Pool creation and RANDOM then require a new seeded session.
 Synthetic tests cover deterministic rolling, every supported race/gender,
 exceptional caps, alternate ability lists, invalid rules/parties, capacity,
 roundtrip/atomic restoration, and SDL creation/removal/load/cancellation.
-Original DOS creation parity and character-dependent gameplay are unverified.
+Complete original DOS creation parity remains unverified.
 
 A local SDL smoke test on 2026-10-16 used the authorized Steam Pool resources:
 a named dwarf fighter was created, reviewed and added, map/ECL record 18

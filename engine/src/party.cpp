@@ -121,9 +121,14 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     unique(r.classes);
     for (const auto& v : j::array(field("races"),"races")) {
         const auto& o = j::object(v,"race");
-        j::fields_only(o,{"id","label","minimum","maximum","percentileMaximum","classes"},"race");
+        j::fields_only(o,{"id","label","minimum","maximum","percentileMaximum","classes","adjustments"},"race");
         CreationRace race; race.id = id(j::field(o,"id","race")); race.label = label(j::field(o,"label","race"));
         race.minimum = scores(j::field(o,"minimum","race"),r.abilities.size());
+        if (const auto* value = o.if_contains("adjustments")) {
+            const auto& values = j::array(*value,"racial adjustments");
+            require(values.size() == r.abilities.size(),"Racial adjustment count mismatch");
+            for (const auto& n : values) race.adjustments.push_back(number(n,-100,100));
+        }
         race.classes = ids(j::field(o,"classes","race"));
         for (const auto& c : race.classes) (void)find(r.classes,c);
         const auto& maxima = j::object(j::field(o,"maximum","race"),"maximum");
@@ -161,6 +166,10 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
         rules.drop_lowest >= 0 && rules.drop_lowest < rules.dice_count,"Invalid ability dice");
     require(rules.keep_best_of >= 1 && rules.keep_best_of <= 16,"Invalid ability trial count");
     Character c; c.race = race; c.gender = gender;
+    const auto& adjustments = find(rules.races,race).adjustments;
+    (void)find(rules.genders,gender);
+    require(adjustments.empty() || adjustments.size() == rules.abilities.size(),"Racial adjustment count mismatch");
+    for (const auto n : adjustments) require(n >= -100 && n <= 100,"Racial adjustment out of range");
     for (int attempt = 0; attempt < 256; ++attempt) {
         c.abilities.clear();
         for (std::size_t i = 0; i < rules.abilities.size(); ++i) {
@@ -173,7 +182,8 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
                 for (int j = rules.drop_lowest; j < rules.dice_count; ++j) score += dice[j];
                 best = std::max(best,score);
             }
-            c.abilities.push_back({best,0});
+            // A fixed per-ability modifier commutes with keeping the best trial.
+            c.abilities.push_back({best+(adjustments.empty() ? 0 : adjustments[i]),0});
         }
         if (!eligible_classes(rules,c).empty()) return c.abilities;
     }

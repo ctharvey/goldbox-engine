@@ -90,18 +90,34 @@ int main(int argc, char** argv) {
     custom.genders.resize(1); custom.classes.resize(1); custom.percentile_ability.reset();
     custom.classes[0].minimum = {1,1}; custom.classes[0].percentile = false;
     custom.races[0].minimum = {1,1}; custom.races[0].maximum = {{"male",{18,18}}};
+    custom.races[0].adjustments.clear();
     custom.races[0].percentile_maximum = {{"male",0}}; custom.races[0].classes = {custom.classes[0].id};
     Character other{"Other",custom.races[0].id,"male",custom.classes[0].id,custom.classes[0].alignments[0],{}};
     other.abilities = roll_abilities(custom,other.race,other.gender,random);
     validate_character(custom,finish_character(custom,other,random)); assert(other.abilities.size() == 2);
     auto impossible = rules; impossible.dice_count = 1; impossible.dice_sides = 2; impossible.drop_lowest = 0;
     rejects([&] { (void)roll_abilities(impossible,"human","male",random); });
+    // Alternate ability layout: signed adjustments apply once and do not consume extra draws.
+    custom.races[0].minimum = {1,1}; custom.races[0].maximum = {{"male",{100,100}}};
+    auto adjusted = custom;
+    adjusted.races[0].adjustments = {-1,2};
+    std::mt19937 plain_rng(99), adjusted_rng(99);
+    const auto plain = roll_abilities(custom,other.race,other.gender,plain_rng);
+    const auto modified = roll_abilities(adjusted,other.race,other.gender,adjusted_rng);
+    assert(modified[0].value == plain[0].value-1 && modified[1].value == plain[1].value+2);
+    assert(plain_rng == adjusted_rng);
+    adjusted.races[0].adjustments = {1};
+    rejects([&] { (void)roll_abilities(adjusted,other.race,other.gender,adjusted_rng); });
+    assert(plain_rng == adjusted_rng);
     std::ifstream source(argv[1]); const std::string original{std::istreambuf_iterator<char>(source),{}};
     const auto invalid_file = std::filesystem::temp_directory_path()/"goldbox-invalid-creation-rules.json";
     for (const auto& value : {changed(original,"\"partyLimit\": 6","\"partyLimit\": 0"),
         changed(original,"\"dropLowest\": 1","\"dropLowest\": 4"),
         changed(original,"\"id\": \"strength\"","\"id\": \"intelligence\""),
-        changed(original,"\"id\": \"fighter\"","\"id\": \"missing\"")}) {
+        changed(original,"\"id\": \"fighter\"","\"id\": \"missing\""),
+        changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [1]"),
+        changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [0, 0, 0, 0, true, -1]"),
+        changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [0, 0, 0, 0, 101, -1]")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

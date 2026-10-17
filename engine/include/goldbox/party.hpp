@@ -17,6 +17,8 @@ struct CreationRace {
     std::map<std::string,std::vector<int>> maximum;
     std::map<std::string,int> percentile_maximum;
     std::vector<std::string> classes;
+    // Empty preserves legacy unadjusted rolling; otherwise one signed value per ability.
+    std::vector<int> adjustments;
 };
 struct CreationClass {
     std::string id, label;

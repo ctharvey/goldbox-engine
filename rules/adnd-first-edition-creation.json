@@ -186,6 +186,7 @@
     {
       "id": "dwarf",
       "label": "Dwarf",
+      "adjustments": [0, 0, 0, 0, 1, -1],
       "minimum": [
         8,
         3,
@@ -224,6 +225,7 @@
     {
       "id": "elf",
       "label": "Elf",
+      "adjustments": [0, 0, 0, 1, -1, 0],
       "minimum": [
         3,
         8,
@@ -341,6 +343,7 @@
     {
       "id": "halfling",
       "label": "Halfling",
+      "adjustments": [-1, 0, 0, 1, 0, 0],
       "minimum": [
         6,
         6,

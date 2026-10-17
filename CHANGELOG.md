@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Apply optional rules-defined racial ability modifiers during party creation.
+  Verify dwarf, elf and halfling adjustments plus unmodified controls against
+  isolated original code; regress seeded scores, unchanged draw consumption,
+  legal ability values of 19 and save roundtrips. Full creation parity remains
+  unfinished.
+
 - Use profile-selected, saved RNG state for character creation and ECL RANDOM.
   Pool rolls the best of six 3d6 trials per ability; five human raw-score vectors
   and final states match 540 isolated original-runtime draws. Add explicit startup

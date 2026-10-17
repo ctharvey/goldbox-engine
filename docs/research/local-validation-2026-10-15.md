@@ -628,3 +628,40 @@ The serialized two-job build passed. CTest passed all 26 public suites in
 because its private inputs were not configured for this run. Hygiene,
 attribution and whitespace checks passed. This run includes synthetic
 fresh-process RANDOM/save/reload and numeric raw-character regression coverage.
+
+### Racial ability adjustments (2026-10-17)
+
+The same private original-code probe now exercises race codes 1, 2, 3, 4, 5 and
+7 through the raw rolling loop. The installed GAME.OVR and unpacked resident
+image SHA-256 fingerprints match the previously recorded inputs. Original
+instructions apply fixed modifiers to each trial before selecting the best:
+dwarf CON +1/CHA -1, elf DEX +1/CON -1, halfling STR -1/DEX +1; gnome, half-elf
+and human remain unchanged in this loop. Applying a fixed modifier once after
+the maximum yields the same scores without extra RNG draws.
+
+The bounded probe ran seven seeds (the five earlier states plus 7 and 17) for
+each of six races: 42 blocks, 4,536 original runtime draws. Public regression
+tests check the original five seeds for all six races, plus seed 7 dwarf
+scores [13,11,15,12,19,16] / final state 4271756779 and seed 17 elf scores
+[14,15,13,19,15,18] / final state 1283653141. Those last two cases also validate
+legal 19 values through party persistence. Every block consumes exactly 108
+bound-6 draws. The other raw seed-7/17 blocks are not public engine parity
+fixtures because existing provisional eligibility/cap checks can reroll them.
+
+The independent implementation adds optional signed, bounded per-ability values
+to each race's rules configuration, with no title IDs or native race codes in
+the core. It reuses the current party roller; no upstream source is copied or
+ported. Existing saved values are read as already adjusted. Private reproduction
+and numeric results remain in `.cache/goldbox-validation/` as
+`emulate_original_racial_rolls.py` and `original-racial-rolls-report.json`, with
+the same instruction/time/process limits as the human probe.
+
+This advances raw-score compatibility only. Native age/class/gender processing,
+cap-versus-rejection behavior, exceptional-strength timing and whole-creation
+draw alignment remain unverified. No original game assets are redistributed.
+
+Verification: the bounded serialized two-job build and all 26 public CTest
+suites passed (19.06 seconds); the optional private integration test skipped
+because its private inputs were not configured. Hygiene, attribution and
+whitespace checks passed. Synthetic cases also cover alternate ability layouts,
+invalid adjustment counts/types/ranges and unchanged draw consumption.

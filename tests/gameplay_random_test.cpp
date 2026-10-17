@@ -95,6 +95,34 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < 6; ++i) assert(rolled[i].value == observed.scores[i]);
         assert(rng.state() == observed.after); // Exactly 108 original runtime draws.
     }
+    // Observed original racial deltas; controls have no modifier. Same draw consumption.
+    struct RacialObservation { const char* race; std::array<int,6> delta; };
+    const RacialObservation races[]{
+        {"dwarf",{0,0,0,0,1,-1}}, {"elf",{0,0,0,1,-1,0}}, {"gnome",{}},
+        {"half-elf",{}}, {"halfling",{-1,0,0,1,0,0}}, {"human",{}}
+    };
+    for (const auto& race : races) for (const auto& observed : observations) {
+        HighWordLcg32 rng(observed.seed,profile.random->multiplier(),profile.random->increment());
+        const auto rolled = roll_abilities(rules,race.race,"male",rng);
+        for (std::size_t i = 0; i < 6; ++i) assert(rolled[i].value == observed.scores[i]+race.delta[i]);
+        assert(rng.state() == observed.after);
+    }
+    struct ExceptionalRacialObservation {
+        const char* race; std::uint32_t seed; std::array<int,6> scores; std::uint32_t after;
+    };
+    for (const auto& observed : {
+        ExceptionalRacialObservation{"dwarf",7,{13,11,15,12,19,16},4271756779u},
+        ExceptionalRacialObservation{"elf",17,{14,15,13,19,15,18},1283653141u}}) {
+        HighWordLcg32 rng(observed.seed,profile.random->multiplier(),profile.random->increment());
+        const auto rolled = roll_abilities(rules,observed.race,"male",rng);
+        for (std::size_t i = 0; i < 6; ++i) assert(rolled[i].value == observed.scores[i]);
+        assert(rng.state() == observed.after);
+        Party party;
+        add_character(party,rules,finish_character(rules,
+            {"Nineteen",observed.race,"male","fighter","lawful-good",rolled},rng));
+        const auto restored = read_party(serialize_party(party,rules),rules);
+        same(rolled,restored[0].abilities); // Legal 19 survives validation and persistence.
+    }
     auto session = session_for(profile);
     const auto first_scores = roll_abilities(rules,"human","male",*session.state.random);
     Character created{"Seeded","human","male","fighter","lawful-good",first_scores};

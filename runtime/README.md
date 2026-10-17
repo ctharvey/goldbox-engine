@@ -205,8 +205,9 @@ Each ability keeps the best of six 3d6 trials. The default startup seed is 1;
 `--seed <decimal-or-0x-uint32>` selects another reproducible stream. Engine saves
 preserve its current state. F10 returns to the launch seed, while loading a legacy
 save with no RNG state requires a new seeded session before further rolls.
-Full original creation-sequence parity, racial adjustments and age caps remain
-unverified; see [creation rules](../docs/character-creation.md).
+Rules-configured racial adjustments apply before class eligibility checks and
+can produce legal scores of 19. Full original creation-sequence parity and age
+caps remain unverified; see [creation rules](../docs/character-creation.md).
 
 Pool allows up to six members and names up to 15 printable ASCII characters.
 Names must be distinct ignoring case. At least one member is required before
