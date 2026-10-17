@@ -351,6 +351,32 @@ int main(int argc, char** argv) {
     assert(session.party[0].spellbook->known == std::vector<std::string>{"synthetic.light"} &&
         session.party[0].spellbook->first_level_slots == 3);
     assert(session.state.random->state() == 0xe28f6d7a);
+    auto single_session = session;
+    auto compound_creation = creation;
+    auto mystic = creation.classes[0]; mystic.id = "mystic"; mystic.label = "Mystic";
+    compound_creation.classes.push_back(mystic);
+    auto dual = creation.classes[0]; dual.id = "dual"; dual.label = "Dual";
+    dual.components = {"adventurer","mystic"}; dual.starting_money.reset(); dual.starting_spells.reset();
+    dual.hit_points = CreationHitPoints{0,0,0,0,12,{2}};
+    dual.starting_spellbooks = {{"divine",{{"synthetic.heal"},2,{},{},{}}},
+        {"arcane",{{"synthetic.light"},1,{},{},{}}}};
+    compound_creation.classes.push_back(dual);
+    compound_creation.races[0].classes = {"adventurer","mystic","dual"};
+    compound_creation.races[0].starting_ages["mystic"] = {20,1,2};
+    compound_creation.races[0].starting_ages["dual"] = {22,0,2};
+    session.party.clear(); session.state.random = session.initial_random; session.character_rules = compound_creation;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,
+        SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_UNKNOWN,SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
+    if (session.party.empty()) std::cerr << "Compound UI created no party\n";
+    else if (session.party[0].character_class != "dual" || session.party[0].age != 22)
+        std::cerr << "Compound UI class " << session.party[0].character_class << " age " << session.party[0].age.value_or(0) << '\n';
+    assert(session.party.size() == 1 && session.party[0].character_class == "dual" && session.party[0].age == 22);
+    assert(session.party[0].spellbooks.at("divine").first_level_slots == 2 &&
+        session.party[0].spellbooks.at("arcane").first_level_slots == 1);
+    auto compound_rng = *session.initial_random;
+    for (int draw = 0; draw < 7; ++draw) (void)compound_rng.draw(1);
+    assert(session.state.random->state() == compound_rng.state()); // No age draw or confirmation-time rerolls.
+    session = std::move(single_session);
     auto second_member = session.party.front(); second_member.name = "BOB";
     session.party.push_back(second_member); session.loaded_character = 1;
     session.party_memory = PartyMemoryLayout{"ssi-selected-character-v1",0x5000,256,0x4fff,

@@ -2,6 +2,10 @@
 
 ## 2026-10-17
 
+- Add configurable multi-class creation: component dice, averaged starting gold
+  and HP, fixed starting ages and separate spellbooks. Match the original race
+  availability table and regress complete original multi-class numeric results.
+
 - Preserve configurable starting spellbooks and first-level slots. Verify all
   supported class initializations and 18 original Wisdom boundary cases without
   extra random draws. Show spell/slot counts and validate saved spellbooks.

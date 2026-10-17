@@ -1,7 +1,7 @@
 # Character creation pilot
 
 The engine stores a party independently of ECL memory and original character
-records. Each character has a name, race ID, gender ID, single-class ID,
+records. Each character has a name, race ID, gender ID, class ID,
 alignment ID and ordered ability values with optional percentiles. Creation
 also records a symbolic status (`okay` on completion); status is independent of
 ability values. An absent status in older saves remains unknown.
@@ -38,7 +38,7 @@ the draft raises scores before exceptional strength; it consumes no extra draws
 for the floors. Absent configuration retains strict score-based eligibility.
 Saved-party validation still uses `minimum` and never applies creation floors.
 Optional race `startingAge` maps each supported class ID to `{base, count, sides}`.
-Generation adds the configured dice to the base (count 1..10, sides 2..100), with
+Generation adds the configured dice to the base (count 0..10, sides 2..100), with
 a result bounded to 1..65535. Missing age configuration consumes no draws.
 Every supported class must have a valid entry when a race opts in; unknown,
 missing, malformed and overflowing entries fail explicitly.
@@ -101,7 +101,7 @@ verify legal scores of 19 and their party save roundtrip. Modifiers consume no
 additional random draws. The original also draws before the raw
 ability loop, applies age processing before the racial clamps and class floors
 afterward; complete
-live interactive creation parity remains unverified. Multi-classing, AC, portraits, equipment,
+live interactive creation parity remains unverified. AC, portraits, equipment,
 spell casting/memorization, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
 
@@ -151,6 +151,37 @@ one first-level slot through 12, two at 13, three thereafter. Magic-users have
 one. Initialization consumes no additional RNG. The summary displays spell and
 slot counts. This models starting availability/capacity; memorized spell lists,
 casting, spell effects and progression remain unfinished.
+
+### Multi-class creation
+
+A class can declare an ordered `components` list of 2..8 base-class IDs. Nested,
+cyclic, duplicate and missing references fail. The parent keeps its own ability
+minima, creation floors, alignments and percentile policy. Its money comes from
+all component rolls in list order, scaled and summed per currency, then divided
+by the component count. Partial money configuration fails instead of inventing
+missing balances. All money rolls finish before HP rolls.
+
+The parent's `hitPoints` provides only its ability/modifier table; dice come from
+each component and retain each component's minimum. Sum those rolls, add the
+parent modifier, divide by component count and clamp to at least one. Base HP is
+the divided roll before modifiers. The parent's modifier is a total across
+components. A fixed starting age uses `count: 0`, a positive `base` and no draws.
+
+Pool's native availability table permits Fighter/Thief for dwarves, gnomes and
+halflings; elves also have Fighter/Magic-User, Magic-User/Thief and the three-way
+combination. Half-elves additionally have Cleric/Fighter, Cleric/Magic-User and
+Cleric/Fighter/Magic-User. Humans remain single-class. These combinations use
+their own verified age/floor/alignment data. Supported cleric compounds receive
+a creation-only Wisdom floor of 13. The extra fighter CON bonus applies to the
+single-class fighter; compound HP modifiers follow the separately observed
+native calculation.
+
+Optional `startingSpellbooks` maps stable book IDs to the same starting-book
+definition. It is mutually exclusive with `startingSpells`. Saved `spellbooks`
+keeps those IDs, known spells and individual first-level capacities; the older
+single `spellbook` remains supported, with conflicting definitions rejected.
+The renderer lists each book's counts separately. This represents distinct
+divine and arcane capacities without title-specific engine branches.
 
 ## Saves and lifecycle
 

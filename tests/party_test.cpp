@@ -17,14 +17,16 @@ void rejects(const std::function<void()>& action) {
     assert(failed);
 }
 std::string changed(std::string value, const std::string& from, const std::string& to) {
-    const auto at = value.find(from); assert(at != std::string::npos); value.replace(at,from.size(),to); return value;
+    const auto at = value.find(from);
+    if (at == std::string::npos) std::cerr << "Missing fixture fragment: " << from << '\n';
+    assert(at != std::string::npos); value.replace(at,from.size(),to); return value;
 }
 }
 int main(int argc, char** argv) {
     assert(argc == 2);
     const auto rules = read_creation_rules(argv[1]);
     assert(rules.party_limit == 6 && rules.name_limit == 15 && rules.abilities.size() == 6);
-    assert(rules.races.size() == 6 && rules.classes.size() == 4);
+    assert(rules.races.size() == 6 && rules.classes.size() == 11);
     std::mt19937 random(1234), same(1234);
     const auto a = roll_abilities(rules,"human","male",random);
     const auto b = roll_abilities(rules,"human","male",same);
@@ -74,6 +76,20 @@ int main(int argc, char** argv) {
     rejects([&] { (void)read_party(changed(spells_json,"mod.custom-spell","divine.bless"),rules); });
     caster.spellbook->known.push_back("divine.bless");
     rejects([&] { (void)serialize_party({caster},rules); });
+    caster.spellbook.reset();
+    caster.spellbooks = {{"divine",{{"divine.bless"},3}},{"arcane",{{"arcane.sleep"},1}}};
+    const auto grouped_json = serialize_party({caster},rules);
+    auto grouped = read_party(grouped_json,rules)[0];
+    assert(grouped.spellbooks.at("divine").first_level_slots == 3 && grouped.spellbooks.at("arcane").first_level_slots == 1);
+    rejects([&] { (void)read_party(changed(grouped_json,"\"arcane\":{","\"Invalid ID\":{"),rules); });
+    caster.spellbook = Spellbook{{},0};
+    rejects([&] { (void)serialize_party({caster},rules); });
+    caster.spellbook.reset(); caster.spellbooks.clear();
+    Spellbook large_book;
+    for (int n = 0; n < 64; ++n) large_book.known.push_back(std::string(60,'a')+std::to_string(n));
+    for (int n = 0; n < 8; ++n) caster.spellbooks.emplace("book"+std::to_string(n),large_book);
+    auto another_caster = caster; another_caster.name = "Another";
+    rejects([&] { (void)serialize_party({caster,another_caster},rules); }); // Never write a party that its reader rejects by size.
     auto wounded = hero; wounded.hit_points = HitPoints{5,0,6}; wounded.money["gold"] = 0;
     const auto vitals_json = serialize_party({wounded},rules);
     auto restored = read_party(vitals_json,rules)[0];
@@ -140,7 +156,8 @@ int main(int argc, char** argv) {
     adjusted.races[0].adjustments = {1};
     rejects([&] { (void)roll_abilities(adjusted,other.race,other.gender,adjusted_rng); });
     assert(plain_rng == adjusted_rng);
-    std::ifstream source(argv[1]); const std::string original{std::istreambuf_iterator<char>(source),{}};
+    std::ifstream source(argv[1]); std::string original{std::istreambuf_iterator<char>(source),{}};
+    std::erase(original,'\r');
     const auto invalid_file = std::filesystem::temp_directory_path()/"goldbox-invalid-creation-rules.json";
     for (const auto& value : {changed(original,"\"partyLimit\": 6","\"partyLimit\": 0"),
         changed(original,"\"dropLowest\": 1","\"dropLowest\": 4"),
@@ -175,7 +192,15 @@ int main(int argc, char** argv) {
         changed(original,"\"divine.curse\"","\"divine.bless\""),
         changed(original,"\"ability\": \"wisdom\"","\"ability\": \"missing\""),
         changed(original,"\"firstLevelSlots\": 0","\"firstLevelSlots\": 0, \"modifiers\": [0]"),
-        changed(original,"\"modifiers\": [0, 0","\"modifiers\": [65, 0")}) {
+        changed(original,"\"modifiers\": [0, 0","\"modifiers\": [65, 0"),
+        changed(original,"\"components\": [\n        \"cleric\",\n        \"fighter\"",
+            "\"components\": [\n        \"cleric-fighter\",\n        \"fighter\""),
+        changed(original,"\"components\": [\n        \"cleric\",\n        \"fighter\"",
+            "\"components\": [\n        \"missing\",\n        \"fighter\""),
+        changed(original,"\"components\": [\n        \"cleric\",\n        \"fighter\"",
+            "\"components\": [\n        \"fighter\",\n        \"fighter\""),
+        changed(original,"\"startingSpellbooks\": {",
+            "\"startingSpells\": {\"known\": [], \"firstLevelSlots\": 0}, \"startingSpellbooks\": {")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

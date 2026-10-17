@@ -52,6 +52,8 @@ struct CreationClass {
     std::optional<CreationHitPoints> hit_points{};
     std::optional<CreationMoney> starting_money{};
     std::optional<CreationSpells> starting_spells{};
+    std::vector<std::string> components{};
+    std::map<std::string,CreationSpells> starting_spellbooks{};
 };
 enum class CreationBounds { reject, clamp };
 struct CreationRules {
@@ -80,6 +82,7 @@ struct Character {
     std::optional<HitPoints> hit_points{};
     std::map<std::string,std::uint16_t> money{}; // Missing currency means unknown, rather than an inferred balance.
     std::optional<Spellbook> spellbook{};
+    std::map<std::string,Spellbook> spellbooks{};
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);

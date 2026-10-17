@@ -10,13 +10,16 @@
 #include <functional>
 #include <fstream>
 #include <algorithm>
+#include <iostream>
+#include <source_location>
 
 using namespace goldbox;
 namespace {
 struct Host : EclHost { void text(std::string_view, bool) override {} };
-void rejects(const std::function<void()>& action) {
+void rejects(const std::function<void()>& action, const std::source_location location = std::source_location::current()) {
     bool failed = false;
     try { action(); } catch (const std::exception&) { failed = true; }
+    if (!failed) std::cerr << "Expected rejection at " << location.line() << '\n';
     assert(failed);
 }
 ExplorationSession session_for(const GameProfile& profile) {
@@ -669,6 +672,273 @@ int main(int argc, char** argv) {
         assert(loaded.spellbook->known == rolled.spellbook->known &&
             loaded.spellbook->first_level_slots == rolled.spellbook->first_level_slots);
     }
+    struct CompoundObservation {
+        const char* race; const char* character_class; const char* gender; std::uint32_t seed;
+        int age; std::array<int,6> scores; int percentile, gold, base, hp; std::uint32_t after;
+        int divine_slots, arcane_slots;
+    };
+    const CompoundObservation compound_observations[]{
+        {"dwarf","fighter-thief","male",0u,60,{17,13,14,16,18,13},0,80,6,8,288477010u,0,0},
+        {"dwarf","fighter-thief","male",1u,60,{15,13,14,15,18,14},0,85,5,7,258954395u,0,0},
+        {"dwarf","fighter-thief","male",4294967295u,60,{15,15,13,14,16,12},0,100,5,7,317999625u,0,0},
+        {"dwarf","fighter-thief","male",305419896u,60,{14,14,15,14,16,14},0,90,5,7,497209226u,0,0},
+        {"dwarf","fighter-thief","male",776800562u,60,{14,15,15,15,16,16},0,90,5,7,400189588u,0,0},
+        {"dwarf","fighter-thief","male",23u,60,{15,14,12,17,18,15},0,100,7,9,3904424161u,0,0},
+        {"dwarf","fighter-thief","female",0u,60,{17,13,14,16,18,13},0,80,6,8,288477010u,0,0},
+        {"dwarf","fighter-thief","female",1u,60,{15,13,14,15,18,14},0,85,5,7,258954395u,0,0},
+        {"dwarf","fighter-thief","female",4294967295u,60,{15,15,13,14,16,12},0,100,5,7,317999625u,0,0},
+        {"dwarf","fighter-thief","female",305419896u,60,{14,14,15,14,16,14},0,90,5,7,497209226u,0,0},
+        {"dwarf","fighter-thief","female",776800562u,60,{14,15,15,15,16,16},0,90,5,7,400189588u,0,0},
+        {"dwarf","fighter-thief","female",23u,60,{15,14,12,17,18,15},0,100,7,9,3904424161u,0,0},
+        {"elf","fighter-magic-user","male",0u,180,{17,13,14,17,16,14},0,80,5,7,288477010u,0,1},
+        {"elf","fighter-magic-user","male",1u,180,{15,13,14,16,16,15},0,95,5,7,258954395u,0,1},
+        {"elf","fighter-magic-user","male",4294967295u,180,{15,15,13,15,14,13},0,100,4,4,317999625u,0,1},
+        {"elf","fighter-magic-user","male",305419896u,180,{14,14,15,15,14,15},0,80,4,4,497209226u,0,1},
+        {"elf","fighter-magic-user","male",776800562u,180,{14,15,15,16,14,17},0,80,4,4,400189588u,0,1},
+        {"elf","fighter-magic-user","male",23u,180,{15,14,12,18,16,16},0,100,6,8,3904424161u,0,1},
+        {"elf","fighter-magic-user","female",0u,180,{16,13,14,17,16,14},0,80,5,7,288477010u,0,1},
+        {"elf","fighter-magic-user","female",1u,180,{15,13,14,16,16,15},0,95,5,7,258954395u,0,1},
+        {"elf","fighter-magic-user","female",4294967295u,180,{15,15,13,15,14,13},0,100,4,4,317999625u,0,1},
+        {"elf","fighter-magic-user","female",305419896u,180,{14,14,15,15,14,15},0,80,4,4,497209226u,0,1},
+        {"elf","fighter-magic-user","female",776800562u,180,{14,15,15,16,14,17},0,80,4,4,400189588u,0,1},
+        {"elf","fighter-magic-user","female",23u,180,{15,14,12,18,16,16},0,100,6,8,3904424161u,0,1},
+        {"elf","fighter-thief","male",0u,160,{16,13,13,17,16,14},0,80,6,8,288477010u,0,0},
+        {"elf","fighter-thief","male",1u,160,{14,13,13,16,16,15},0,85,5,7,258954395u,0,0},
+        {"elf","fighter-thief","male",4294967295u,160,{14,15,12,15,14,13},0,100,5,5,317999625u,0,0},
+        {"elf","fighter-thief","male",305419896u,160,{13,14,14,15,14,15},0,90,5,5,497209226u,0,0},
+        {"elf","fighter-thief","male",776800562u,160,{13,15,14,16,14,17},0,90,5,5,400189588u,0,0},
+        {"elf","fighter-thief","male",23u,160,{14,14,11,18,16,16},0,100,7,9,3904424161u,0,0},
+        {"elf","fighter-thief","female",0u,160,{16,13,13,17,16,14},0,80,6,8,288477010u,0,0},
+        {"elf","fighter-thief","female",1u,160,{14,13,13,16,16,15},0,85,5,7,258954395u,0,0},
+        {"elf","fighter-thief","female",4294967295u,160,{14,15,12,15,14,13},0,100,5,5,317999625u,0,0},
+        {"elf","fighter-thief","female",305419896u,160,{13,14,14,15,14,15},0,90,5,5,497209226u,0,0},
+        {"elf","fighter-thief","female",776800562u,160,{13,15,14,16,14,17},0,90,5,5,400189588u,0,0},
+        {"elf","fighter-thief","female",23u,160,{14,14,11,18,16,16},0,100,7,9,3904424161u,0,0},
+        {"elf","fighter-magic-user-thief","male",0u,180,{17,13,14,17,16,14},0,73,4,6,2890333993u,0,1},
+        {"elf","fighter-magic-user-thief","male",1u,180,{15,13,14,16,16,15},0,90,5,7,977018830u,0,1},
+        {"elf","fighter-magic-user-thief","male",4294967295u,180,{15,15,13,15,14,13},0,100,4,4,508681860u,0,1},
+        {"elf","fighter-magic-user-thief","male",305419896u,180,{14,14,15,15,14,15},0,76,5,5,3416898177u,0,1},
+        {"elf","fighter-magic-user-thief","male",776800562u,180,{14,15,15,16,14,17},0,90,5,5,2079206499u,0,1},
+        {"elf","fighter-magic-user-thief","male",23u,180,{15,14,12,18,16,16},0,96,5,7,1833758204u,0,1},
+        {"elf","fighter-magic-user-thief","female",0u,180,{16,13,14,17,16,14},0,73,4,6,2890333993u,0,1},
+        {"elf","fighter-magic-user-thief","female",1u,180,{15,13,14,16,16,15},0,90,5,7,977018830u,0,1},
+        {"elf","fighter-magic-user-thief","female",4294967295u,180,{15,15,13,15,14,13},0,100,4,4,508681860u,0,1},
+        {"elf","fighter-magic-user-thief","female",305419896u,180,{14,14,15,15,14,15},0,76,5,5,3416898177u,0,1},
+        {"elf","fighter-magic-user-thief","female",776800562u,180,{14,15,15,16,14,17},0,90,5,5,2079206499u,0,1},
+        {"elf","fighter-magic-user-thief","female",23u,180,{15,14,12,18,16,16},0,96,5,7,1833758204u,0,1},
+        {"elf","magic-user-thief","male",0u,180,{17,13,14,17,16,14},0,75,3,5,3509128559u,0,1},
+        {"elf","magic-user-thief","male",1u,180,{15,13,14,16,16,15},0,60,3,5,607289132u,0,1},
+        {"elf","magic-user-thief","male",4294967295u,180,{15,15,13,15,14,13},0,65,3,3,2116000690u,0,1},
+        {"elf","magic-user-thief","male",305419896u,180,{14,14,15,15,14,15},0,35,4,4,1311759367u,0,1},
+        {"elf","magic-user-thief","male",776800562u,180,{14,15,15,16,14,17},0,60,3,3,2312759641u,0,1},
+        {"elf","magic-user-thief","male",23u,180,{15,14,12,18,16,16},0,50,3,5,1191331178u,0,1},
+        {"elf","magic-user-thief","female",0u,180,{16,13,14,17,16,14},0,75,3,5,3509128559u,0,1},
+        {"elf","magic-user-thief","female",1u,180,{15,13,14,16,16,15},0,60,3,5,607289132u,0,1},
+        {"elf","magic-user-thief","female",4294967295u,180,{15,15,13,15,14,13},0,65,3,3,2116000690u,0,1},
+        {"elf","magic-user-thief","female",305419896u,180,{14,14,15,15,14,15},0,35,4,4,1311759367u,0,1},
+        {"elf","magic-user-thief","female",776800562u,180,{14,15,15,16,14,17},0,60,3,3,2312759641u,0,1},
+        {"elf","magic-user-thief","female",23u,180,{15,14,12,18,16,16},0,50,3,5,1191331178u,0,1},
+        {"gnome","fighter-thief","male",0u,80,{16,13,13,16,17,14},0,80,6,8,288477010u,0,0},
+        {"gnome","fighter-thief","male",1u,80,{14,13,13,15,17,15},0,85,5,7,258954395u,0,0},
+        {"gnome","fighter-thief","male",4294967295u,80,{14,15,12,14,15,13},0,100,5,6,317999625u,0,0},
+        {"gnome","fighter-thief","male",305419896u,80,{13,14,14,14,15,15},0,90,5,6,497209226u,0,0},
+        {"gnome","fighter-thief","male",776800562u,80,{13,15,14,15,15,17},0,90,5,6,400189588u,0,0},
+        {"gnome","fighter-thief","male",23u,80,{14,14,11,17,17,16},0,100,7,9,3904424161u,0,0},
+        {"gnome","fighter-thief","female",0u,80,{15,13,13,16,17,14},0,80,6,8,288477010u,0,0},
+        {"gnome","fighter-thief","female",1u,80,{14,13,13,15,17,15},0,85,5,7,258954395u,0,0},
+        {"gnome","fighter-thief","female",4294967295u,80,{14,15,12,14,15,13},0,100,5,6,317999625u,0,0},
+        {"gnome","fighter-thief","female",305419896u,80,{13,14,14,14,15,15},0,90,5,6,497209226u,0,0},
+        {"gnome","fighter-thief","female",776800562u,80,{13,15,14,15,15,17},0,90,5,6,400189588u,0,0},
+        {"gnome","fighter-thief","female",23u,80,{14,14,11,17,17,16},0,100,7,9,3904424161u,0,0},
+        {"half-elf","cleric-fighter","male",0u,48,{17,13,14,16,17,14},0,140,5,7,258954395u,3,0},
+        {"half-elf","cleric-fighter","male",1u,48,{15,13,14,15,17,15},0,145,8,10,832869128u,3,0},
+        {"half-elf","cleric-fighter","male",4294967295u,48,{15,15,13,14,15,13},0,125,5,6,3980006958u,2,0},
+        {"half-elf","cleric-fighter","male",305419896u,48,{14,14,15,14,15,15},0,130,6,7,1400976819u,3,0},
+        {"half-elf","cleric-fighter","male",776800562u,48,{14,15,15,15,15,17},0,120,5,6,4191181541u,3,0},
+        {"half-elf","cleric-fighter","male",23u,48,{15,14,13,17,17,16},0,120,7,9,574091366u,2,0},
+        {"half-elf","cleric-fighter","female",0u,48,{17,13,14,16,17,14},0,140,5,7,258954395u,3,0},
+        {"half-elf","cleric-fighter","female",1u,48,{15,13,14,15,17,15},0,145,8,10,832869128u,3,0},
+        {"half-elf","cleric-fighter","female",4294967295u,48,{15,15,13,14,15,13},0,125,5,6,3980006958u,2,0},
+        {"half-elf","cleric-fighter","female",305419896u,48,{14,14,15,14,15,15},0,130,6,7,1400976819u,3,0},
+        {"half-elf","cleric-fighter","female",776800562u,48,{14,15,15,15,15,17},0,120,5,6,4191181541u,3,0},
+        {"half-elf","cleric-fighter","female",23u,48,{15,14,13,17,17,16},0,120,7,9,574091366u,2,0},
+        {"half-elf","cleric-fighter-magic-user","male",0u,48,{17,13,14,16,17,14},0,113,4,6,977018830u,3,1},
+        {"half-elf","cleric-fighter-magic-user","male",1u,48,{15,13,14,15,17,15},0,113,6,8,2449659655u,3,1},
+        {"half-elf","cleric-fighter-magic-user","male",4294967295u,48,{15,15,13,14,15,13},0,96,4,5,3799345301u,2,1},
+        {"half-elf","cleric-fighter-magic-user","male",305419896u,48,{14,14,15,14,15,15},0,103,6,7,1518545030u,3,1},
+        {"half-elf","cleric-fighter-magic-user","male",776800562u,48,{14,15,15,15,15,17},0,93,5,6,3047287280u,3,1},
+        {"half-elf","cleric-fighter-magic-user","male",23u,48,{15,14,13,17,17,16},0,96,4,6,488019437u,2,1},
+        {"half-elf","cleric-fighter-magic-user","female",0u,48,{17,13,14,16,17,14},0,113,4,6,977018830u,3,1},
+        {"half-elf","cleric-fighter-magic-user","female",1u,48,{15,13,14,15,17,15},0,113,6,8,2449659655u,3,1},
+        {"half-elf","cleric-fighter-magic-user","female",4294967295u,48,{15,15,13,14,15,13},0,96,4,5,3799345301u,2,1},
+        {"half-elf","cleric-fighter-magic-user","female",305419896u,48,{14,14,15,14,15,15},0,103,6,7,1518545030u,3,1},
+        {"half-elf","cleric-fighter-magic-user","female",776800562u,48,{14,15,15,15,15,17},0,93,5,6,3047287280u,3,1},
+        {"half-elf","cleric-fighter-magic-user","female",23u,48,{15,14,13,17,17,16},0,96,4,6,488019437u,2,1},
+        {"half-elf","cleric-magic-user","male",0u,48,{17,13,14,16,17,14},0,95,4,6,607289132u,3,1},
+        {"half-elf","cleric-magic-user","male",1u,48,{15,13,14,15,17,15},0,100,4,6,401550301u,3,1},
+        {"half-elf","cleric-magic-user","male",4294967295u,48,{15,15,13,14,15,13},0,90,5,6,813027963u,2,1},
+        {"half-elf","cleric-magic-user","male",305419896u,48,{14,14,15,14,15,15},0,85,5,6,1285220388u,3,1},
+        {"half-elf","cleric-magic-user","male",776800562u,48,{14,15,15,15,15,17},0,70,4,5,542864062u,3,1},
+        {"half-elf","cleric-magic-user","male",23u,48,{15,14,13,17,17,16},0,70,4,6,170263315u,2,1},
+        {"half-elf","cleric-magic-user","female",0u,48,{17,13,14,16,17,14},0,95,4,6,607289132u,3,1},
+        {"half-elf","cleric-magic-user","female",1u,48,{15,13,14,15,17,15},0,100,4,6,401550301u,3,1},
+        {"half-elf","cleric-magic-user","female",4294967295u,48,{15,15,13,14,15,13},0,90,5,6,813027963u,2,1},
+        {"half-elf","cleric-magic-user","female",305419896u,48,{14,14,15,14,15,15},0,85,5,6,1285220388u,3,1},
+        {"half-elf","cleric-magic-user","female",776800562u,48,{14,15,15,15,15,17},0,70,4,5,542864062u,3,1},
+        {"half-elf","cleric-magic-user","female",23u,48,{15,14,13,17,17,16},0,70,4,6,170263315u,2,1},
+        {"half-elf","fighter-magic-user","male",0u,46,{17,13,14,16,17,14},0,80,5,7,288477010u,0,1},
+        {"half-elf","fighter-magic-user","male",1u,46,{15,13,14,15,17,15},0,95,5,7,258954395u,0,1},
+        {"half-elf","fighter-magic-user","male",4294967295u,46,{15,15,13,14,15,13},0,100,4,5,317999625u,0,1},
+        {"half-elf","fighter-magic-user","male",305419896u,46,{14,14,15,14,15,15},0,80,4,5,497209226u,0,1},
+        {"half-elf","fighter-magic-user","male",776800562u,46,{14,15,15,15,15,17},0,80,4,5,400189588u,0,1},
+        {"half-elf","fighter-magic-user","male",23u,46,{15,14,12,17,17,16},0,100,6,8,3904424161u,0,1},
+        {"half-elf","fighter-magic-user","female",0u,46,{17,13,14,16,17,14},0,80,5,7,288477010u,0,1},
+        {"half-elf","fighter-magic-user","female",1u,46,{15,13,14,15,17,15},0,95,5,7,258954395u,0,1},
+        {"half-elf","fighter-magic-user","female",4294967295u,46,{15,15,13,14,15,13},0,100,4,5,317999625u,0,1},
+        {"half-elf","fighter-magic-user","female",305419896u,46,{14,14,15,14,15,15},0,80,4,5,497209226u,0,1},
+        {"half-elf","fighter-magic-user","female",776800562u,46,{14,15,15,15,15,17},0,80,4,5,400189588u,0,1},
+        {"half-elf","fighter-magic-user","female",23u,46,{15,14,12,17,17,16},0,100,6,8,3904424161u,0,1},
+        {"half-elf","fighter-thief","male",0u,34,{16,13,13,16,17,14},0,80,6,8,288477010u,0,0},
+        {"half-elf","fighter-thief","male",1u,34,{14,13,13,15,17,15},0,85,5,7,258954395u,0,0},
+        {"half-elf","fighter-thief","male",4294967295u,34,{14,15,12,14,15,13},0,100,5,6,317999625u,0,0},
+        {"half-elf","fighter-thief","male",305419896u,34,{13,14,14,14,15,15},0,90,5,6,497209226u,0,0},
+        {"half-elf","fighter-thief","male",776800562u,34,{13,15,14,15,15,17},0,90,5,6,400189588u,0,0},
+        {"half-elf","fighter-thief","male",23u,34,{14,14,11,17,17,16},0,100,7,9,3904424161u,0,0},
+        {"half-elf","fighter-thief","female",0u,34,{16,13,13,16,17,14},0,80,6,8,288477010u,0,0},
+        {"half-elf","fighter-thief","female",1u,34,{14,13,13,15,17,15},0,85,5,7,258954395u,0,0},
+        {"half-elf","fighter-thief","female",4294967295u,34,{14,15,12,14,15,13},0,100,5,6,317999625u,0,0},
+        {"half-elf","fighter-thief","female",305419896u,34,{13,14,14,14,15,15},0,90,5,6,497209226u,0,0},
+        {"half-elf","fighter-thief","female",776800562u,34,{13,15,14,15,15,17},0,90,5,6,400189588u,0,0},
+        {"half-elf","fighter-thief","female",23u,34,{14,14,11,17,17,16},0,100,7,9,3904424161u,0,0},
+        {"half-elf","fighter-magic-user-thief","male",0u,46,{17,13,14,16,17,14},0,73,4,6,2890333993u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",1u,46,{15,13,14,15,17,15},0,90,5,7,977018830u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",4294967295u,46,{15,15,13,14,15,13},0,100,4,5,508681860u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",305419896u,46,{14,14,15,14,15,15},0,76,5,6,3416898177u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",776800562u,46,{14,15,15,15,15,17},0,90,5,6,2079206499u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",23u,46,{15,14,12,17,17,16},0,96,5,7,1833758204u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",0u,46,{17,13,14,16,17,14},0,73,4,6,2890333993u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",1u,46,{15,13,14,15,17,15},0,90,5,7,977018830u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",4294967295u,46,{15,15,13,14,15,13},0,100,4,5,508681860u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",305419896u,46,{14,14,15,14,15,15},0,76,5,6,3416898177u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",776800562u,46,{14,15,15,15,15,17},0,90,5,6,2079206499u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",23u,46,{15,14,12,17,17,16},0,96,5,7,1833758204u,0,1},
+        {"half-elf","magic-user-thief","male",0u,46,{17,13,14,16,17,14},0,75,3,5,3509128559u,0,1},
+        {"half-elf","magic-user-thief","male",1u,46,{15,13,14,15,17,15},0,60,3,5,607289132u,0,1},
+        {"half-elf","magic-user-thief","male",4294967295u,46,{15,15,13,14,15,13},0,65,3,4,2116000690u,0,1},
+        {"half-elf","magic-user-thief","male",305419896u,46,{14,14,15,14,15,15},0,35,4,5,1311759367u,0,1},
+        {"half-elf","magic-user-thief","male",776800562u,46,{14,15,15,15,15,17},0,60,3,4,2312759641u,0,1},
+        {"half-elf","magic-user-thief","male",23u,46,{15,14,12,17,17,16},0,50,3,5,1191331178u,0,1},
+        {"half-elf","magic-user-thief","female",0u,46,{17,13,14,16,17,14},0,75,3,5,3509128559u,0,1},
+        {"half-elf","magic-user-thief","female",1u,46,{15,13,14,15,17,15},0,60,3,5,607289132u,0,1},
+        {"half-elf","magic-user-thief","female",4294967295u,46,{15,15,13,14,15,13},0,65,3,4,2116000690u,0,1},
+        {"half-elf","magic-user-thief","female",305419896u,46,{14,14,15,14,15,15},0,35,4,5,1311759367u,0,1},
+        {"half-elf","magic-user-thief","female",776800562u,46,{14,15,15,15,15,17},0,60,3,4,2312759641u,0,1},
+        {"half-elf","magic-user-thief","female",23u,46,{15,14,12,17,17,16},0,50,3,5,1191331178u,0,1},
+        {"halfling","fighter-thief","male",0u,32,{15,13,13,17,17,14},0,80,6,8,288477010u,0,0},
+        {"halfling","fighter-thief","male",1u,32,{13,13,13,16,17,15},0,85,5,7,258954395u,0,0},
+        {"halfling","fighter-thief","male",4294967295u,32,{13,15,12,15,15,13},0,100,5,6,317999625u,0,0},
+        {"halfling","fighter-thief","male",305419896u,32,{12,14,14,15,15,15},0,90,5,6,497209226u,0,0},
+        {"halfling","fighter-thief","male",776800562u,32,{12,15,14,16,15,17},0,90,5,6,400189588u,0,0},
+        {"halfling","fighter-thief","male",23u,32,{13,14,11,18,17,16},0,100,7,9,3904424161u,0,0},
+        {"halfling","fighter-thief","female",0u,32,{14,13,13,17,17,14},0,80,6,8,288477010u,0,0},
+        {"halfling","fighter-thief","female",1u,32,{13,13,13,16,17,15},0,85,5,7,258954395u,0,0},
+        {"halfling","fighter-thief","female",4294967295u,32,{13,15,12,15,15,13},0,100,5,6,317999625u,0,0},
+        {"halfling","fighter-thief","female",305419896u,32,{12,14,14,15,15,15},0,90,5,6,497209226u,0,0},
+        {"halfling","fighter-thief","female",776800562u,32,{12,15,14,16,15,17},0,90,5,6,400189588u,0,0},
+        {"halfling","fighter-thief","female",23u,32,{13,14,11,18,17,16},0,100,7,9,3904424161u,0,0},
+        {"half-elf","cleric-fighter","male",8u,48,{18,15,17,10,15,14},39,90,7,8,112718864u,3,0},
+        {"half-elf","cleric-fighter","male",15u,48,{18,15,16,14,16,17},90,85,6,8,1630071031u,3,0},
+        {"half-elf","cleric-fighter","male",18u,48,{18,14,13,16,16,13},50,110,6,8,3507498330u,2,0},
+        {"half-elf","cleric-fighter","female",8u,48,{17,15,15,11,14,15},0,105,6,6,555304963u,3,0},
+        {"half-elf","cleric-fighter","female",15u,48,{17,15,17,16,17,16},0,65,6,8,277740798u,3,0},
+        {"half-elf","cleric-fighter","female",18u,48,{17,14,13,15,15,15},0,115,8,9,1999484997u,2,0},
+        {"half-elf","cleric-fighter-magic-user","male",8u,48,{18,15,17,10,15,14},39,80,4,5,186292207u,3,1},
+        {"half-elf","cleric-fighter-magic-user","male",15u,48,{18,15,16,14,16,17},90,66,6,8,3574554810u,3,1},
+        {"half-elf","cleric-fighter-magic-user","male",18u,48,{18,14,13,16,16,13},50,83,4,6,3799533841u,2,1},
+        {"half-elf","cleric-fighter-magic-user","female",8u,48,{17,15,15,11,14,15},0,83,5,5,4168210838u,3,1},
+        {"half-elf","cleric-fighter-magic-user","female",15u,48,{17,15,17,16,17,16},0,53,4,6,1591794725u,3,1},
+        {"half-elf","cleric-fighter-magic-user","female",18u,48,{17,14,13,15,15,15},0,90,4,5,1714749904u,2,1},
+        {"half-elf","cleric-magic-user","male",8u,48,{18,15,15,11,14,15},0,75,4,4,3256345780u,3,1},
+        {"half-elf","cleric-magic-user","male",15u,48,{18,15,17,16,17,16},0,30,4,6,1816173963u,3,1},
+        {"half-elf","cleric-magic-user","male",18u,48,{18,14,13,15,15,15},0,65,4,5,1198957470u,2,1},
+        {"half-elf","cleric-magic-user","female",8u,48,{17,15,15,11,14,15},0,75,4,4,3256345780u,3,1},
+        {"half-elf","cleric-magic-user","female",15u,48,{17,15,17,16,17,16},0,30,4,6,1816173963u,3,1},
+        {"half-elf","cleric-magic-user","female",18u,48,{17,14,13,15,15,15},0,65,4,5,1198957470u,2,1},
+        {"half-elf","fighter-magic-user","male",8u,46,{18,15,17,10,15,14},39,90,5,6,555304963u,0,1},
+        {"half-elf","fighter-magic-user","male",15u,46,{18,15,16,14,16,17},90,80,4,6,277740798u,0,1},
+        {"half-elf","fighter-magic-user","male",18u,46,{18,14,13,16,16,13},50,100,6,8,1999484997u,0,1},
+        {"half-elf","fighter-magic-user","female",8u,46,{17,15,15,11,14,15},0,90,4,4,52296090u,0,1},
+        {"half-elf","fighter-magic-user","female",15u,46,{17,15,17,16,17,16},0,80,4,6,4140605081u,0,1},
+        {"half-elf","fighter-magic-user","female",18u,46,{17,14,13,15,15,15},0,100,4,5,4052037236u,0,1},
+        {"half-elf","fighter-thief","male",8u,34,{18,15,16,10,15,14},39,90,6,7,555304963u,0,0},
+        {"half-elf","fighter-thief","male",15u,34,{18,15,15,14,16,17},90,100,5,7,277740798u,0,0},
+        {"half-elf","fighter-thief","male",18u,34,{18,14,12,16,16,13},50,100,8,10,1999484997u,0,0},
+        {"half-elf","fighter-thief","female",8u,34,{17,15,14,11,14,15},0,90,6,6,52296090u,0,0},
+        {"half-elf","fighter-thief","female",15u,34,{17,15,16,16,17,16},0,100,5,7,4140605081u,0,0},
+        {"half-elf","fighter-thief","female",18u,34,{17,14,12,15,15,15},0,90,6,7,4052037236u,0,0},
+        {"half-elf","fighter-magic-user-thief","male",8u,46,{18,15,17,10,15,14},39,86,5,6,4168210838u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",15u,46,{18,15,16,14,16,17},90,63,4,6,1591794725u,0,1},
+        {"half-elf","fighter-magic-user-thief","male",18u,46,{18,14,13,16,16,13},50,106,5,7,1714749904u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",8u,46,{17,15,15,11,14,15},0,90,4,4,468714577u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",15u,46,{17,15,17,16,17,16},0,66,5,7,4255377620u,0,1},
+        {"half-elf","fighter-magic-user-thief","female",18u,46,{17,14,13,15,15,15},0,103,5,6,2810399427u,0,1},
+        {"half-elf","magic-user-thief","male",8u,46,{18,15,15,11,14,15},0,40,3,3,1769249623u,0,1},
+        {"half-elf","magic-user-thief","male",15u,46,{18,15,17,16,17,16},0,65,3,5,2931210114u,0,1},
+        {"half-elf","magic-user-thief","male",18u,46,{18,14,13,15,15,15},0,65,3,4,2815626425u,0,1},
+        {"half-elf","magic-user-thief","female",8u,46,{17,15,15,11,14,15},0,40,3,3,1769249623u,0,1},
+        {"half-elf","magic-user-thief","female",15u,46,{17,15,17,16,17,16},0,65,3,5,2931210114u,0,1},
+        {"half-elf","magic-user-thief","female",18u,46,{17,14,13,15,15,15},0,65,3,4,2815626425u,0,1},
+    };
+    for (const auto& expected : compound_observations) {
+        Character draft{"Multi",expected.race,expected.gender,expected.character_class,"neutral-good",{}};
+        HighWordLcg32 rng(expected.seed,profile.random->multiplier(),1);
+        const auto rolled = roll_character(complete_rules,draft,rng);
+        assert(rolled.age == expected.age && rolled.hit_points);
+        for (std::size_t i = 0; i < 6; ++i) {
+            if (rolled.abilities[i].value != expected.scores[i]) std::cerr << expected.race << ' ' << expected.character_class
+                << ' ' << expected.seed << " ability " << i << ": " << rolled.abilities[i].value << " expected " << expected.scores[i] << '\n';
+            assert(rolled.abilities[i].value == expected.scores[i]);
+        }
+        assert(rolled.abilities[0].percentile == expected.percentile);
+        assert(rolled.money.at("gold") == expected.gold && rolled.hit_points->base == expected.base);
+        assert(rolled.hit_points->current == expected.hp && rolled.hit_points->maximum == expected.hp);
+        assert(rng.state() == expected.after);
+        if (expected.divine_slots) assert(rolled.spellbooks.at("divine").first_level_slots == expected.divine_slots &&
+            rolled.spellbooks.at("divine").known.size() == 8);
+        if (expected.arcane_slots) assert(rolled.spellbooks.at("arcane").first_level_slots == expected.arcane_slots &&
+            rolled.spellbooks.at("arcane").known.size() == 4);
+        assert(rolled.spellbooks.size() == static_cast<std::size_t>((expected.divine_slots != 0)+(expected.arcane_slots != 0)));
+        const auto loaded = read_party(serialize_party({rolled},complete_rules),complete_rules)[0];
+        for (const auto& [name,book] : rolled.spellbooks) {
+            assert(loaded.spellbooks.at(name).known == book.known);
+            assert(loaded.spellbooks.at(name).first_level_slots == book.first_level_slots);
+        }
+        assert(loaded.money == rolled.money && loaded.hit_points->maximum == expected.hp);
+    }
+    auto compound_session = session_for(profile);
+    compound_session.state.random.emplace(8,profile.random->multiplier(),1);
+    Character compound_pc{"Dual","half-elf","male","cleric-fighter-magic-user","neutral-good",{}};
+    compound_pc = roll_character(complete_rules,compound_pc,*compound_session.state.random);
+    add_character(compound_session.party,complete_rules,compound_pc);
+    auto restored_compound = session_for(profile);
+    restore_exploration(restored_compound,serialize_exploration(compound_session,"compound-replay"),"compound-replay");
+    const auto rerolled_compound = roll_character(complete_rules,compound_pc,*compound_session.state.random);
+    const auto replayed_compound = roll_character(complete_rules,restored_compound.party[0],*restored_compound.state.random);
+    same(rerolled_compound.abilities,replayed_compound.abilities);
+    assert(rerolled_compound.age == compound_pc.age && rerolled_compound.money == replayed_compound.money);
+    assert(rerolled_compound.hit_points->current == replayed_compound.hit_points->current);
+    for (const auto& [name,book] : rerolled_compound.spellbooks) {
+        assert(replayed_compound.spellbooks.at(name).known == book.known);
+        assert(replayed_compound.spellbooks.at(name).first_level_slots == book.first_level_slots);
+    }
+    assert(compound_session.state.random->state() == restored_compound.state.random->state());
+    for (const auto& components : std::vector<std::vector<std::string>>{
+        {"missing","fighter"},{"cleric-fighter","fighter"},{"fighter","fighter"}}) {
+        auto invalid = complete_rules; invalid.classes[5].components = components;
+        HighWordLcg32 rng(8,profile.random->multiplier(),1);
+        rejects([&] { (void)roll_character(invalid,compound_pc,rng); });
+        assert(rng.state() == 8);
+    }
     // Original isolated HP routine, CON 3..20. Synthetic ability clamps supply its inputs.
     const int hp_edges[4][18]{
         {3,4,4,4,5,5,5,5,5,5,5,5,6,7,7,7,7,7},
@@ -790,9 +1060,13 @@ int main(int argc, char** argv) {
     rejects([&] { (void)roll_starting_age(rules,"dwarf","magic-user",no_age_rng); });
     assert(no_age_rng.state() == 1);
     auto invalid_age = rules;
-    invalid_age.races[0].starting_ages["fighter"].count = 0;
+    invalid_age.races[0].starting_ages["fighter"].count = -1;
     rejects([&] { (void)roll_starting_age(invalid_age,"dwarf","fighter",no_age_rng); });
     assert(no_age_rng.state() == 1);
+    invalid_age.races[0].starting_ages["fighter"] = {40,0,2};
+    assert(roll_starting_age(invalid_age,"dwarf","fighter",no_age_rng) == 40 && no_age_rng.state() == 1);
+    invalid_age.races[0].starting_ages["fighter"].base = 0;
+    rejects([&] { (void)roll_starting_age(invalid_age,"dwarf","fighter",no_age_rng); });
     auto aged = session_for(profile);
     Character aged_pc{"Aged","human","male","fighter","lawful-good",std::vector<AbilityValue>(6,{15,0})};
     aged_pc.age = roll_starting_age(rules,"human","fighter",*aged.state.random);

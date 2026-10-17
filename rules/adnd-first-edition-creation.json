@@ -199,6 +199,567 @@
         "chaotic-evil"
       ],
       "percentile": false
+    },
+    {
+      "id": "cleric-fighter",
+      "label": "Cleric/Fighter",
+      "components": [
+        "cleric",
+        "fighter"
+      ],
+      "creationMinimum": [9, 0, 13, 0, 0, 0],
+      "minimum": [
+        9,
+        3,
+        9,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": true,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -4,
+          -2,
+          -2,
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "startingSpellbooks": {
+        "divine": {
+          "known": [
+            "divine.bless",
+            "divine.curse",
+            "divine.cure-light-wounds",
+            "divine.cause-light-wounds",
+            "divine.detect-magic",
+            "divine.protection-from-evil",
+            "divine.protection-from-good",
+            "divine.resist-cold"
+          ],
+          "firstLevelSlots": 1,
+          "ability": "wisdom",
+          "abilityMinimum": 3,
+          "modifiers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "id": "cleric-fighter-magic-user",
+      "label": "Cleric/Fighter/Magic-user",
+      "components": [
+        "cleric",
+        "fighter",
+        "magic-user"
+      ],
+      "creationMinimum": [9, 9, 13, 0, 0, 0],
+      "minimum": [
+        9,
+        9,
+        9,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": true,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -6,
+          -3,
+          -3,
+          -3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          6,
+          6,
+          6,
+          6,
+          6
+        ]
+      },
+      "startingSpellbooks": {
+        "divine": {
+          "known": [
+            "divine.bless",
+            "divine.curse",
+            "divine.cure-light-wounds",
+            "divine.cause-light-wounds",
+            "divine.detect-magic",
+            "divine.protection-from-evil",
+            "divine.protection-from-good",
+            "divine.resist-cold"
+          ],
+          "firstLevelSlots": 1,
+          "ability": "wisdom",
+          "abilityMinimum": 3,
+          "modifiers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "arcane": {
+          "known": [
+            "arcane.detect-magic",
+            "arcane.read-magic",
+            "arcane.shield",
+            "arcane.sleep"
+          ],
+          "firstLevelSlots": 1
+        }
+      }
+    },
+    {
+      "id": "cleric-magic-user",
+      "label": "Cleric/Magic-user",
+      "components": [
+        "cleric",
+        "magic-user"
+      ],
+      "creationMinimum": [0, 9, 13, 0, 0, 0],
+      "minimum": [
+        3,
+        9,
+        9,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": false,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -4,
+          -2,
+          -2,
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "startingSpellbooks": {
+        "divine": {
+          "known": [
+            "divine.bless",
+            "divine.curse",
+            "divine.cure-light-wounds",
+            "divine.cause-light-wounds",
+            "divine.detect-magic",
+            "divine.protection-from-evil",
+            "divine.protection-from-good",
+            "divine.resist-cold"
+          ],
+          "firstLevelSlots": 1,
+          "ability": "wisdom",
+          "abilityMinimum": 3,
+          "modifiers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "arcane": {
+          "known": [
+            "arcane.detect-magic",
+            "arcane.read-magic",
+            "arcane.shield",
+            "arcane.sleep"
+          ],
+          "firstLevelSlots": 1
+        }
+      }
+    },
+    {
+      "id": "fighter-magic-user",
+      "label": "Fighter/Magic-user",
+      "components": [
+        "fighter",
+        "magic-user"
+      ],
+      "creationMinimum": [
+        9,
+        9,
+        0,
+        0,
+        0,
+        0
+      ],
+      "minimum": [
+        9,
+        9,
+        3,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": true,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -4,
+          -2,
+          -2,
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "startingSpellbooks": {
+        "arcane": {
+          "known": [
+            "arcane.detect-magic",
+            "arcane.read-magic",
+            "arcane.shield",
+            "arcane.sleep"
+          ],
+          "firstLevelSlots": 1
+        }
+      }
+    },
+    {
+      "id": "fighter-thief",
+      "label": "Fighter/Thief",
+      "components": [
+        "fighter",
+        "thief"
+      ],
+      "creationMinimum": [
+        9,
+        0,
+        0,
+        9,
+        0,
+        0
+      ],
+      "minimum": [
+        9,
+        3,
+        3,
+        9,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": true,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -4,
+          -2,
+          -2,
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "startingSpells": {
+        "known": [],
+        "firstLevelSlots": 0
+      }
+    },
+    {
+      "id": "fighter-magic-user-thief",
+      "label": "Fighter/Magic-user/Thief",
+      "components": [
+        "fighter",
+        "magic-user",
+        "thief"
+      ],
+      "creationMinimum": [
+        9,
+        9,
+        0,
+        9,
+        0,
+        0
+      ],
+      "minimum": [
+        9,
+        9,
+        3,
+        9,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": true,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -6,
+          -3,
+          -3,
+          -3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          6,
+          6,
+          6,
+          6,
+          6
+        ]
+      },
+      "startingSpellbooks": {
+        "arcane": {
+          "known": [
+            "arcane.detect-magic",
+            "arcane.read-magic",
+            "arcane.shield",
+            "arcane.sleep"
+          ],
+          "firstLevelSlots": 1
+        }
+      }
+    },
+    {
+      "id": "magic-user-thief",
+      "label": "Magic-user/Thief",
+      "components": [
+        "magic-user",
+        "thief"
+      ],
+      "creationMinimum": [
+        0,
+        9,
+        0,
+        9,
+        0,
+        0
+      ],
+      "minimum": [
+        3,
+        9,
+        3,
+        9,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": false,
+      "hitPoints": {
+        "ability": "constitution",
+        "abilityMinimum": 3,
+        "modifiers": [
+          -4,
+          -2,
+          -2,
+          -2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "startingSpellbooks": {
+        "arcane": {
+          "known": [
+            "arcane.detect-magic",
+            "arcane.read-magic",
+            "arcane.shield",
+            "arcane.sleep"
+          ],
+          "firstLevelSlots": 1
+        }
+      }
     }
   ],
   "races": [
@@ -214,7 +775,8 @@
       ],
       "startingAge": {
         "fighter": {"base": 40, "count": 5, "sides": 4},
-        "thief": {"base": 75, "count": 3, "sides": 6}
+        "thief": {"base": 75, "count": 3, "sides": 6},
+        "fighter-thief": {"base": 60, "count": 0, "sides": 2}
       },
       "adjustments": [0, 0, 0, 0, 1, -1],
       "minimum": [
@@ -249,7 +811,8 @@
       },
       "classes": [
         "fighter",
-        "thief"
+        "thief",
+        "fighter-thief"
       ]
     },
     {
@@ -265,7 +828,11 @@
       "startingAge": {
         "fighter": {"base": 130, "count": 5, "sides": 6},
         "magic-user": {"base": 150, "count": 5, "sides": 6},
-        "thief": {"base": 100, "count": 5, "sides": 6}
+        "thief": {"base": 100, "count": 5, "sides": 6},
+        "fighter-magic-user": {"base": 180, "count": 0, "sides": 2},
+        "fighter-thief": {"base": 160, "count": 0, "sides": 2},
+        "fighter-magic-user-thief": {"base": 180, "count": 0, "sides": 2},
+        "magic-user-thief": {"base": 180, "count": 0, "sides": 2}
       },
       "adjustments": [0, 0, 0, 1, -1, 0],
       "minimum": [
@@ -301,7 +868,11 @@
       "classes": [
         "fighter",
         "magic-user",
-        "thief"
+        "thief",
+        "fighter-magic-user",
+        "fighter-thief",
+        "fighter-magic-user-thief",
+        "magic-user-thief"
       ]
     },
     {
@@ -316,7 +887,8 @@
       ],
       "startingAge": {
         "fighter": {"base": 60, "count": 5, "sides": 4},
-        "thief": {"base": 80, "count": 5, "sides": 4}
+        "thief": {"base": 80, "count": 5, "sides": 4},
+        "fighter-thief": {"base": 80, "count": 0, "sides": 2}
       },
       "minimum": [
         6,
@@ -350,7 +922,8 @@
       },
       "classes": [
         "fighter",
-        "thief"
+        "thief",
+        "fighter-thief"
       ]
     },
     {
@@ -367,7 +940,14 @@
         "cleric": {"base": 40, "count": 2, "sides": 4},
         "fighter": {"base": 22, "count": 3, "sides": 4},
         "magic-user": {"base": 30, "count": 2, "sides": 8},
-        "thief": {"base": 22, "count": 3, "sides": 8}
+        "thief": {"base": 22, "count": 3, "sides": 8},
+        "cleric-fighter": {"base": 48, "count": 0, "sides": 2},
+        "cleric-fighter-magic-user": {"base": 48, "count": 0, "sides": 2},
+        "cleric-magic-user": {"base": 48, "count": 0, "sides": 2},
+        "fighter-magic-user": {"base": 46, "count": 0, "sides": 2},
+        "fighter-thief": {"base": 34, "count": 0, "sides": 2},
+        "fighter-magic-user-thief": {"base": 46, "count": 0, "sides": 2},
+        "magic-user-thief": {"base": 46, "count": 0, "sides": 2}
       },
       "minimum": [
         3,
@@ -403,7 +983,14 @@
         "cleric",
         "fighter",
         "magic-user",
-        "thief"
+        "thief",
+        "cleric-fighter",
+        "cleric-fighter-magic-user",
+        "cleric-magic-user",
+        "fighter-magic-user",
+        "fighter-thief",
+        "fighter-magic-user-thief",
+        "magic-user-thief"
       ]
     },
     {
@@ -418,7 +1005,8 @@
       ],
       "startingAge": {
         "fighter": {"base": 20, "count": 3, "sides": 4},
-        "thief": {"base": 40, "count": 2, "sides": 4}
+        "thief": {"base": 40, "count": 2, "sides": 4},
+        "fighter-thief": {"base": 32, "count": 0, "sides": 2}
       },
       "adjustments": [-1, 0, 0, 1, 0, 0],
       "minimum": [
@@ -453,7 +1041,8 @@
       },
       "classes": [
         "fighter",
-        "thief"
+        "thief",
+        "fighter-thief"
       ]
     },
     {

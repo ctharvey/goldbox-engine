@@ -944,3 +944,54 @@ Verification: all 26 public CTest suites pass (20.63 seconds); optional private
 integration skips without configured inputs. After adding stricter in-memory
 configuration guards, all four affected party/RNG/SDL suites pass again (0.65
 seconds). Hygiene, attribution and whitespace checks pass.
+
+### Multi-class creation — 2026-10-17
+
+Read-only native research identifies race class-selection table DS:3E17
+(12 bytes per race, count followed by class codes), class floor table DS:3F81
+(six bytes per class), and alignment table DS:3FE7 (10 bytes per class).
+The selection code sets component flags before deriving starting state. This
+confirms seven supported compound class IDs across fourteen additional race/class
+pairs, without importing later-game ranger/paladin or cleric/thief options.
+SSI Engine's existing research-only standard rules include later-game options;
+its combined-class implementation is not adopted for Pool.
+
+Private `emulate_original_multiclass_creation.py` and
+`original-multiclass-creation-report.json` execute class-flag initialization,
+setup, age, all abilities and complete post-stat initialization for 168 compound
+cases (14 pairs, two genders, six seeds). Per-block execution is bounded to
+25,000 instructions/100 ms, with a 45-second total deadline. Original compound
+age is constant (selected base plus maximum dice), consuming no age RNG. Money
+rolls for every component precede all HP rolls. Both money and HP totals are
+divided by component count; HP base is divided separately before storage.
+The original Constitution routine grants the extra CON 17/18 fighter bonuses
+only when the single-class code is 2. Compound total modifiers reflect the
+separately observed calculation, rather than inheriting that extra bonus.
+
+An additional bounded 64-seed scan of half-elf Cleric/Fighter identifies seeds
+8,15,18. `emulate_original_multiclass_strength.py` runs those seeds for seven
+compound classes and both genders: 42 cases, including 15 exceptional-strength
+results. Its reports are `original-multiclass-strength-scan-report.json` and
+`original-multiclass-strength-report.json`. Public tests retain only numeric
+outcomes and normalized option IDs. Native binaries, class-table bytes, spell
+records and probe implementations remain private.
+
+The combined regression catches a conditional beyond the generic class-floor
+table: Wisdom below 13 is raised to 13 for the supported cleric compounds.
+`emulate_original_multiclass_wisdom_floor.py` confirms the isolated postprocessing
+for single cleric and all seven supported compounds. This is represented as an
+effective parent creation floor, without changing ordinary saved-party minima.
+The SDL compound-creation scenario also checks that class selection, fixed age,
+separate books and exactly seven synthetic draws survive the interactive flow.
+
+Verification: all 26 public CTest suites pass (21.21 seconds); optional private
+integration skips without configured inputs. All 210 original compound outcomes
+match, including exceptional strength and exact final RNG. Party tests cover
+cycles/missing/duplicate components, conflicting books, custom saved book IDs,
+fixed-age draws and preventing oversized party output that its reader would
+reject. Seeded save/reroll replay and the scripted compound SDL creator pass.
+The initial SDL failure was a test input sent at the gender screen; corrected
+class selection passes. A synthetic save left by that abort was preserved in
+the private validation cache before the next run. Hygiene, attribution and
+whitespace checks pass. Live original UI parity and remaining creation fields
+remain unverified.

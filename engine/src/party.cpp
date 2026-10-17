@@ -52,6 +52,25 @@ std::vector<int> scores(const bj::value& value, std::size_t count) {
     for (const auto& v : a) result.push_back(number(v,1,1000));
     return result;
 }
+void validate_spellbook(const Spellbook& book) {
+    require(book.first_level_slots >= 0 && book.first_level_slots <= 64 && book.known.size() <= 64,
+        "Invalid character spellbook");
+    std::set<std::string> known;
+    for (const auto& name : book.known) require(known.insert(id(bj::value(name))).second,"Duplicate known spell");
+}
+bj::object spellbook_object(const Spellbook& book) {
+    bj::array known; for (const auto& name : book.known) known.push_back(bj::value(name));
+    return {{"known",std::move(known)},{"firstLevelSlots",book.first_level_slots}};
+}
+Spellbook read_spellbook(const bj::value& value) {
+    const auto& spells = j::object(value,"saved spellbook");
+    j::fields_only(spells,{"known","firstLevelSlots"},"saved spellbook");
+    Spellbook book;
+    const auto& known = j::field(spells,"known","saved spellbook");
+    if (!j::array(known,"known spells").empty()) book.known = ids(known);
+    book.first_level_slots = number(j::field(spells,"firstLevelSlots","saved spellbook"),0,64);
+    return book;
+}
 int die(HighWordLcg32& random, int sides) {
     return 1+random.draw(static_cast<std::uint16_t>(sides));
 }
@@ -128,18 +147,26 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     for (const auto& v : j::array(field("classes"),"classes")) {
         const auto& o = j::object(v,"class");
         j::fields_only(o,{"id","label","minimum","alignments","percentile","creationMinimum",
-            "hitPoints","startingMoney","startingSpells"},"class");
+            "hitPoints","startingMoney","startingSpells","components","startingSpellbooks"},"class");
         CreationClass c{id(j::field(o,"id","class")),label(j::field(o,"label","class")),
             scores(j::field(o,"minimum","class"),r.abilities.size()),ids(j::field(o,"alignments","class")),false,{}};
         const auto& flag = j::field(o,"percentile","class"); require(flag.is_bool(),"Invalid percentile flag");
         c.percentile = flag.as_bool(); require(!c.percentile || r.percentile_ability.has_value(),"Missing percentile policy");
+        if (const auto* value = o.if_contains("components")) {
+            c.components = ids(*value);
+            require(c.components.size() >= 2 && c.components.size() <= 8,"Invalid class component count");
+            require(!o.contains("startingMoney"),"Component classes inherit starting money");
+        }
         if (const auto* value = o.if_contains("hitPoints")) {
             const auto& hp = j::object(*value,"hit points");
             j::fields_only(hp,{"count","sides","minimum","ability","abilityMinimum","modifiers"},"hit points");
             CreationHitPoints rule;
-            rule.count = number(j::field(hp,"count","hit points"),1,10);
-            rule.sides = number(j::field(hp,"sides","hit points"),2,100);
-            rule.minimum = number(j::field(hp,"minimum","hit points"),1,rule.count*rule.sides);
+            if (c.components.empty()) {
+                rule.count = number(j::field(hp,"count","hit points"),1,10);
+                rule.sides = number(j::field(hp,"sides","hit points"),2,100);
+                rule.minimum = number(j::field(hp,"minimum","hit points"),1,rule.count*rule.sides);
+            } else require(!hp.contains("count") && !hp.contains("sides") && !hp.contains("minimum"),
+                "Component classes inherit hit dice");
             const auto& ability = find(r.abilities,id(j::field(hp,"ability","hit points")));
             rule.ability = static_cast<std::size_t>(&ability-r.abilities.data());
             rule.ability_minimum = number(j::field(hp,"abilityMinimum","hit points"),1,1000);
@@ -158,8 +185,8 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
             require(rule.count*rule.sides <= 65535/rule.multiplier,"Starting money overflows uint16");
             c.starting_money = std::move(rule);
         }
-        if (const auto* value = o.if_contains("startingSpells")) {
-            const auto& spells = j::object(*value,"starting spells");
+        const auto read_spells = [&](const bj::value& value) {
+            const auto& spells = j::object(value,"starting spells");
             j::fields_only(spells,{"known","firstLevelSlots","ability","abilityMinimum","modifiers"},"starting spells");
             CreationSpells rule;
             const auto& known = j::field(spells,"known","starting spells");
@@ -176,7 +203,14 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
                     rule.first_level_slots+n <= 64,"Invalid starting spell slots");
             } else require(!spells.contains("abilityMinimum") && !spells.contains("modifiers"),
                 "Spell modifiers require an ability");
-            c.starting_spells = std::move(rule);
+            return rule;
+        };
+        if (const auto* value = o.if_contains("startingSpells")) c.starting_spells = read_spells(*value);
+        if (const auto* value = o.if_contains("startingSpellbooks")) {
+            require(!c.starting_spells,"Conflicting spellbook definitions");
+            const auto& books = j::object(*value,"starting spellbooks");
+            require(!books.empty() && books.size() <= 8,"Invalid spellbook count");
+            for (const auto& [name,book] : books) c.starting_spellbooks.emplace(id(bj::value(name)),read_spells(book));
         }
         if (const auto* value = o.if_contains("creationMinimum")) {
             const auto& values = j::array(*value,"class creation minimum");
@@ -187,6 +221,16 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
         r.classes.push_back(std::move(c));
     }
     unique(r.classes);
+    for (const auto& c : r.classes) if (!c.components.empty()) {
+        std::size_t known = 0;
+        for (const auto& name : c.components) known += find(r.classes,name).starting_money.has_value();
+        require(known == 0 || known == c.components.size(),"Incomplete component starting money");
+    }
+    for (const auto& c : r.classes) for (const auto& name : c.components) {
+        const auto& component = find(r.classes,name);
+        require(component.components.empty() && component.id != c.id,"Nested or cyclic class components");
+        require(!c.hit_points || component.hit_points.has_value(),"Component hit dice unavailable");
+    }
     for (const auto& v : j::array(field("races"),"races")) {
         const auto& o = j::object(v,"race");
         j::fields_only(o,{"id","label","minimum","maximum","percentileMaximum","classes","adjustments",
@@ -230,8 +274,8 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
                 const auto& dice = j::object(j::field(ages,c,"starting age"),"starting age dice");
                 j::fields_only(dice,{"base","count","sides"},"starting age dice");
                 StartingAgeDice age{number(j::field(dice,"base","age"),0,65535),
-                    number(j::field(dice,"count","age"),1,10),number(j::field(dice,"sides","age"),2,100)};
-                require(age.base+age.count*age.sides <= 65535,"Starting age overflows uint16");
+                    number(j::field(dice,"count","age"),0,10),number(j::field(dice,"sides","age"),2,100)};
+                require(age.base+age.count*age.sides <= 65535 && age.base+age.count > 0,"Invalid starting age range");
                 race.starting_ages.emplace(c,age);
             }
         }
@@ -260,8 +304,8 @@ std::optional<std::uint16_t> roll_starting_age_impl(const CreationRules& rules, 
     const auto it = choice.starting_ages.find(std::string(character_class));
     require(it != choice.starting_ages.end(),"Starting age unavailable for class");
     const auto& dice = it->second;
-    require(dice.base >= 0 && dice.count >= 1 && dice.count <= 10 && dice.sides >= 2 && dice.sides <= 100 &&
-        dice.base <= 65535-dice.count*dice.sides,"Invalid starting age dice");
+    require(dice.base >= 0 && dice.count >= 0 && dice.count <= 10 && dice.sides >= 2 && dice.sides <= 100 &&
+        dice.base <= 65535-dice.count*dice.sides && dice.base+dice.count > 0,"Invalid starting age dice");
     int age = dice.base;
     for (int i = 0; i < dice.count; ++i) age += die(random,dice.sides);
     return static_cast<std::uint16_t>(age);
@@ -386,33 +430,57 @@ Character roll_character_impl(const CreationRules& rules, Character draft, Rando
     require(race.age_adjustments.empty() || draft.age.has_value(),"Age state unavailable");
     require(!draft.age || *draft.age > 0,"Invalid character age");
     draft.abilities = roll_abilities_impl(rules,draft.race,draft.gender,candidate,&draft);
-    if (choice.starting_money) {
-        const auto& money = *choice.starting_money;
+    std::vector<const CreationClass*> components;
+    if (choice.components.empty()) components.push_back(&choice);
+    else {
+        require(choice.components.size() >= 2 && choice.components.size() <= 8 && !choice.starting_money,
+            "Invalid class components");
+        std::set<std::string> seen;
+        for (const auto& name : choice.components) {
+            const auto& component = find(rules.classes,name);
+            require(component.components.empty() && component.id != choice.id && seen.insert(name).second,
+                "Invalid class component reference");
+            components.push_back(&component);
+        }
+    }
+    const auto divisor = static_cast<int>(components.size());
+    const auto money_known = std::count_if(components.begin(),components.end(),
+        [](const auto* c) { return c->starting_money.has_value(); });
+    require(money_known == 0 || static_cast<std::size_t>(money_known) == components.size(),
+        "Incomplete component starting money");
+    std::map<std::string,int> balances;
+    for (const auto* component : components) if (component->starting_money) {
+        const auto& money = *component->starting_money;
         require(money.count >= 1 && money.count <= 10 && money.sides >= 2 && money.sides <= 100 &&
             money.multiplier >= 1 && money.multiplier <= 65535 &&
             money.count*money.sides <= 65535/money.multiplier,"Invalid starting money dice");
         (void)id(bj::value(money.currency));
         int balance = 0;
         for (int i = 0; i < money.count; ++i) balance += die(candidate,money.sides);
-        draft.money[money.currency] = static_cast<std::uint16_t>(balance*money.multiplier);
+        balances[money.currency] += balance*money.multiplier;
     }
+    for (const auto& [currency,total] : balances) draft.money[currency] = static_cast<std::uint16_t>(total/divisor);
     if (choice.hit_points) {
         const auto& hp = *choice.hit_points;
-        require(hp.count >= 1 && hp.count <= 10 && hp.sides >= 2 && hp.sides <= 100 &&
-            hp.minimum >= 1 && hp.minimum <= hp.count*hp.sides && hp.ability < draft.abilities.size() &&
-            hp.ability_minimum >= 1 && hp.ability_minimum <= 1000,
-            "Invalid hit point dice");
+        require(hp.ability < draft.abilities.size() && hp.ability_minimum >= 1 && hp.ability_minimum <= 1000,
+            "Invalid hit point modifier ability");
         const int index = draft.abilities[hp.ability].value-hp.ability_minimum;
         require(index >= 0 && static_cast<std::size_t>(index) < hp.modifiers.size(),"Missing hit point modifier");
         require(hp.modifiers[index] >= -100 && hp.modifiers[index] <= 100,"Invalid hit point modifier");
-        int base = 0;
-        for (int i = 0; i < hp.count; ++i) base += die(candidate,hp.sides);
-        base = std::max(base,hp.minimum);
-        const auto maximum = std::max(1,base+hp.modifiers[index]);
-        draft.hit_points = HitPoints{base,maximum,maximum};
+        int total = 0;
+        for (const auto* component : components) {
+            require(component->hit_points.has_value(),"Component hit dice unavailable");
+            const auto& dice = *component->hit_points;
+            require(dice.count >= 1 && dice.count <= 10 && dice.sides >= 2 && dice.sides <= 100 &&
+                dice.minimum >= 1 && dice.minimum <= dice.count*dice.sides,"Invalid hit point dice");
+            int base = 0;
+            for (int i = 0; i < dice.count; ++i) base += die(candidate,dice.sides);
+            total += std::max(base,dice.minimum);
+        }
+        const auto maximum = std::max(1,(total+hp.modifiers[index])/divisor);
+        draft.hit_points = HitPoints{total/divisor,maximum,maximum};
     }
-    if (choice.starting_spells) {
-        const auto& spells = *choice.starting_spells;
+    const auto prepare_book = [&](const CreationSpells& spells) {
         int slots = spells.first_level_slots;
         require(slots >= 0 && slots <= 64,"Invalid starting spell slots");
         if (spells.ability) {
@@ -426,7 +494,18 @@ Character roll_character_impl(const CreationRules& rules, Character draft, Rando
         require(slots >= 0 && slots <= 64 && spells.known.size() <= 64,"Invalid starting spellbook");
         std::set<std::string> seen;
         for (const auto& name : spells.known) require(seen.insert(id(bj::value(name))).second,"Duplicate known spell");
-        draft.spellbook = Spellbook{spells.known,slots};
+        return Spellbook{spells.known,slots};
+    };
+    require(!choice.starting_spells || choice.starting_spellbooks.empty(),"Conflicting spellbook definitions");
+    if (choice.starting_spells) {
+        draft.spellbook = prepare_book(*choice.starting_spells);
+        draft.spellbooks.clear();
+    }
+    if (!choice.starting_spellbooks.empty()) {
+        require(choice.starting_spellbooks.size() <= 8,"Too many starting spellbooks");
+        draft.spellbook.reset(); draft.spellbooks.clear();
+        for (const auto& [name,book] : choice.starting_spellbooks)
+            draft.spellbooks.emplace(id(bj::value(name)),prepare_book(book));
     }
     draft.status = "okay";
     random = candidate;
@@ -447,13 +526,10 @@ void validate_character(const CreationRules& rules, const Character& c) {
     }
     require(c.money.size() <= 64,"Too many character currencies");
     for (const auto& [currency,balance] : c.money) { (void)id(bj::value(currency)); (void)balance; }
-    if (c.spellbook) {
-        require(c.spellbook->first_level_slots >= 0 && c.spellbook->first_level_slots <= 64 &&
-            c.spellbook->known.size() <= 64,"Invalid character spellbook");
-        std::set<std::string> known;
-        for (const auto& name : c.spellbook->known)
-            require(known.insert(id(bj::value(name))).second,"Duplicate known spell");
-    }
+    require(!c.spellbook || c.spellbooks.empty(),"Conflicting saved spellbooks");
+    if (c.spellbook) validate_spellbook(*c.spellbook);
+    require(c.spellbooks.size() <= 8,"Too many saved spellbooks");
+    for (const auto& [name,book] : c.spellbooks) { (void)id(bj::value(name)); validate_spellbook(book); }
     if (c.status) (void)id(bj::value(*c.status));
     require(!c.name.empty() && c.name.size() <= rules.name_limit && c.name.front() != ' ' && c.name.back() != ' ' &&
         std::all_of(c.name.begin(),c.name.end(),[](unsigned char b) { return b >= 32 && b < 127; }),"Invalid character name");
@@ -527,14 +603,17 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
             for (const auto& [currency,balance] : c.money) money[currency] = balance;
             member["money"] = std::move(money);
         }
-        if (c.spellbook) {
-            bj::array known; for (const auto& name : c.spellbook->known) known.push_back(bj::value(name));
-            member["spellbook"] = bj::object{{"known",std::move(known)},
-                {"firstLevelSlots",c.spellbook->first_level_slots}};
+        if (c.spellbook) member["spellbook"] = spellbook_object(*c.spellbook);
+        if (!c.spellbooks.empty()) {
+            bj::object books;
+            for (const auto& [name,book] : c.spellbooks) books[name] = spellbook_object(book);
+            member["spellbooks"] = std::move(books);
         }
         members.push_back(std::move(member));
     }
-    return bj::serialize(bj::object{{"rulesId",rules.id},{"characters",std::move(members)}});
+    auto result = bj::serialize(bj::object{{"rulesId",rules.id},{"characters",std::move(members)}});
+    require(result.size() <= 64*1024,"Saved party too large");
+    return result;
 }
 Party read_party(std::string_view json, const CreationRules& rules) {
     require(json.size() <= 64*1024,"Saved party too large"); const auto parsed = bj::parse(json);
@@ -545,7 +624,7 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
         j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age",
-            "hitPoints","money","spellbook"},"character");
+            "hitPoints","money","spellbook","spellbooks"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
         if (const auto* value = o.if_contains("status")) c.status = id(*value);
@@ -562,14 +641,11 @@ Party read_party(std::string_view json, const CreationRules& rules) {
             for (const auto& [currency,balance] : money)
                 c.money.emplace(id(bj::value(currency)),static_cast<std::uint16_t>(number(balance,0,65535)));
         }
-        if (const auto* value = o.if_contains("spellbook")) {
-            const auto& spells = j::object(*value,"saved spellbook");
-            j::fields_only(spells,{"known","firstLevelSlots"},"saved spellbook");
-            Spellbook book;
-            const auto& known = j::field(spells,"known","saved spellbook");
-            if (!j::array(known,"known spells").empty()) book.known = ids(known);
-            book.first_level_slots = number(j::field(spells,"firstLevelSlots","saved spellbook"),0,64);
-            c.spellbook = std::move(book);
+        if (const auto* value = o.if_contains("spellbook")) c.spellbook = read_spellbook(*value);
+        if (const auto* value = o.if_contains("spellbooks")) {
+            const auto& books = j::object(*value,"saved spellbooks");
+            require(books.size() <= 8,"Too many saved spellbooks");
+            for (const auto& [name,book] : books) c.spellbooks.emplace(id(bj::value(name)),read_spellbook(book));
         }
         const auto& abilities = j::array(j::field(o,"abilities","character"),"abilities");
         require(abilities.size() == rules.abilities.size(),"Saved ability count mismatch");

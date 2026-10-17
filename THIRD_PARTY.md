@@ -47,6 +47,12 @@ Pool execution independently verifies its starting spell flags and slot counts;
 FRUA layout similarity alone is not treated as Pool compatibility. No viewer,
 spell interpreter or upstream array implementation is copied or translated.
 
+Multi-class creation also consults the previously listed SSI Engine standard
+race/class definitions. They include later-game options that are not assumed
+valid for Pool. Available combinations and their numeric starting state are
+independently checked against the locally owned original selection/creation
+routines; no upstream combined-class implementation is adopted.
+
 The locally installed Pool manual (PDF pages 4, 5 and 17; character/party
 sections and race-limit table) was read to cross-check six races, four base
 classes, six PCs, 15-character names and race/gender ability caps. Only mechanical

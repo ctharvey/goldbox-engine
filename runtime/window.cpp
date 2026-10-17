@@ -265,6 +265,9 @@ public:
         if (c.spellbook && !c.spellbook->known.empty()) result += "SPELLS " +
             std::to_string(c.spellbook->known.size()) + "   LEVEL 1 SLOTS " +
             std::to_string(c.spellbook->first_level_slots) + "\n";
+        for (const auto& [name,book] : c.spellbooks) if (!book.known.empty())
+            result += name + " SPELLS " + std::to_string(book.known.size()) + "   LEVEL 1 SLOTS " +
+                std::to_string(book.first_level_slots) + "\n";
         for (std::size_t i = 0; i < c.abilities.size(); ++i) {
             result += rules.abilities[i].label + " " + std::to_string(c.abilities[i].value);
             if (c.abilities[i].percentile) result += "/" + (c.abilities[i].percentile == 100 ?
