@@ -134,16 +134,17 @@
         "src/Common/Plugins/Dax/DaxFile.cs",
         "src/Common/Plugins/DaxEcl/Program.cs",
         "src/Common/Plugins/Dax/DaxWallDefFile.cs",
-        "src/Common/Plugins/Dax/EgaVgaPalette.cs"
+        "src/Common/Plugins/Dax/EgaVgaPalette.cs",
+        "src/Common/Plugins/Character/FruaCharacter.cs"
       ],
       "license": "MIT",
       "licenseFile": "licenses/gold-box-explorer-MIT.txt",
       "licenseUrl": "https://github.com/bsimser/Gold-Box-Explorer/blob/eac30abaa6ee66aea6f5d65ebe6d676b10015a8f/LICENSE",
       "copyrightNotice": "Copyright (c) 2018 Bil Simser",
       "localFiles": [],
-      "purpose": "Cross-check DAX index byte count, RLE and ECL address bases; evaluate event-discovery heuristics; cross-check wall tile references and EGA color facts",
-      "modifications": "Research only; no source copied. Existing independent bounded DAX implementation retained with corrected index interpretation. Byte-pattern event discovery deliberately excluded. Wall assembly code referencing Simeon Pilgrim was not copied or ported.",
-      "reviewed": "2026-10-16"
+      "purpose": "Cross-check DAX index byte count, RLE and ECL address bases; evaluate event-discovery heuristics; cross-check wall tile references and EGA color facts; corroborate native first-level spell IDs and character spell-slot fields during independently probed Pool creation research",
+      "modifications": "Research only; no source copied. Existing independent bounded DAX implementation retained with corrected index interpretation. Byte-pattern event discovery deliberately excluded. Wall assembly code referencing Simeon Pilgrim was not copied or ported. Native Pool spell IDs/capacities are independently probed; FRUA annotations only corroborate names and field meanings. No upstream spell array/viewer implementation adopted.",
+      "reviewed": "2026-10-17"
     },
     {
       "id": "openxcom-modding-reference",

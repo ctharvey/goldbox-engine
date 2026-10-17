@@ -321,6 +321,7 @@ int main(int argc, char** argv) {
     creation.classes[0].percentile = true; creation.races[0].percentile_maximum["any"] = 100;
     creation.classes[0].starting_money = CreationMoney{"tokens",1,2,10};
     creation.classes[0].hit_points = CreationHitPoints{1,2,1,0,12,{2}};
+    creation.classes[0].starting_spells = CreationSpells{{"synthetic.light"},2,0,12,{1}};
     session.initial_random.emplace(0x12345678,134775813,1);
     session.state.random = session.initial_random;
     session.character_rules = creation;
@@ -337,6 +338,8 @@ int main(int argc, char** argv) {
     assert(session.party[0].age && *session.party[0].age >= 21 && *session.party[0].age <= 22);
     assert(session.party[0].age == 22 && session.party[0].abilities[0].percentile == 45);
     assert(session.party[0].money.at("tokens") == 20 && session.party[0].hit_points->current == 4);
+    assert(session.party[0].spellbook->known == std::vector<std::string>{"synthetic.light"} &&
+        session.party[0].spellbook->first_level_slots == 3);
     assert(session.state.random->state() == 0xe28f6d7a); // Money then HP; no confirmation-time redraw.
     const auto created_age = session.party[0].age;
     session.party.clear();
@@ -345,6 +348,8 @@ int main(int argc, char** argv) {
     assert(session.party[0].abilities[0].value == 12);
     assert(session.party[0].age == created_age);
     assert(session.party[0].money.at("tokens") == 20 && session.party[0].hit_points->maximum == 4);
+    assert(session.party[0].spellbook->known == std::vector<std::string>{"synthetic.light"} &&
+        session.party[0].spellbook->first_level_slots == 3);
     assert(session.state.random->state() == 0xe28f6d7a);
     auto second_member = session.party.front(); second_member.name = "BOB";
     session.party.push_back(second_member); session.loaded_character = 1;

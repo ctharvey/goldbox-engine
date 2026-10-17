@@ -918,3 +918,29 @@ Verification: the serialized two-job build and all 26 public CTest suites pass
 Hygiene, attribution and whitespace checks pass. The first HP test run exposed
 missing modifier coverage for legal dwarf CON 19; the corrected table and new
 original boundary checks cover scores through 20.
+
+### Starting spellbooks — 2026-10-17
+
+The same 204 complete original post-stat executions record spell availability
+flags and first-level capacity. Clerics set IDs 1..8; magic-users set 11,18,19,21;
+fighter/thief set none. Gold Box Explorer `FruaCharacter.cs` at research revision
+`eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` corroborates standard spell names and
+slot-field meanings. These references remain research-only; no upstream viewer,
+spell implementation or character layout is adopted. Independent native Pool
+execution supplies the behavior rather than assuming FRUA compatibility.
+
+Private `emulate_original_creation_spell_edges.py` and
+`original-creation-spell-edges-report.json` extend the full initializer probe to
+18 cleric Wisdom scores 3..20, under the same per-block/total limits. First-level
+slots are 1 through Wisdom 12, 2 at 13, and 3 from 14; mage capacity is 1.
+The full initializer consumes exactly the previously recorded gold/HP draws.
+Public regression tests compare stable normalized known-spell IDs and capacity
+for 204 cases and all 18 boundaries, verify unchanged RNG, reject malformed
+books/rules, preserve custom saved IDs and legacy unknowns, and exercise SDL
+creation/save/load. Casting, memorization and higher-level spell progression
+are not implemented by this starting-state model.
+
+Verification: all 26 public CTest suites pass (20.63 seconds); optional private
+integration skips without configured inputs. After adding stricter in-memory
+configuration guards, all four affected party/RNG/SDL suites pass again (0.65
+seconds). Hygiene, attribution and whitespace checks pass.

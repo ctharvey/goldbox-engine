@@ -40,6 +40,13 @@ adopted. Upstream fixed-HP and zero-racial-adjustment placeholders
 were not adopted. The normalized character model, data profile, bounded dice,
 save validation and SDL creator are independent project code.
 
+Gold Box Explorer `src/Common/Plugins/Character/FruaCharacter.cs` at
+`eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` was consulted for spell identifier
+names and slot-field annotations during starting spellbook research. Native
+Pool execution independently verifies its starting spell flags and slot counts;
+FRUA layout similarity alone is not treated as Pool compatibility. No viewer,
+spell interpreter or upstream array implementation is copied or translated.
+
 The locally installed Pool manual (PDF pages 4, 5 and 17; character/party
 sections and race-limit table) was read to cross-check six races, four base
 classes, six PCs, 15-character names and race/gender ability caps. Only mechanical

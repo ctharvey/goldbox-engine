@@ -63,6 +63,17 @@ int main(int argc, char** argv) {
     const auto json = serialize_party(party,rules);
     assert(!read_party(json,rules)[0].age); // Legacy ages remain unknown.
     assert(!read_party(json,rules)[0].hit_points && read_party(json,rules)[0].money.empty());
+    assert(!read_party(json,rules)[0].spellbook);
+    auto caster = hero; caster.spellbook = Spellbook{{"mod.custom-spell","divine.bless"},3};
+    const auto spells_json = serialize_party({caster},rules);
+    const auto saved_caster = read_party(spells_json,rules)[0];
+    assert(saved_caster.spellbook->known == caster.spellbook->known && saved_caster.spellbook->first_level_slots == 3);
+    for (const auto& value : {"-1","65","true","null"})
+        rejects([&] { (void)read_party(changed(spells_json,"\"firstLevelSlots\":3",
+            std::string("\"firstLevelSlots\":")+value),rules); });
+    rejects([&] { (void)read_party(changed(spells_json,"mod.custom-spell","divine.bless"),rules); });
+    caster.spellbook->known.push_back("divine.bless");
+    rejects([&] { (void)serialize_party({caster},rules); });
     auto wounded = hero; wounded.hit_points = HitPoints{5,0,6}; wounded.money["gold"] = 0;
     const auto vitals_json = serialize_party({wounded},rules);
     auto restored = read_party(vitals_json,rules)[0];
@@ -159,7 +170,12 @@ int main(int argc, char** argv) {
         changed(original,"\"abilityMinimum\": 3","\"abilityMinimum\": true"),
         changed(original,"\"minimum\": 5, \"ability\"","\"minimum\": 9, \"ability\""),
         changed(original,"\"currency\": \"gold\"","\"currency\": \"Invalid ID\""),
-        changed(original,"\"multiplier\": 10","\"multiplier\": 65535")}) {
+        changed(original,"\"multiplier\": 10","\"multiplier\": 65535"),
+        changed(original,"\"firstLevelSlots\": 1","\"firstLevelSlots\": 65"),
+        changed(original,"\"divine.curse\"","\"divine.bless\""),
+        changed(original,"\"ability\": \"wisdom\"","\"ability\": \"missing\""),
+        changed(original,"\"firstLevelSlots\": 0","\"firstLevelSlots\": 0, \"modifiers\": [0]"),
+        changed(original,"\"modifiers\": [0, 0","\"modifiers\": [65, 0")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

@@ -102,7 +102,7 @@ additional random draws. The original also draws before the raw
 ability loop, applies age processing before the racial clamps and class floors
 afterward; complete
 live interactive creation parity remains unverified. Multi-classing, AC, portraits, equipment,
-spells, experience/advancement and original character import are unfinished.
+spell casting/memorization, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
 
 `roll_character` prepares a draft with known race/gender/class. A draft without
@@ -134,6 +134,23 @@ maximum. Loading preserves wounds and balances, never rerolling or recomputing
 them. Legacy missing fields remain unknown. Rerolls regenerate money and HP while
 retaining age. The original reroll branch confirms this ordering; interactive
 input, idle timing and the entire native character record remain unverified.
+
+### Starting spellbooks
+
+Optional class `startingSpells` provides `known` spell IDs and `firstLevelSlots`.
+An optional `ability`, `abilityMinimum` and ordered `modifiers` array adjust
+slots by ability score. Spell IDs are opaque to the shared creator. A character
+can have an explicitly empty book; absent legacy books remain unknown. Saves
+preserve known IDs and slot counts, including mod-defined IDs, without deriving
+them from current abilities. Duplicate/invalid IDs and counts outside 0..64 fail.
+
+Original post-stat execution across 204 cases confirms eight available cleric
+spells, four magic-user spells (Detect Magic, Read Magic, Shield, Sleep), and
+empty noncaster books. Eighteen isolated cleric cases verify Wisdom 3..20:
+one first-level slot through 12, two at 13, three thereafter. Magic-users have
+one. Initialization consumes no additional RNG. The summary displays spell and
+slot counts. This models starting availability/capacity; memorized spell lists,
+casting, spell effects and progression remain unfinished.
 
 ## Saves and lifecycle
 

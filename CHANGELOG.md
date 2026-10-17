@@ -2,6 +2,10 @@
 
 ## 2026-10-17
 
+- Preserve configurable starting spellbooks and first-level slots. Verify all
+  supported class initializations and 18 original Wisdom boundary cases without
+  extra random draws. Show spell/slot counts and validate saved spellbooks.
+
 - Generate, display and preserve configurable starting gold and hit points after
   ability rolls. Verify 204 original post-stat initializations and 72 HP/CON
   boundary cases. Preserve wounded HP and unknown legacy values; regress exact

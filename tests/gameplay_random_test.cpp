@@ -650,10 +650,24 @@ int main(int argc, char** argv) {
         assert(rolled.abilities[0].percentile == source.percentile);
         assert(rolled.money.at("gold") == expected.gold && rolled.hit_points->base == expected.base);
         assert(rolled.hit_points->current == expected.hp && rolled.hit_points->maximum == expected.hp);
+        assert(rolled.spellbook);
+        const std::vector<std::string> divine{"divine.bless","divine.curse","divine.cure-light-wounds",
+            "divine.cause-light-wounds","divine.detect-magic","divine.protection-from-evil",
+            "divine.protection-from-good","divine.resist-cold"};
+        const std::vector<std::string> arcane{"arcane.detect-magic","arcane.read-magic","arcane.shield","arcane.sleep"};
+        if (draft.character_class == "cleric") {
+            assert(rolled.spellbook->known == divine);
+            const int original_slots[]{1,1,1,1,1,1,1,1,1,1,2,3,3,3,3,3,3,3}; // Original WIS 3..20 probe.
+            assert(rolled.spellbook->first_level_slots == original_slots[rolled.abilities[2].value-3]);
+        } else if (draft.character_class == "magic-user") {
+            assert(rolled.spellbook->known == arcane && rolled.spellbook->first_level_slots == 1);
+        } else assert(rolled.spellbook->known.empty() && rolled.spellbook->first_level_slots == 0);
         assert(rng.state() == expected.after);
         const auto loaded = read_party(serialize_party({rolled},complete_rules),complete_rules)[0];
         assert(loaded.money == rolled.money && loaded.hit_points->base == expected.base);
         assert(loaded.hit_points->current == expected.hp && loaded.hit_points->maximum == expected.hp);
+        assert(loaded.spellbook->known == rolled.spellbook->known &&
+            loaded.spellbook->first_level_slots == rolled.spellbook->first_level_slots);
     }
     // Original isolated HP routine, CON 3..20. Synthetic ability clamps supply its inputs.
     const int hp_edges[4][18]{
@@ -677,6 +691,21 @@ int main(int argc, char** argv) {
         (void)expected_rng.draw(choice.hit_points->sides);
         assert(rng.state() == expected_rng.state());
     }
+    const int original_spell_slots[]{1,1,1,1,1,1,1,1,1,1,2,3,3,3,3,3,3,3};
+    for (int wisdom = 3; wisdom <= 20; ++wisdom) {
+        auto spell_rules = complete_rules;
+        spell_rules.dice_count = 1; spell_rules.dice_sides = 2; spell_rules.drop_lowest = 0; spell_rules.keep_best_of = 1;
+        auto& race = spell_rules.races[5]; race.age_adjustments.clear();
+        race.minimum.assign(6,15); race.minimum[2] = wisdom; race.maximum["male"] = race.minimum;
+        auto& cleric = spell_rules.classes[0]; cleric.minimum.assign(6,1); cleric.creation_minimum.clear();
+        cleric.starting_money.reset(); cleric.hit_points.reset();
+        Character draft{"Spells","human","male","cleric","lawful-good",{}}; draft.age = 1;
+        HighWordLcg32 rng(0x12345678,profile.random->multiplier(),1);
+        const auto rolled = roll_character(spell_rules,draft,rng);
+        assert(rolled.abilities[2].value == wisdom);
+        assert(rolled.spellbook->first_level_slots == original_spell_slots[wisdom-3]);
+        assert(rolled.spellbook->known.size() == 8 && rng.state() == 0xe28f6d7a);
+    }
     auto complete_session = session_for(profile);
     complete_session.state.random.emplace(0x12345678,profile.random->multiplier(),1);
     auto original_roll = roll_character(complete_rules,Character{"Full","human","male","fighter","lawful-good",{}},
@@ -690,12 +719,21 @@ int main(int argc, char** argv) {
     same(reroll.abilities,replay_roll.abilities);
     assert(reroll.money == replay_roll.money && reroll.hit_points->base == replay_roll.hit_points->base);
     assert(reroll.hit_points->current == replay_roll.hit_points->current);
+    assert(reroll.spellbook->known == replay_roll.spellbook->known &&
+        reroll.spellbook->first_level_slots == replay_roll.spellbook->first_level_slots);
     assert(complete_session.state.random->state() == full_restored.state.random->state());
     auto invalid_vitals = complete_rules; invalid_vitals.classes[1].hit_points->modifiers.clear();
     HighWordLcg32 vitals_rng(123,profile.random->multiplier(),1);
     rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
     assert(vitals_rng.state() == 123); // Failures after money rolling also leave the caller RNG untouched.
     invalid_vitals = complete_rules; invalid_vitals.classes[1].starting_money->multiplier = 65535;
+    rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
+    assert(vitals_rng.state() == 123);
+    invalid_vitals = complete_rules;
+    invalid_vitals.classes[1].starting_spells->known = {"duplicate","duplicate"};
+    rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
+    assert(vitals_rng.state() == 123);
+    invalid_vitals.classes[1].starting_spells->first_level_slots = 2147483647;
     rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
     assert(vitals_rng.state() == 123);
     struct AgeObservation { const char* race; const char* character_class; int age; std::uint32_t after; };
