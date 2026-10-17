@@ -179,7 +179,9 @@ Operational prerequisites and rules:
   bounds inactivity while waiting for engine startup or an action response.
   Operator/menu input may wait until the total deadline.
 - The controller holds an OS-backed single-session lock in `privateRoot`
-  (`goldbox-compare.lock`; released on exit, no stale-lock deletion), then
+  (`goldbox-compare.lock`; released on exit, no stale-lock deletion). The lock is
+  per `privateRoot` only: two configs with different roots do not exclude each
+  other, and engine output paths are not containment-checked. Then it
   launches **both children as fully owned trees**:
   - Windows: a session Job Object with kill-on-close; the child is started
     suspended, assigned to the job, then resumed (no spawn-before-assignment

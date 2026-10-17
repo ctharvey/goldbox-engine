@@ -139,8 +139,12 @@ class WindowsMessages:
             raise ReferenceInputError(f"expected one owned SDL_app window; found {len(candidates)}")
         return candidates[0]
 
+    cancel = None  # threading.Event set by the controller when it gives up on a dispatch
+
     def send(self, sequence, deadline):
         for key in key_sequence(sequence):
+            if self.cancel is not None and self.cancel.is_set():
+                raise ReferenceInputError("reference input cancelled; delivery may be partial")
             if time.monotonic() + 0.25 >= deadline:
                 raise ReferenceInputError("reference input exceeded the dispatch deadline")
             handle = self.window(deadline)  # Recheck ownership before every key; never use a title match.

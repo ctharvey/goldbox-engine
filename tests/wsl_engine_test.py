@@ -240,6 +240,32 @@ def test_input_bounds(root):
         probe.close()
 
 
+def test_hostile_frame_and_signal_policy(root):
+    # F24: a hostile control frame ends the adapter with a diagnostic, not a
+    # traceback, and cleans up. F23: the engine must not inherit SIGHUP=SIG_IGN.
+    probe = Probe(root, "tree")
+    probe.ready()
+    pids = probe.event()
+    probe.process.stdin.write(b"[" * 5000 + b"]" * 5000 + b"\n")
+    probe.process.stdin.flush()
+    assert probe.process.wait(timeout=8) == 1, probe.stderr
+    probe.error_reader.join(timeout=1)
+    assert b"Traceback" not in probe.stderr and b"WSL adapter:" in probe.stderr, probe.stderr
+    assert not any(running([pids["engine"], pids["grandchild"]]).values())
+    probe.close()
+
+    report = ("import signal, json, time\n"
+              "print(json.dumps({'ignored': signal.getsignal(signal.SIGHUP) == signal.SIG_IGN}),"
+              " flush=True)\ntime.sleep(5)\n")
+    probe = Probe(root, command=["/usr/bin/python3", "-u", "-c", report])
+    probe.ready()
+    reported = probe.event()
+    assert reported == {"ignored": False}, reported
+    probe.send({"op": "stop"})
+    probe.closed("controller stopped")
+    probe.close()
+
+
 def test_blocked_output(root):
     # Do not drain stdout: a full Windows/Linux pipe must not defeat the deadline.
     argv = (["wsl.exe", "-d", "Ubuntu", "--exec", "/usr/bin/python3", "-u", "-c", SOURCE]
@@ -388,7 +414,8 @@ def main():
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             for test in (test_flow, test_cleanup, test_lease, test_lease_renewal, test_supervisor_loss,
-                         test_invalid_start, test_input_bounds, test_blocked_output):
+                         test_invalid_start, test_input_bounds, test_hostile_frame_and_signal_policy,
+                         test_blocked_output):
                 test(root)
                 print(test.__name__ + ": PASS", flush=True)
             if os.name == "nt":

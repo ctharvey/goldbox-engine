@@ -190,11 +190,17 @@ class Session:
         remainder = max(self.deadline - time.monotonic(), 0.0)
         budget = min(max(remainder, 0.5), ENGINE_QUIT_DRAIN_SECONDS)
         drain_deadline = time.monotonic() + budget  # one budget for exit and EOF together
-        try:
-            self.engine.process.wait(timeout=budget)
-        except subprocess.TimeoutExpired as error:
-            raise ControlledError(
-                "engine did not exit after acknowledging quit") from error
+        while True:
+            # Sliced so the WSL lease keeps being renewed while the engine exits.
+            try:
+                self.engine.process.wait(
+                    timeout=max(min(EVENT_WAIT_SLICE, drain_deadline - time.monotonic()), 0.0))
+                break
+            except subprocess.TimeoutExpired as error:
+                if time.monotonic() >= drain_deadline:
+                    raise ControlledError(
+                        "engine did not exit after acknowledging quit") from error
+                self._check_housekeeping()
         code = self.engine.process.returncode
         if code != 0:
             raise ControlledError(
@@ -387,18 +393,24 @@ class Session:
             except Exception as error:  # A failed worker must never look like delivered input.
                 failures.append(error)
 
+        cancel = threading.Event()
         actions = [write] if document is not None else []
         if reference_keys is not None:
+            self.reference_input.cancel = cancel
             actions.append(lambda: self.reference_input.send(reference_keys, limit))
         threads = [threading.Thread(target=worker, args=(action,), daemon=True) for action in actions]
         for thread in threads:
             thread.start()
         gate.set()
-        while any(thread.is_alive() for thread in threads):
-            self._check_housekeeping()
-            if time.monotonic() >= limit:
-                raise ControlledError("input dispatch exceeded its bounded deadline; delivery may be partial")
-            time.sleep(0.01)
+        try:
+            while any(thread.is_alive() for thread in threads):
+                self._check_housekeeping()
+                if time.monotonic() >= limit:
+                    raise ControlledError("input dispatch exceeded its bounded deadline; delivery may be partial")
+                time.sleep(0.01)
+        except BaseException:
+            cancel.set()  # No further reference key may start after we gave up.
+            raise
         if failures:
             raise ControlledError(f"input dispatch failed; delivery may be partial, do not retry: {failures[0]}")
 

@@ -45,6 +45,8 @@ class WslEngine:
         # helper deployment, service installation or network listener is needed.
         argv = ["wsl.exe", "--distribution", config["distribution"], "--exec",
                 "/usr/bin/python3", "-u", "-c", source]
+        if len(subprocess.list2cmdline(argv)) > 30000:  # CreateProcess limit is 32767
+            raise ControlledError("the WSL adapter source no longer fits on a command line")
         native = OwnedProcess._launch_windows(argv, Path(__file__).resolve().parent, allow_wsl=True)
         try:
             return cls(native, config, duration)

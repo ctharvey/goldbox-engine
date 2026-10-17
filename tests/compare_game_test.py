@@ -904,6 +904,23 @@ def test_posix_leader_not_reaped(fixture):
     check(reaped, "kill_tree did not reap the leader")
 
 
+def test_reference_input_cancel(fixture):
+    # F11: once the controller gives up on a dispatch, no further key may start.
+    import threading
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import reference_input
+    messages = object.__new__(reference_input.WindowsMessages)
+    messages.window = lambda deadline: (_ for _ in ()).throw(AssertionError("key started after cancel"))
+    messages.cancel = threading.Event()
+    messages.cancel.set()
+    try:
+        messages.send(["ENTER", "UP"], time.monotonic() + 5)
+    except reference_input.ReferenceInputError as error:
+        check("cancelled" in str(error), f"unexpected message: {error}")
+    else:
+        check(False, "send ran after cancel")
+
+
 def test_cleanup_failure_handling(fixture):
     # F6: a second interrupt during kill_tree must not skip the other tree or the
     # lock release. F7: a cleanup failure must not replace the session failure.
@@ -971,6 +988,7 @@ def main():
         test_reader_errors_are_failures(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
+        test_reference_input_cancel(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])
     print("compare_game tests passed")

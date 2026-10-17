@@ -2,6 +2,15 @@
 
 ## 2026-10-16
 
+- Controller Low-finding fixes: bounded config size/duplicate keys/NUL bytes, menu and
+  completion render validation, reader OSErrors reported as failures, lock opened
+  `O_NOFOLLOW` and taken before the marker is read, Windows job accounting via
+  `ActiveProcesses` and a single-resume check, WSL adapter cleanup/reap bounded
+  below the controller wait, engine no longer inherits `SIGHUP=SIG_IGN`, hostile
+  control frames end with a diagnostic, and abandoned reference-input dispatches
+  are cancelled before the next key. Deferred: F13, F30, F33, reference mapping/
+  disarm failures staying fatal, and two interrupt windows around launch.
+
 - Controller cleanup hardening: SIGTERM/SIGHUP (POSIX) and CTRL_BREAK (Windows) now run
   the same cleanup path as Ctrl-C; POSIX `poll()` no longer reaps the owned group
   leader before `killpg`; a second interrupt during cleanup no longer skips the

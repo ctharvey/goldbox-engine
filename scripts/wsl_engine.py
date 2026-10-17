@@ -18,6 +18,8 @@ import sys
 import time
 
 LEASE_SECONDS = 5.0
+CLEANUP_SECONDS = 3.0  # Must stay below the controller's 8 s wait for this process.
+REAP_SECONDS = 2.0
 INPUT_LIMIT = 128 * 1024
 BUFFER_LIMIT = 1024 * 1024
 OUTPUT_LIMIT = 64 * 1024 * 1024
@@ -56,8 +58,10 @@ def anchor(command, cwd, pipes, parent, deadline):
     signal.signal(signal.SIGALRM, stop)
     signal.setitimer(signal.ITIMER_REAL, max(0.1, deadline - time.monotonic()))
     try:
+        # SIG_IGN survives exec; the engine must not inherit this process's SIGHUP policy.
         child = subprocess.Popen(command, cwd=cwd, stdin=stdin_read, stdout=out_write,
-                                 stderr=err_write, close_fds=True)
+                                 stderr=err_write, close_fds=True,
+                                 preexec_fn=lambda: signal.signal(signal.SIGHUP, signal.SIG_DFL))
         for descriptor in (stdin_read, out_write, err_write):
             os.close(descriptor)
         reported = False
@@ -155,7 +159,7 @@ def supervise(config, incoming):
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
-        limit = time.monotonic() + 1
+        limit = time.monotonic() + CLEANUP_SECONDS
         while time.monotonic() < limit:
             try:
                 os.killpg(pid, signal.SIGKILL)
@@ -272,6 +276,8 @@ def supervise(config, incoming):
                         raise ValueError("anchor status exceeded bound")
                     if b"\n" in status:
                         message = json.loads(status.partition(b"\n")[0])
+                        if not isinstance(message, dict):
+                            raise ValueError("invalid anchor status")
                         engine_exit = message.get("exit")
                         if "error" in message:
                             reason = message["error"]
@@ -292,7 +298,14 @@ def supervise(config, incoming):
     finally:
         if drain_deadline is None:
             cleanup()
-        os.waitpid(pid, 0)
+        reap_limit = time.monotonic() + REAP_SECONDS
+        while time.monotonic() < reap_limit:  # A D-state anchor must not hang us; init reaps it.
+            try:
+                if os.waitpid(pid, os.WNOHANG)[0] == pid:
+                    break
+            except ChildProcessError:
+                break
+            time.sleep(0.01)
         selector.close()
         for descriptor in (stdin_write, out_read, err_read, status_read):
             os.close(descriptor)
@@ -304,7 +317,7 @@ def main():
     try:
         config, incoming = read_start()
         return supervise(config, incoming)
-    except (OSError, ValueError, KeyError, TypeError) as error:
+    except Exception as error:  # incl. RecursionError/AttributeError from hostile frames
         try:
             os.write(2, ("WSL adapter: " + str(error) + "\n").encode())
         except OSError:
