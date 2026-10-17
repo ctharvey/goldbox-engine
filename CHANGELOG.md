@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Add deterministic scripted input and exact ordered engine-event assertions to
+  the existing comparison harness, usable from the CLI or Python without an LLM.
+  Exercise the real engine's movement, menus, memory and save/load in CI; stop on
+  mismatches, unexpected events or invalid choices. Preserve manual control and
+  existing limits, and close drained pipes for repeated programmatic sessions.
+
 - Automate RNG regression coverage with 280 fixed original-runtime numeric
   observations, exact state checks and synthetic capture/cleanup failure tests
   in public CI. Add a bounded opt-in native integration test for 280 original

@@ -216,6 +216,54 @@ explicit resource/save arguments) next to **one** reference process, renders
 engine events for a human operator, and **never claims parity**: the session is
 unpaired/inconclusive by design and no MATCH result is produced.
 
+For code-driven runs, add `--script <scenario.json>`. No LLM or console input is
+used. The same controller sends a fixed command sequence, waits for engine
+acknowledgments, supplies menu answers, and checks every engine event in order.
+It stops at the first mismatch. A scenario for an empty start at row/column zero
+with a blocked north move is:
+
+```json
+{
+  "schemaVersion": 1,
+  "commands": ["north", "quit"],
+  "expect": [
+    {"type": "ready", "checks": {"/protocol": 1, "/row": 0, "/column": 0}},
+    {"type": "complete", "checks": {"/id": 1, "/status": "blocked", "/row": 0, "/column": 0}},
+    {"type": "complete", "checks": {"/id": 2, "/status": "ok"}}
+  ]
+}
+```
+
+Checks use JSON pointers, including array indexes such as
+`/state/memory/18944`; values must match exactly, with booleans distinct from
+integers. Include text and menu events explicitly. Menu checks can assert
+`/choices` and `/menu_id`; the next command supplies a zero-based numeric answer.
+Each action event must check `/id`, each completion must check `/status`, and
+the script must finish with one `quit` and its successful completion. Missing,
+extra or reordered events, invalid choices and unused commands fail the run.
+Scenarios are bounded to 256 KiB, 63 commands and 256 expected events. Existing
+session deadlines, output limits, ownership, cleanup and private-root locks apply.
+Repeated code runs release drained pipe handles, and retain the engine's refusal
+to overwrite saves: prepare the same private baseline and a fresh output path.
+
+Success returns zero and prints `[scripted PASS]` only after assertions and
+process cleanup succeed. Failure returns nonzero with the event/check that
+failed. Python tests can call
+`run_session(parse_config(Path('session.json')), ScriptInput(document))` directly
+with the `scripts` directory on their module path. `goldbox_scripted_harness_tests`
+runs in CTest/CI against the real engine with synthetic map/script resources,
+covering repeatability, menus, movement, exact memory, save/load, failure and
+deadline paths. Interactive operation remains available without `--script`.
+
+When reference input is configured, scripts can use the existing `reference KEY`
+staging, `arm` and `disarm` commands and mirrored action/menu mappings. Rejected
+staging/arming commands are fatal in scripted mode. Prepare the reference's known
+starting state first; engine acknowledgments do not acknowledge DOS game state.
+Scripted PASS verifies engine assertions, **not original-game parity**. This mode
+does not inject a DOS seed, control native input-processing timing or add gameplay
+RANDOM support. The seeded original-runtime comparison remains its separate
+automated RNG test.
+
 Version-1 session configuration (trusted local execution input; the controller
 spawns with `shell=False` and never interpolates shell text; validated fully
 before anything is spawned):

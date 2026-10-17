@@ -240,6 +240,7 @@ class Session:
     def _await_ready(self):
         document = self._next_event("engine never became ready")
         _render_ready(document, self.reference_input is not None)
+        self._observe(document)
         self.facing = document["facing"]
         if self.reference_input is not None:
             print("[dual input] disarmed. Use 'reference KEY ...' to stage the original, then 'arm'.")
@@ -286,6 +287,17 @@ class Session:
             if token[0] == "event":
                 return token[1]
 
+    def _observe(self, document):
+        observer = getattr(self.console, 'observe', None)
+        if observer is not None:
+            observer(document)
+
+    def _ignored(self, message):
+        if getattr(self.console, 'observe', None) is None:
+            print(f'[ignored] {message}')
+        else:
+            raise ControlledError(f'scenario command rejected: {message}')
+
     def _serve_operator(self):
         if self.console.failure is not None:
             raise self.console.failure
@@ -310,7 +322,7 @@ class Session:
                 try:
                     self.reference_input.window()
                 except ReferenceInputError as error:
-                    print(f"[ignored] cannot arm yet: {error}")
+                    self._ignored(f"cannot arm yet: {error}")
                     return
                 self.armed = True
                 print("[dual input] armed; action/menu keys go to both sides. Baseline remains unverified.")
@@ -323,7 +335,7 @@ class Session:
                 try:
                     keys = key_sequence(item.upper().split()[1:])
                 except ReferenceInputError as error:
-                    print(f"[ignored] nothing was sent: {error}")
+                    self._ignored(f"nothing was sent: {error}")
                     return
                 self._send(None, keys)
                 print("[reference] staging keys delivered")
@@ -335,7 +347,7 @@ class Session:
             print("[note] menus accept a zero-based choice number shown alongside each entry.")
             return
         if verb not in COMMANDS:
-            print(f"[ignored] unknown command {item!r}; type 'help' for the accepted list")
+            self._ignored(f"unknown command {item!r}; type 'help' for the accepted list")
             return
         self._dispatch(verb)
 
@@ -438,11 +450,11 @@ class Session:
         try:
             choice = int(stripped)
         except ValueError:
-            print("[ignored] menu choice requires a decimal number; re-enter it")
+            self._ignored("menu choice requires a decimal number; re-enter it")
             return
         if not 0 <= choice < len(choices):
-            print(f"[ignored] menu choice {choice} lies outside the offered range "
-                  f"[0, {len(choices) - 1}]; re-enter it")
+            self._ignored(f"menu choice {choice} lies outside the offered range "
+                          f"[0, {len(choices) - 1}]; re-enter it")
             return
         keys = None
         if self.reference_input is not None:
@@ -473,6 +485,7 @@ class Session:
                 f"out-of-order engine event id {event_id}: pending action id {self.pending_id}")
         if event_type == "text":
             _render_text(document)
+            self._observe(document)
             self.last_summary = f"text (action {event_id})"
             return
         if event_type == "menu":
@@ -490,6 +503,7 @@ class Session:
             _print_menu(choices, prompt)
             self.last_menu_id = menu_id
             self.pending_menu = (self.pending_id, menu_id, choices)
+            self._observe(document)
             self.last_summary = f"menu event (action {event_id}, menu {menu_id})"
             return
         if event_type == "complete":
@@ -499,6 +513,7 @@ class Session:
                 raise ControlledError("engine action unsupported; dual input stopped before another action")
             if self.quit_requested and document["status"] != "ok":
                 raise ControlledError("engine did not successfully acknowledge quit")
+            self._observe(document)
             self.last_summary = f"complete status {document.get('status')!r} (id {event_id})"
             self.pending_id = None
             return

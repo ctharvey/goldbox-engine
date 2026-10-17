@@ -40,6 +40,7 @@ from compare_stream import (
     ConsoleInput, _BoundedDrain, _EventQueue, EngineStdoutReader, _wait_bounded)
 from compare_session import (
     _render_ready, _render_text, _offer_menu, _render_complete, Session)
+from compare_script import ScriptInput
 
 if os.name == "nt":
     import ctypes.wintypes
@@ -53,10 +54,10 @@ if os.name == "nt":
 else:
     import fcntl
 
-USAGE = "usage: compare_game.py <session-config.json>"
+USAGE = "usage: compare_game.py <session-config.json> [--script <scenario.json>]"
 
 
-def run_session(config):
+def run_session(config, console=None):
     lock = SessionLock(config["privateRoot"]).acquire()
     engine = reference = None
     stdout_reader = stderr_reader = None
@@ -87,11 +88,13 @@ def run_session(config):
                                     REFERENCE_OUTPUT_LIMIT)]
         for drain in ref_drains:
             drain.start()
-        console = ConsoleInput()
+        if console is None:
+            console = ConsoleInput()
         console.start()
         session = Session(config, engine, reference, engine_queue, console, deadline)
         session.drain_watch = [stderr_reader, *ref_drains]
         code = session.run()
+        script_note = console.finish() if isinstance(console, ScriptInput) else None
         _wait_bounded(stdout_reader)
         if engine_queue.failure is not None:
             raise engine_queue.failure
@@ -108,6 +111,8 @@ def run_session(config):
             if drain.failure is not None:
                 raise drain.failure
         notes = session.end_notes
+        if script_note:
+            notes.append(script_note)
         return code, notes
     finally:
         primary = sys.exc_info()[1]
@@ -132,6 +137,23 @@ def run_session(config):
                 _wait_bounded(waiter)
             except KeyboardInterrupt as error:
                 interrupted = interrupted or error
+        # Repeated programmatic runs must release drained pipe handles. Never
+        # close a buffered reader while another thread could hold its lock.
+        output_pipes = []
+        if engine is not None:
+            output_pipes.extend([(engine.process.stdout, stdout_reader), (engine.process.stderr, stderr_reader)])
+        if reference is not None:
+            output_pipes.extend((pipe, ref_drains[index] if index < len(ref_drains) else None)
+                                for index, pipe in enumerate((reference.process.stdout, reference.process.stderr)))
+        for pipe, reader in output_pipes:
+            if pipe is None or (reader is not None and reader.is_alive()):
+                continue
+            try:
+                pipe.close()
+            except KeyboardInterrupt as error:
+                interrupted = interrupted or error
+            except Exception as error:
+                cleanup_errors.append(str(error))
         if not cleanup_errors:
             lock.release()  # A failed kill leaves ownership ambiguous: keep the lock until exit.
         if cleanup_errors:
@@ -167,13 +189,14 @@ def _install_termination_handlers():
 
 
 def main(argv):
-    if len(argv) != 2:
+    if len(argv) not in (2, 4) or (len(argv) == 4 and argv[2] != '--script'):
         print(USAGE, file=sys.stderr)
         return 2
     try:
         _install_termination_handlers()
         config = parse_config(Path(argv[1]))
-        code, notes = run_session(config)
+        scripted = ScriptInput.from_file(argv[3]) if len(argv) == 4 else None
+        code, notes = run_session(config, scripted) if scripted is not None else run_session(config)
         _announce(notes)
         return code
     except ControlledError as error:
