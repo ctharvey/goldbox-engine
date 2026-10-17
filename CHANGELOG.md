@@ -2,6 +2,10 @@
 
 ## 2026-10-17
 
+- Clarify the harness's operator checkpoint and RNG limits. Regress that
+  reference-only code-wheel/startup inputs never become engine actions, consume
+  action IDs, or bypass the shared-input staging guard.
+
 - Add a read-only combat-icon part probe. Verify all 56 CHEAD and 128 CBODY
   records with the existing decoder, and inspect the original customization
   screen. Icon composition/recoloring still needs deterministic reference data.

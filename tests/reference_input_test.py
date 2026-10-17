@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Synthetic mapping tests and Windows dual-dispatch integration; no game data."""
+import io
 import json
 import os
+import queue
 from pathlib import Path
 import subprocess
 import sys
@@ -142,6 +144,59 @@ def test_dispatch_gate():
         raise AssertionError("worker exception was reported as successful dispatch")
 
 
+def test_startup_checkpoint():
+    """Reference-only startup cannot send engine actions or consume action IDs."""
+    from compare_game import ControlledError, Session
+
+    output = io.BytesIO()
+    console = SimpleNamespace(queue=queue.Queue(), failure=None)
+    events = SimpleNamespace(queue=queue.Queue(), failure=None)
+    engine = SimpleNamespace(process=SimpleNamespace(stdin=output, poll=lambda: None))
+    config = {"reference": {}, "timeout": 10, "checkpoint": 2}
+    reference = SimpleNamespace(process=SimpleNamespace(poll=lambda: None))
+    session = Session(config, engine, reference, events, console, time.monotonic() + 10)
+    delivered = []
+    session.reference_input = SimpleNamespace(
+        window=lambda: None, mapping=Mapping(CONFIG),
+        send=lambda keys, deadline: delivered.append(list(keys)))
+
+    def command(text):
+        console.queue.put_nowait(text)
+        session._serve_operator()
+
+    def refused(text, diagnostic):
+        before = output.getvalue(), list(delivered), session.next_id
+        try:
+            command(text)
+        except ControlledError as error:
+            assert diagnostic in str(error), str(error)
+        else:
+            raise AssertionError(f"unsafe staging command accepted: {text}")
+        assert before == (output.getvalue(), delivered, session.next_id)
+
+    assert not session.armed
+    refused("search", "dual input is disarmed")
+    # Different editions can need different startup inputs. None is mirrored.
+    for key in ("ENTER", "ENTER", "C"):
+        command("reference " + key)
+    assert delivered == [["ENTER"], ["ENTER"], ["C"]]
+    assert output.getvalue() == b"" and session.next_id == 1
+    assert session.pending_id is None and session.facing is None
+
+    # Arming is an operator assertion, not a seed capture or an engine action.
+    command("arm")
+    assert session.armed and output.getvalue() == b"" and session.next_id == 1
+    refused("reference ENTER", "disarm before sending reference-only")
+    command("disarm")
+    command("reference ENTER")
+    refused("search", "dual input is disarmed")
+    command("arm")
+    command("search")
+    assert json.loads(output.getvalue()) == {"id": 1, "action": "search"}
+    assert delivered == [["ENTER"], ["ENTER"], ["C"], ["ENTER"], ["S"]]
+    assert session.pending_id == 1 and session.next_id == 2
+
+
 def _windows_flow(root, backend):
     from compare_game_test import Fixture
     fixture = Fixture(root)
@@ -216,6 +271,7 @@ def test_windows_flow(root, backend="native"):
 def main():
     test_mappings()
     test_dispatch_gate()
+    test_startup_checkpoint()
     if os.name == "nt":
         with tempfile.TemporaryDirectory() as temp:
             test_windows_flow(Path(temp))

@@ -326,6 +326,8 @@ class Session:
                     return
                 self.armed = True
                 print("[dual input] armed; action/menu keys go to both sides. Baseline remains unverified.")
+                print("[checkpoint] operator asserts matching gameplay state; "
+                      "startup screens and RNG state are not verified or synchronized.")
             elif verb == "disarm":
                 self.armed = False
                 print("[dual input] disarmed")

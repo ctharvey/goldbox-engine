@@ -494,6 +494,23 @@ The prototype engine still starts with independently initialized state; do not
 arm shared gameplay merely because the original save has loaded. Map identity,
 coordinates, facing, party and event state still need independent alignment.
 
+For character-creation comparisons, the code wheel belongs only to reference
+startup. Leave input disarmed, observe and pass the original's startup screens,
+and bring each implementation to the same creation checkpoint independently.
+Only arm after verifying equivalent selections and state. Never mirror the
+wheel's Enter into our engine, add a wheel to its startup, or compensate with
+dummy random draws. Edition-specific startup keys belong in reference staging,
+not engine rules.
+
+RNG parity additionally needs the original's current generator state at the
+common checkpoint, before the first compared draw, and that exact state supplied
+to our generator. Equal launch seeds or equal numbers of keypresses are not
+evidence of equal state after different startup paths. `arm` neither reads nor
+sets either generator. The existing isolated numeric creation tests use explicit
+input states; live checkpoint capture and synchronization remain unfinished.
+`python tests/reference_input_test.py` regresses staging isolation, unchanged
+engine command IDs, and rejection of reference-only keys while armed.
+
 For TypeScript mod SDK authoring (requires Node.js and npm):
 
 ```bash
