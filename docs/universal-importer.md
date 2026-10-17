@@ -48,6 +48,14 @@ unsigned 16-bit integers ordered outdoors/indoors. Absent configuration preserve
 the placeholder background. Unknown fields, invalid addresses or array sizes
 are rejected; no game name is checked in core code.
 
+Optional `portrait` configures the shared body/head PICTURE adapter with an
+unsigned 16-bit `headIdAddress`, canvas `width` (1..320), `height` (1..200), and
+two X/Y pairs `headOffset`/`bodyOffset` within that canvas. Pool supplies 0x6DE1,
+88x88, (0,0)/(0,40). No address is hardcoded in the VM or renderer. The current
+window supports only portraits fitting its 88x88 image view; larger profile
+layouts require a capable host. The adapter is enabled by explicit portrait
+archives, not by title matching. Unknown fields and invalid geometry are rejected.
+
 ## Compatibility acceptance per game/version
 
 1. Fingerprint user-supplied install files without ever uploading or committing them.

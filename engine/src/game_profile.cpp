@@ -15,7 +15,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
-        "colorBackdrop"}, "game profile");
+        "colorBackdrop", "portrait"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -27,7 +27,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "eventDialect", "game profile"), "profile.eventDialect"),
         j::string(j::field(root, "rulesProfile", "game profile"), "profile.rulesProfile"),
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
-        {}, std::nullopt, "disabled", std::nullopt
+        {}, std::nullopt, "disabled", std::nullopt, std::nullopt
     };
     static const std::regex id_pattern(R"(^[a-z0-9][a-z0-9._-]{0,127}$)");
     if (!std::regex_match(profile.id, id_pattern) || profile.id.find("..") != std::string::npos ||
@@ -87,6 +87,34 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
             config.sky_color_addresses[i] = static_cast<std::uint16_t>(address);
         }
         profile.color_backdrop = config;
+    }
+    if (const auto* value = root.if_contains("portrait")) {
+        const auto& object = j::object(*value,"portrait");
+        j::fields_only(object,{"headIdAddress","width","height","headOffset","bodyOffset"},"portrait");
+        const auto bounded = [&](const char* name, std::int64_t minimum, std::int64_t maximum) {
+            const auto n = j::integer(j::field(object,name,"portrait"),name);
+            if (n < minimum || n > maximum) throw std::runtime_error("Invalid portrait configuration");
+            return static_cast<std::uint16_t>(n);
+        };
+        GameProfile::Portrait config{};
+        config.head_id_address = bounded("headIdAddress",0,65535);
+        config.layout.width = bounded("width",1,320);
+        config.layout.height = bounded("height",1,200);
+        const auto offset = [&](const char* name) {
+            const auto& a = j::array(j::field(object,name,"portrait"),name);
+            if (a.size() != 2) throw std::runtime_error("Portrait offset requires X/Y");
+            std::array<std::uint16_t,2> result{};
+            for (std::size_t i = 0; i < 2; ++i) {
+                const auto n = j::integer(a[i],name);
+                const auto limit = i ? config.layout.height : config.layout.width;
+                if (n < 0 || n >= limit) throw std::runtime_error("Invalid portrait offset");
+                result[i] = static_cast<std::uint16_t>(n);
+            }
+            return result;
+        };
+        config.layout.head_offset = offset("headOffset");
+        config.layout.body_offset = offset("bodyOffset");
+        profile.portrait = config;
     }
     return profile;
 }

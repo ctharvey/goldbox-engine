@@ -1,4 +1,5 @@
 #pragma once
+#include "goldbox/formats/graphics.hpp"
 
 #include <filesystem>
 #include <cstdint>
@@ -32,6 +33,11 @@ struct GameProfile {
         std::array<std::uint16_t,2> sky_color_addresses; // Outdoors, indoors.
     };
     std::optional<ColorBackdrop> color_backdrop;
+    struct Portrait {
+        std::uint16_t head_id_address{};
+        formats::EgaPortraitLayout layout;
+    };
+    std::optional<Portrait> portrait;
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

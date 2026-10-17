@@ -23,6 +23,7 @@ public:
     SDL_Renderer* renderer;
     const formats::WallGraphics* graphics;
     const GameProfile::ColorBackdrop* backdrop;
+    const GameProfile::Portrait* portrait_config;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     std::optional<ImagePresentation> images;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
@@ -34,8 +35,8 @@ public:
 
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
         const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
-        std::span<const formats::IndexedImage> font)
-        : session(value), renderer(target), graphics(walls), backdrop(colors) {
+        std::span<const formats::IndexedImage> font, const GameProfile::Portrait* portrait)
+        : session(value), renderer(target), graphics(walls), backdrop(colors), portrait_config(portrait) {
         if (archives) images.emplace(*archives);
         if (!font.empty()) {
             const auto atlas = compose_font_atlas(font);
@@ -71,7 +72,10 @@ public:
     }
     void picture(std::uint8_t id) override {
         if (!images) throw std::runtime_error("No image archives selected");
-        images->picture(id); update_image();
+        if (portrait_config && session.state.memory[portrait_config->head_id_address] != 255)
+            images->portrait(session.state.memory[portrait_config->head_id_address],id,portrait_config->layout);
+        else images->picture(id);
+        update_image();
     }
     void sprite_start(EclSpriteRequest request) override {
         if (!images) throw std::runtime_error("No image archives selected");
@@ -232,7 +236,8 @@ public:
 
 int run_exploration_window(ExplorationSession& session, std::string_view identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images,
-    const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font) {
+    const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
+    const GameProfile::Portrait* portrait) {
     if (graphics) {
         for (const auto& cell : session.map.cells) {
             for (const auto id : {cell.north,cell.east,cell.south,cell.west}) {
@@ -252,7 +257,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    WindowHost host(session,raw_renderer,graphics,images,backdrop,font);
+    WindowHost host(session,raw_renderer,graphics,images,backdrop,font,portrait);
     host.text("Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented.",false);
     const auto trigger = [&](formats::EclEventKind kind) {
         const auto result = session.trigger(kind,host);

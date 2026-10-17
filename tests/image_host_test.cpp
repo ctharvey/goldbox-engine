@@ -38,6 +38,12 @@ std::vector<std::uint8_t> sequence() {
     }
     return result;
 }
+std::vector<std::uint8_t> part(std::uint8_t color) {
+    std::vector<std::uint8_t> bytes(17+32,color*17);
+    std::fill_n(bytes.begin(),17,0);
+    bytes[0] = 8; bytes[2] = 1; bytes[8] = 1;
+    return bytes;
+}
 std::vector<std::uint8_t> program(std::initializer_list<std::uint8_t> body) {
     std::vector<std::uint8_t> result;
     for (int i = 0; i < 5; ++i) result.insert(result.end(),{1,1,20,0x99});
@@ -136,6 +142,18 @@ int main(int argc, char** argv) {
     display.sprite_advance(); display.clear(); assert(!display.frame());
     session.row = 255;
     rejects([&] { display.sprite_start({7,0,255},session); });
+    assets.portraits = PortraitArchives{archive(7,part(3)),archive(9,part(4))};
+    const formats::EgaPortraitLayout layout{88,88,{0,0},{0,40}};
+    display.portrait(7,9,layout);
+    assert(display.frame()->image.pixels[0] == 3 && display.frame()->image.pixels[40*88] == 4);
+    assert(display.palette() == EgaPaletteKind::standard);
+    rejects([&] { display.portrait(8,9,layout); });
+    assert(display.frame()->image.pixels[0] == 3);
+    rejects([&] { display.portrait(7,8,layout); });
+    assert(display.frame()->image.pixels[40*88] == 4);
+    ImagePresentation no_portraits(short_assets);
+    rejects([&] { no_portraits.portrait(7,9,layout); });
+    display.clear(); assert(!display.frame());
 #ifdef GOLDBOX_RENDERER
     session = {};
     session.dialect = dialect; session.opcodes = ops;
@@ -148,6 +166,19 @@ int main(int argc, char** argv) {
     }
     assert(run_exploration_window(session,"synthetic-images",{},nullptr,&assets) == 0);
     assert(session.state.memory[0x4a00] == 9); // Reached past every graphics callback.
+    SDL_Quit();
+    session = {};
+    session.dialect = dialect; session.opcodes = ops;
+    session.ecl_record = program({9,0,7,1,0x10,0x4a,0x0e,0,9,
+        9,0,255,1,0x10,0x4a,0x0e,0,7,9,0,42,1,0,0x4a,0});
+    const GameProfile::Portrait config{0x4a10,layout};
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    for (const auto code : {SDLK_SPACE,SDLK_ESCAPE}) {
+        SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = code;
+        assert(SDL_PushEvent(&event));
+    }
+    assert(run_exploration_window(session,"synthetic-portraits",{},nullptr,&assets,nullptr,{},&config) == 0);
+    assert(session.state.memory[0x4a00] == 42 && session.state.memory[0x4a10] == 255);
     SDL_Quit();
 #endif
 }

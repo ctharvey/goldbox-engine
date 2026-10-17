@@ -225,8 +225,9 @@ timeout 30 ./build/tests/goldbox_image_sequence_tests portrait /private/HEAD1.DA
 ```
 
 The output contains only counts. This tests structural fit, not which heads and
-bodies an original event actually pairs. ECL resource binding and renderer
-portrait selection remain unfinished. TITLE, combat and other static graphics
+bodies an original event actually pairs. Opt-in ECL PICTURE integration now uses
+the profile's head-ID address and caller-selected archives; campaign archive
+binding and original-event pairing remain unverified. TITLE, combat and other static graphics
 use the existing explicit `ega` validation mode; FINAL5 contains both static
 images and picture sequences, so it must not be assigned one guessed decoder.
 

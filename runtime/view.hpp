@@ -27,5 +27,5 @@ formats::IndexedImage compose_wall_view(const ExplorationSession& session, const
 int run_exploration_window(ExplorationSession& session, std::string_view source_identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics = nullptr,
     const ImageArchives* images = nullptr, const GameProfile::ColorBackdrop* backdrop = nullptr,
-    std::span<const formats::IndexedImage> font = {});
+    std::span<const formats::IndexedImage> font = {}, const GameProfile::Portrait* portrait = nullptr);
 } // namespace goldbox

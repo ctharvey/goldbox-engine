@@ -2,6 +2,11 @@
 
 ## 2026-10-16
 
+- Connect opt-in ECL PICTURE portrait selection to profile-configured head memory
+  and layout, with explicitly supplied HEAD/BODY archives. Preserve normal-picture
+  sentinel handling, clear behavior and the previous image after resource errors;
+  test typed memory writes, portrait upload and fallback in the SDL host.
+
 - Add a reusable EGA body/head portrait composition adapter with explicit canvas
   and fallback coordinates, embedded-offset handling, opaque layer order and
   strict bounds. Keep composition separate from decoding, ECL and rendering;

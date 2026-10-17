@@ -22,6 +22,8 @@ int main(int argc, char** argv) {
     assert(pool.image_dialect == "ssi-images-3-v1" && curse.image_dialect == "disabled");
     if (!pool.color_backdrop || curse.color_backdrop ||
         pool.color_backdrop->sky_color_addresses != std::array<std::uint16_t,2>{0x49fd,0x49fe}) return 1;
+    if (!pool.portrait || curse.portrait || pool.portrait->head_id_address != 0x6de1 ||
+        pool.portrait->layout.body_offset[1] != 40) return 1;
     const auto path = fs::temp_directory_path() / "goldbox_invalid_profile_fixture.json";
     {
         std::ofstream o(path, std::ios::trunc);

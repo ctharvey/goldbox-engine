@@ -54,6 +54,17 @@ void ImagePresentation::sprite_start(EclSpriteRequest request, const Exploration
     index_ = distance;
     sprite_ = true;
 }
+void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const formats::EgaPortraitLayout& layout) {
+    if (!archives_.portraits) throw std::runtime_error("No portrait archives selected");
+    auto image = formats::compose_ega_portrait(
+        formats::decode_ega_images(archives_.portraits->heads.extract(head)),
+        formats::decode_ega_images(archives_.portraits->bodies.extract(body)),layout);
+    formats::EgaFrame frame;
+    frame.image = std::move(image);
+    std::vector<formats::EgaFrame> decoded{std::move(frame)};
+    validate(decoded);
+    frames_ = std::move(decoded); index_ = 0; sprite_ = false;
+}
 void ImagePresentation::sprite_advance() {
     if (sprite_ && index_) --index_;
 }

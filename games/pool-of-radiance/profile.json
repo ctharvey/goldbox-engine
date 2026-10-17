@@ -7,6 +7,8 @@
   "eventDialect": "unverified",
   "imageDialect": "ssi-images-3-v1",
   "colorBackdrop": {"skyColorAddresses": [18941, 18942]},
+  "portrait": {"headIdAddress": 28129, "width": 88, "height": 88,
+    "headOffset": [0, 0], "bodyOffset": [0, 40]},
   "eventDispatch": {"dialect": "ssi-five-entry-v1", "codeBase": 39168, "squareInfoAddress": 49231,
     "positionAddresses": [49227, 49228, 49229]},
   "rulesProfile": "adnd-first-edition-unimplemented",

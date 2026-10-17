@@ -99,6 +99,20 @@ read-only from the supplied archive; no artwork is bundled. Font selection is
 explicit, does not affect game state, and is not a recreation of the original
 screen layout or a visual-parity claim.
 
+Add `--portraits /private/HEAD1.DAX /private/BODY1.DAX` with `--images` to enable
+profile-driven PICTURE portrait selection. The profile must declare `portrait`
+with `headIdAddress`, canvas `width`/`height`, `headOffset` and `bodyOffset` pairs.
+Pool declares head ID at 0x6DE1 and an 88x88 canvas with body fallback (0,40).
+PICTURE reads that byte at the call: 255 selects a normal PIC record; otherwise
+it selects HEAD by that byte and BODY by the PICTURE operand. PICTURE 255 still
+clears before any archive lookup. Missing parts stop the event without replacing
+the preceding image. This is opt-in; without `--portraits` the picture-only pilot
+retains its previous behavior and does not claim original portrait routing.
+No initial head ID is invented: empty VM memory remains empty. Original startup
+must establish correct state, or an authored test must set the head byte explicitly.
+Archive groups remain caller-selected. Timed sprite/portrait replacement and
+campaign-driven archive switching are not implemented.
+
 Reuse decision: use SDL3's zlib-licensed platform/input/rendering/font services
 instead of implementing platform backends. Validated with SDL 3.2.28 at
 `7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`; no upstream source or artwork copied.

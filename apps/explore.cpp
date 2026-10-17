@@ -268,9 +268,18 @@ int main(int argc, char** argv) {
 #ifdef GOLDBOX_RENDERER
         std::optional<goldbox::formats::WallGraphics> graphics;
         std::optional<goldbox::ImageArchives> images;
+        std::optional<goldbox::PortraitArchives> portraits;
         std::vector<goldbox::formats::IndexedImage> font;
         while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" ||
-            std::string_view(argv[1]) == "--images" || std::string_view(argv[1]) == "--font")) {
+            std::string_view(argv[1]) == "--images" || std::string_view(argv[1]) == "--font" ||
+            std::string_view(argv[1]) == "--portraits")) {
+            if (std::string_view(argv[1]) == "--portraits") {
+                if (argc < 4 || portraits) throw std::runtime_error("--portraits requires HEAD and BODY archives");
+                portraits.emplace(goldbox::PortraitArchives{goldbox::formats::DaxArchive::from_file(argv[2]),
+                    goldbox::formats::DaxArchive::from_file(argv[3])});
+                argc -= 3; argv += 3;
+                continue;
+            }
             if (std::string_view(argv[1]) == "--font") {
                 if (argc < 4 || !font.empty()) throw std::runtime_error("--font requires one archive and record ID");
                 font = goldbox::formats::decode_mono8_tiles(
@@ -305,9 +314,16 @@ int main(int argc, char** argv) {
             std::cout << "With --window, optional --walls <WALLDEF.DAX> <8X8D.DAX> <shared-8X8D.DAX> <bank1> <bank2> <bank3> precedes the six arguments.\n";
             std::cout << "Optional --images <PIC.DAX> <SPRIT.DAX> also precedes the six resource arguments.\n";
             std::cout << "Optional --font <8X8D.DAX> <record-id> selects SSI-order monochrome text glyphs.\n";
+            std::cout << "Optional --portraits <HEAD.DAX> <BODY.DAX> enables profile-based portraits with --images.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
+#ifdef GOLDBOX_RENDERER
+        if (portraits) {
+            if (!images || !profile.portrait) throw std::runtime_error("Portraits require --images and a portrait profile");
+            images->portraits = std::move(portraits);
+        }
+#endif
         if (!profile.event_dispatch || profile.archive_format != "dax-v1") throw std::runtime_error("Unsupported exploration profile");
         const auto& config = *profile.event_dispatch;
         const auto geo_id = record_id(argv[3]), ecl_id = record_id(argv[5]);
@@ -337,7 +353,8 @@ int main(int argc, char** argv) {
 #ifdef GOLDBOX_RENDERER
         if (window) return goldbox::run_exploration_window(session, source_identity, save,
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
-            profile.color_backdrop ? &*profile.color_backdrop : nullptr,font);
+            profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,
+            images && images->portraits ? &*profile.portrait : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {
