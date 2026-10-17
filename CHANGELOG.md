@@ -2,6 +2,11 @@
 
 ## 2026-10-16
 
+- Execute opt-in LOAD_AREA_DECO through a typed host callback, replacing wall
+  banks only after resource/map validation. Persist selected IDs as optional
+  save state and rebind before restoring the window's game state. Preserve the
+  old display/state on resource failures; keep archive/map switching explicit.
+
 - Connect opt-in ECL PICTURE portrait selection to profile-configured head memory
   and layout, with explicitly supplied HEAD/BODY archives. Preserve normal-picture
   sentinel handling, clear behavior and the previous image after resource errors;

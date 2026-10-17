@@ -44,9 +44,15 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
     for (const auto value : session.state.memory) memory.push_back(value);
     bj::array strings;
     for (const auto& [address, text] : session.state.strings) strings.push_back(bj::object{{"address", address}, {"text", text}});
-    const auto json = bj::serialize(bj::object{{"schemaVersion", 1}, {"sourceIdentity", source_identity},
+    auto object = bj::object{{"schemaVersion", 1}, {"sourceIdentity", source_identity},
         {"dialect", session.dialect.id}, {"row", session.row}, {"column", session.column},
-        {"facing", static_cast<unsigned>(session.facing)}, {"memory", std::move(memory)}, {"strings", std::move(strings)}});
+        {"facing", static_cast<unsigned>(session.facing)}, {"memory", std::move(memory)}, {"strings", std::move(strings)}};
+    if (session.wall_banks) {
+        bj::array banks;
+        for (const auto id : *session.wall_banks) banks.push_back(id);
+        object["wallBanks"] = std::move(banks);
+    }
+    const auto json = bj::serialize(object);
     if (json.size() > 4 * 1024 * 1024) throw std::runtime_error("Save exceeds 4 MiB limit");
     return json;
 }
@@ -56,7 +62,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     if (json.size() > 4 * 1024 * 1024) throw std::runtime_error("Save exceeds 4 MiB limit");
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
-    j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings"}, "save");
+    j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -81,7 +87,15 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
         const auto text = j::string(j::field(item, "text", "saved string"), "saved text");
         if (!state.strings.emplace(address, text).second) throw std::runtime_error("Duplicate saved string address");
     }
+    std::optional<std::array<std::uint8_t,3>> banks;
+    if (const auto* value = root.if_contains("wallBanks")) {
+        const auto& a = j::array(*value,"wallBanks");
+        if (a.size() != 3) throw std::runtime_error("Saved wall banks require three IDs");
+        banks.emplace();
+        for (std::size_t i = 0; i < 3; ++i) (*banks)[i] = static_cast<std::uint8_t>(bounded(a[i],255));
+    }
     // Publish only after validating the entire save; failed loads change nothing.
+    session.wall_banks = banks;
     session.state = std::move(state);
     session.row = static_cast<std::uint8_t>(row);
     session.column = static_cast<std::uint8_t>(column);

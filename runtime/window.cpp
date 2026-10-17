@@ -17,6 +17,12 @@ namespace {
 void checked(bool ok) {
     if (!ok) throw std::runtime_error(SDL_GetError());
 }
+void require_wall_bindings(const ExplorationSession& session, const formats::WallGraphics& graphics) {
+    for (const auto& cell : session.map.cells)
+        for (const auto id : {cell.north,cell.east,cell.south,cell.west})
+            if (id && (id > 15 || !graphics.present[id-1]))
+                throw std::runtime_error("GEO wall has no selected graphics bank");
+}
 class WindowHost final : public EclHost {
 public:
     ExplorationSession& session;
@@ -24,6 +30,8 @@ public:
     const formats::WallGraphics* graphics;
     const GameProfile::ColorBackdrop* backdrop;
     const GameProfile::Portrait* portrait_config;
+    const WallArchives* wall_archives;
+    std::optional<formats::WallGraphics> selected_graphics;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     std::optional<ImagePresentation> images;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
@@ -35,8 +43,8 @@ public:
 
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
         const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
-        std::span<const formats::IndexedImage> font, const GameProfile::Portrait* portrait)
-        : session(value), renderer(target), graphics(walls), backdrop(colors), portrait_config(portrait) {
+        std::span<const formats::IndexedImage> font, const GameProfile::Portrait* portrait, const WallArchives* sources)
+        : session(value), renderer(target), graphics(walls), backdrop(colors), portrait_config(portrait), wall_archives(sources) {
         if (archives) images.emplace(*archives);
         if (!font.empty()) {
             const auto atlas = compose_font_atlas(font);
@@ -54,6 +62,7 @@ public:
             if (!texture) throw std::runtime_error(SDL_GetError());
             checked(SDL_SetTextureScaleMode(texture.get(),SDL_SCALEMODE_NEAREST));
         }
+        if (wall_archives && session.wall_banks) install_walls(load_banks(session,*session.wall_banks));
     }
     void update_image() {
         image_texture.reset();
@@ -69,6 +78,35 @@ public:
             for (const auto pixel : frame->image.pixels) rgba.push_back(palette[pixel]);
             checked(SDL_UpdateTexture(image_texture.get(),nullptr,rgba.data(),frame->image.width*4));
         }
+    }
+    formats::WallGraphics load_banks(const ExplorationSession& context, std::array<std::uint8_t,3> banks) {
+        if (!wall_archives) throw std::runtime_error("No wall archives selected");
+        auto decoded = formats::load_wall_graphics(wall_archives->definitions,wall_archives->tiles,
+            wall_archives->shared,banks);
+        require_wall_bindings(context,decoded);
+        return decoded;
+    }
+    void install_walls(formats::WallGraphics decoded) {
+        if (!texture) {
+            texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,88,88));
+            if (!texture) throw std::runtime_error(SDL_GetError());
+            checked(SDL_SetTextureScaleMode(texture.get(),SDL_SCALEMODE_NEAREST));
+        }
+        selected_graphics = std::move(decoded);
+        graphics = &*selected_graphics;
+    }
+    void wall_banks(std::array<std::uint8_t,3> banks) override {
+        install_walls(load_banks(session,banks));
+        session.wall_banks = banks;
+    }
+    void restore(std::string_view json, std::string_view identity) {
+        auto candidate = session;
+        restore_exploration(candidate,json,identity);
+        if (candidate.wall_banks) install_walls(load_banks(candidate,*candidate.wall_banks));
+        else if (wall_archives && session.wall_banks)
+            throw std::runtime_error("Save lacks wall banks; cannot restore its graphics selection");
+        session = std::move(candidate);
+        clear_images();
     }
     void picture(std::uint8_t id) override {
         if (!images) throw std::runtime_error("No image archives selected");
@@ -237,15 +275,8 @@ public:
 int run_exploration_window(ExplorationSession& session, std::string_view identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images,
     const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
-    const GameProfile::Portrait* portrait) {
-    if (graphics) {
-        for (const auto& cell : session.map.cells) {
-            for (const auto id : {cell.north,cell.east,cell.south,cell.west}) {
-                if (id && (id > 15 || !graphics->present[id-1]))
-                    throw std::runtime_error("GEO wall has no selected graphics bank");
-            }
-        }
-    }
+    const GameProfile::Portrait* portrait, const WallArchives* wall_archives) {
+    if (graphics) require_wall_bindings(session,*graphics);
     SDL_SetMainReady();
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
@@ -257,7 +288,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    WindowHost host(session,raw_renderer,graphics,images,backdrop,font,portrait);
+    WindowHost host(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
     host.text("Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented.",false);
     const auto trigger = [&](formats::EclEventKind kind) {
         const auto result = session.trigger(kind,host);
@@ -298,8 +329,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                 std::ifstream input(save,std::ios::binary);
                 if (!input) throw std::runtime_error("Cannot read save");
                 const std::string json{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
-                restore_exploration(session,json,identity);
-                host.clear_images();
+                host.restore(json,identity);
                 host.text("State restored.",false);
             }
         } catch (const std::exception& error) {

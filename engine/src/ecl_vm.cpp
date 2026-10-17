@@ -57,6 +57,7 @@ void EclHost::picture(std::uint8_t) { throw EclDecodeError("Picture host unavail
 void EclHost::sprite_start(EclSpriteRequest) { throw EclDecodeError("Sprite host unavailable"); }
 void EclHost::sprite_advance() { throw EclDecodeError("Sprite host unavailable"); }
 void EclHost::clear_images() { throw EclDecodeError("Image host unavailable"); }
+void EclHost::wall_banks(std::array<std::uint8_t,3>) { throw EclDecodeError("Wall graphics host unavailable"); }
 
 std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images) {
     require(images == EclImageDialect::disabled || images == EclImageDialect::sprite3,"Unknown image dialect");
@@ -68,6 +69,7 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images) {
     if (images == EclImageDialect::sprite3) {
         result.push_back({0x0c,"SPRITE_START3",3});
         result.push_back({0x31,"SPRITE_OFF",0});
+        result.push_back({0x37,"LOAD_AREA_DECO",3});
     }
     return result;
 }
@@ -223,6 +225,17 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             case 0x31:
                 if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 49");
                 host.clear_images(); break;
+            case 0x37: {
+                if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 55");
+                std::array<std::uint8_t,3> banks{};
+                for (std::size_t i = 0; i < banks.size(); ++i) {
+                    const auto id = numeric(args[i]);
+                    require(id <= 255,"Wall bank ID outside byte range");
+                    banks[i] = static_cast<std::uint8_t>(id);
+                }
+                host.wall_banks(banks);
+                break;
+            }
             default: throw EclDecodeError("Unsupported VM opcode " + std::to_string(instruction.opcode));
             }
         }

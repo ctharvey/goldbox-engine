@@ -16,6 +16,7 @@ struct ExplorationSession {
     std::uint8_t row{};
     std::uint8_t column{};
     Direction facing{Direction::north};
+    std::optional<std::array<std::uint8_t,3>> wall_banks{};
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);

@@ -267,6 +267,8 @@ int main(int argc, char** argv) {
 #endif
 #ifdef GOLDBOX_RENDERER
         std::optional<goldbox::formats::WallGraphics> graphics;
+        std::optional<goldbox::WallArchives> wall_archives;
+        std::optional<std::array<std::uint8_t,3>> initial_banks;
         std::optional<goldbox::ImageArchives> images;
         std::optional<goldbox::PortraitArchives> portraits;
         std::vector<goldbox::formats::IndexedImage> font;
@@ -297,11 +299,13 @@ int main(int argc, char** argv) {
             }
             if (graphics) throw std::runtime_error("Duplicate --walls selection");
             if (argc < 9) throw std::runtime_error("--walls requires definitions, tiles, shared tiles and three bank IDs");
-            graphics = goldbox::formats::load_wall_graphics(
+            wall_archives.emplace(goldbox::WallArchives{
                 goldbox::formats::DaxArchive::from_file(argv[2]),
                 goldbox::formats::DaxArchive::from_file(argv[3]),
-                goldbox::formats::DaxArchive::from_file(argv[4]),
-                {record_id(argv[5]),record_id(argv[6]),record_id(argv[7])});
+                goldbox::formats::DaxArchive::from_file(argv[4])});
+            initial_banks = std::array<std::uint8_t,3>{record_id(argv[5]),record_id(argv[6]),record_id(argv[7])};
+            graphics = goldbox::formats::load_wall_graphics(wall_archives->definitions,wall_archives->tiles,
+                wall_archives->shared,*initial_banks);
             argc -= 7;
             argv += 7;
         }
@@ -330,6 +334,9 @@ int main(int argc, char** argv) {
         const auto raw_map = goldbox::formats::DaxArchive::from_file(argv[2]).extract(geo_id);
         auto ecl = goldbox::formats::DaxArchive::from_file(argv[4]).extract(ecl_id);
         goldbox::ExplorationSession session;
+#ifdef GOLDBOX_RENDERER
+        session.wall_banks = initial_banks;
+#endif
         session.map = goldbox::formats::decode_geo16_record(raw_map, geo_id);
         session.ecl_record = std::move(ecl);
         session.dialect = {config.dialect, config.code_base, config.square_info_address, true, config.position_addresses};
@@ -354,7 +361,7 @@ int main(int argc, char** argv) {
         if (window) return goldbox::run_exploration_window(session, source_identity, save,
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
             profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,
-            images && images->portraits ? &*profile.portrait : nullptr);
+            images && images->portraits ? &*profile.portrait : nullptr,wall_archives ? &*wall_archives : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

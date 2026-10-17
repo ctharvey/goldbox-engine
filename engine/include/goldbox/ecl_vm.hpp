@@ -29,6 +29,7 @@ public:
     virtual void sprite_start(EclSpriteRequest request);
     virtual void sprite_advance();
     virtual void clear_images();
+    virtual void wall_banks(std::array<std::uint8_t,3> banks);
 };
 
 struct EclLimits {

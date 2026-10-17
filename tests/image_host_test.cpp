@@ -64,6 +64,9 @@ struct Host : EclHost {
     }
     void sprite_advance() override { events += 'A'; }
     void clear_images() override { events += 'C'; }
+    void wall_banks(std::array<std::uint8_t,3> banks) override {
+        assert((banks == std::array<std::uint8_t,3>{7,255,127})); events += 'W';
+    }
 };
 }
 int main(int argc, char** argv) {
@@ -96,6 +99,9 @@ int main(int argc, char** argv) {
     const auto script = program({0x0e,0,7,0x0c,0,7,0,2,0,255,0x0d,0x31,0x0e,0,255,0});
     assert(run(script,ops).exited && host.events == "PSACC");
     host.events.clear();
+    assert(run(program({0x37,0,7,0,255,0,127,0}),ops).exited && host.events == "W");
+    host.events.clear();
+    assert(!run(program({0x37,2,0,1,0,255,0,127,0}),ops).exited && host.events.empty());
     assert(!run(script,minimal_vm_opcodes()).exited && host.events.empty());
     assert(!run(program({0x0e,2,0,1,0}),ops).exited && host.events.empty()); // ID 256
     assert(!run(program({0x0c,0,7,0,3,0,255,0}),ops).exited);
@@ -107,6 +113,7 @@ int main(int argc, char** argv) {
     assert(!run(script,conflicting).exited && host.events.empty());
     struct Headless : EclHost { void text(std::string_view,bool) override {} } headless;
     assert(!execute_ecl(script,EclEventKind::search,dialect,ops,state,headless).exited);
+    assert(!execute_ecl(program({0x37,0,7,0,255,0,127,0}),EclEventKind::search,dialect,ops,state,headless).exited);
     ImageArchives assets{archive(7,sequence()),archive(7,sequence())};
     ImagePresentation display(assets);
     ExplorationSession session; session.row = session.column = 8;
@@ -180,5 +187,38 @@ int main(int argc, char** argv) {
     assert(run_exploration_window(session,"synthetic-portraits",{},nullptr,&assets,nullptr,{},&config) == 0);
     assert(session.state.memory[0x4a00] == 42 && session.state.memory[0x4a10] == 255);
     SDL_Quit();
+    const WallArchives walls{archive(7,std::vector<std::uint8_t>(780,2)),archive(7,part(3)),archive(203,part(13))};
+    const auto initial_graphics = formats::load_wall_graphics(walls.definitions,walls.tiles,walls.shared,{7,255,255});
+    const auto save = std::filesystem::temp_directory_path()/"goldbox-wall-host-save.json";
+    assert(!std::filesystem::exists(save));
+    const auto window = [&](std::initializer_list<SDL_Keycode> keys, const WallArchives& sources) {
+        assert(SDL_Init(SDL_INIT_VIDEO));
+        for (const auto code : keys) {
+            SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = code;
+            assert(SDL_PushEvent(&event));
+        }
+        assert(run_exploration_window(session,"synthetic-walls",save,&initial_graphics,nullptr,nullptr,{},nullptr,&sources) == 0);
+        SDL_Quit();
+    };
+    session = {}; session.dialect = dialect; session.opcodes = ops;
+    session.ecl_record = program({0x37,0,7,0,255,0,255,9,0,42,1,1,0x4a,0});
+    window({SDLK_SPACE,SDLK_F5,SDLK_ESCAPE},walls);
+    assert((session.wall_banks == std::array<std::uint8_t,3>{7,255,255}));
+    assert(session.state.memory[0x4a01] == 42);
+    session.ecl_record = program({0x37,0,255,0,7,0,255,9,0,99,1,1,0x4a,0});
+    window({SDLK_SPACE,SDLK_F9,SDLK_ESCAPE},walls);
+    assert((session.wall_banks == std::array<std::uint8_t,3>{7,255,255}));
+    assert(session.state.memory[0x4a01] == 42);
+    session.ecl_record = program({0x37,0,8,0,255,0,255,9,0,73,1,2,0x4a,0});
+    window({SDLK_SPACE,SDLK_ESCAPE},walls);
+    assert((session.wall_banks == std::array<std::uint8_t,3>{7,255,255}));
+    assert(session.state.memory[0x4a02] == 0); // Missing bank stops before this write.
+    const WallArchives missing{archive(8,std::vector<std::uint8_t>(780,2)),archive(8,part(5)),walls.shared};
+    session.wall_banks = std::array<std::uint8_t,3>{8,255,255};
+    session.row = 2; session.state.memory[0x4a01] = 99;
+    window({SDLK_F9,SDLK_ESCAPE},missing);
+    assert(session.row == 2 && session.state.memory[0x4a01] == 99); // Failed visual restore is atomic.
+    assert((session.wall_banks == std::array<std::uint8_t,3>{8,255,255}));
+    std::filesystem::remove(save);
 #endif
 }

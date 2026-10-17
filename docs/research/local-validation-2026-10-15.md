@@ -221,3 +221,32 @@ correct character identities or visual parity. No portrait selection has been
 wired into ECL or the SDL window in this increment. The private report retains
 file sizes and SHA-256 fingerprints outside the repository. No pixels, extracted
 artwork or proprietary text are included here.
+
+
+## Graphics event integration and current blocker (2026-10-16)
+
+The PICTURE host now supports explicit HEAD/BODY archives and profile-configured
+head-ID memory/layout. A synthetic SDL event writes an arbitrary configured head
+address, displays a portrait, writes the 255 sentinel, and displays a normal PIC.
+Resource failures preserve the preceding image. This is host-flow validation,
+not execution of an original portrait encounter.
+
+LOAD_AREA_DECO now requests typed bank IDs from the host. Synthetic tests cover
+argument bounds, missing hosts/banks, replacing banks, saving selected IDs,
+restoring/rebinding them, and rejecting a visual restore when its banks cannot
+be loaded without changing the current state. Original archive groups remain
+explicit; archive fingerprints are not yet bound to prototype save identity.
+
+A bounded read-only harness probe of the installed GEO1/ECL1 record 18 invoked
+its initialization entry from the documented empty prototype state. It stopped
+after 2 steps with `Unknown ECL opcode 33` at reported bytecode offset 113.
+Opcode 0x21 is the researched LOAD_AREA_MAP command. The process exited normally
+after the unsupported result and quit request. No original text or artwork was
+emitted by the validation wrapper; only status, step count and diagnostics were
+retained privately outside the repository.
+
+This is the current original-event graphics integration blocker: map/campaign
+resource loading is not implemented, so this original initialization cannot yet
+establish its map and decoration state. It is not evidence of matched-scene
+parity or complete campaign startup. Implement map-loading/resource resolution
+through a reusable adapter before claiming the original initialization works.

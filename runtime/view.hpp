@@ -7,6 +7,7 @@
 #include <filesystem>
 
 namespace goldbox {
+struct WallArchives { formats::DaxArchive definitions, tiles, shared; };
 struct WallHit {
     double distance{}; // Ray parameter; unnormalized camera rays avoid fisheye distortion.
     std::uint8_t wall{};
@@ -27,5 +28,6 @@ formats::IndexedImage compose_wall_view(const ExplorationSession& session, const
 int run_exploration_window(ExplorationSession& session, std::string_view source_identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics = nullptr,
     const ImageArchives* images = nullptr, const GameProfile::ColorBackdrop* backdrop = nullptr,
-    std::span<const formats::IndexedImage> font = {}, const GameProfile::Portrait* portrait = nullptr);
+    std::span<const formats::IndexedImage> font = {}, const GameProfile::Portrait* portrait = nullptr,
+    const WallArchives* wall_archives = nullptr);
 } // namespace goldbox

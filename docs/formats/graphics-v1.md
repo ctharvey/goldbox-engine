@@ -49,10 +49,14 @@ position/facing and checks opposite-side walls when the near side is absent.
 It does not mutate exploration or VM state. SDL uploads the indexed result as
 RGBA and scales it with nearest-neighbor sampling, preserving its square aspect.
 
-The caller supplies the map/ECL and wall-bank relationship. ECL-driven bank
-selection/switching, image backdrops, interactive doors and original-game scene
-parity are **not implemented or verified**. Save identity remains about engine
-content/state; an explicit visual bank selection is not a parity baseline.
+The caller supplies the map/ECL and initial wall-bank relationship. The selected
+SSI dialect now supports ECL-driven bank switching through LOAD_AREA_DECO, using
+those same explicit archives. It validates all referenced map walls before
+publishing replacement graphics and stores selected IDs as optional `wallBanks`
+save metadata. Window restore rebinds before publishing restored state. Graphics
+archive fingerprints remain outside prototype save identity. Automatic archive
+group/map loading, image backdrops, interactive doors and original-game scene
+parity remain unimplemented or unverified; explicit banks are not a parity baseline.
 
 Reuse: the EGA header/nibble decoder is adapted from MIT Gold Box Explorer
 `EgaBlock.cs` and `EgaBlockSpecification.cs`, revision

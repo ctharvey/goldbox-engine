@@ -49,6 +49,16 @@ int main() {
     restore_exploration(restored, save, identity);
     assert(restored.row == session.row && restored.column == session.column && restored.facing == session.facing);
     assert(restored.state.memory == session.state.memory && restored.state.strings == session.state.strings);
+    session.wall_banks = std::array<std::uint8_t,3>{7,127,255};
+    const auto banked = serialize_exploration(session,identity);
+    restore_exploration(restored,banked,identity);
+    assert(restored.wall_banks == session.wall_banks);
+    auto bad_banks = save;
+    bad_banks.insert(bad_banks.size()-1,",\"wallBanks\":[7,256,255]");
+    rejects([&] { restore_exploration(restored,bad_banks,identity); });
+    assert(restored.wall_banks == session.wall_banks);
+    restore_exploration(restored,save,identity);
+    assert(!restored.wall_banks); // Existing saves remain readable by the engine.
     rejects([&] { restore_exploration(restored, save, "different-source"); });
     assert(restored.state.memory == session.state.memory); // invalid loads publish no partial state
     auto invalid = save;

@@ -54,5 +54,25 @@ int main(int argc, char** argv) {
         fs::remove(path);
         if (!rejected) return 1;
     }
+    auto portrait_prefix = prefix;
+    portrait_prefix.replace(portrait_prefix.find("colorBackdrop"),13,"portrait");
+    for (const std::string field : {
+        R"({"headIdAddress":65536,"width":88,"height":88,"headOffset":[0,0],"bodyOffset":[0,40]})",
+        R"({"headIdAddress":1,"width":0,"height":88,"headOffset":[0,0],"bodyOffset":[0,40]})",
+        R"({"headIdAddress":1,"width":88,"height":201,"headOffset":[0,0],"bodyOffset":[0,40]})",
+        R"({"headIdAddress":1,"width":88,"height":88,"headOffset":[-1,0],"bodyOffset":[0,40]})",
+        R"({"headIdAddress":1,"width":88,"height":88,"headOffset":[0],"bodyOffset":[0,40]})",
+        R"({"headIdAddress":1,"width":88,"height":40,"headOffset":[0,0],"bodyOffset":[0,40]})"}) {
+        { std::ofstream o(path); o << portrait_prefix << field << '}'; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        if (!rejected) return 1;
+    }
+    { std::ofstream o(path); o << portrait_prefix << R"({"headIdAddress":4660,"width":16,"height":16,"headOffset":[0,0],"bodyOffset":[0,8]}})"; }
+    const auto custom = goldbox::read_game_profile(path);
+    fs::remove(path);
+    if (!custom.portrait || custom.portrait->head_id_address != 0x1234 || custom.portrait->layout.width != 16) return 1;
     return 0;
 }

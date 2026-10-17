@@ -60,7 +60,8 @@ the current GEO cell's high event bit selects indoors. Changes appear on the nex
 draw and existing saves preserve those memory values. Invalid sky selectors fail
 explicitly. Profiles without this configuration keep the placeholder background.
 This is an independently implemented color mode, not an imported backdrop image
-or verified original scene. ECL does not yet select or change wall banks automatically.
+or verified original scene. Supported ECL LOAD_AREA_DECO calls can now select
+different banks from these explicitly supplied archives.
 See [graphics format and limits](../docs/formats/graphics-v1.md).
 
 For ECL-selected pictures/sprites, also insert `--images /private/PIC1.DAX
@@ -112,6 +113,21 @@ No initial head ID is invented: empty VM memory remains empty. Original startup
 must establish correct state, or an authored test must set the head byte explicitly.
 Archive groups remain caller-selected. Timed sprite/portrait replacement and
 campaign-driven archive switching are not implemented.
+
+LOAD_AREA_DECO (0x37) accepts three byte-valued bank selectors through the
+selected SSI image dialect. With `--walls`, the host reloads them from the same
+definition/tile/shared archives and validates every wall used by the current
+map before publishing the replacement. Missing banks, bad operands and missing
+hosts stop explicitly. Failed resource selection preserves the preceding walls.
+The command does not select another archive group or load another GEO map.
+
+Engine saves optionally store `wallBanks`; restoring in the window rebuilds and
+validates those banks before publishing game state. A failed rebind changes
+neither game state nor walls. The engine can still read older saves without the
+field; a window with an active bank selection rejects such a visual restore
+instead of guessing. Image/portrait overlays remain transient and are cleared.
+Graphics archive fingerprints are not yet part of save identity: this is record
+selection persistence, not proof that the same artwork or original scene is loaded.
 
 Reuse decision: use SDL3's zlib-licensed platform/input/rendering/font services
 instead of implementing platform backends. Validated with SDL 3.2.28 at

@@ -61,4 +61,12 @@ configuration and non-cryptographic content checksums; the separate installation
 inventory uses SHA-256. These are prototype saves, not original SSI save files
 or a complete campaign/mod compatibility format.
 
+The opt-in SSI image dialect also decodes LOAD_AREA_DECO (0x37, three byte-valued
+selectors). The VM calls a typed host method and does not open archives or invent
+original memory addresses for this presentation selection. The SDL host validates
+and publishes banks, then records optional typed `wallBanks` session/save state.
+Absent hosts and out-of-range values fail explicitly. Legacy saves without this
+metadata remain readable by the engine; the wall-enabled window rejects an
+ambiguous visual restore. Selecting archives or loading maps remains separate.
+
 See [original-resource evidence and remaining gates](../research/local-validation-2026-10-15.md).
