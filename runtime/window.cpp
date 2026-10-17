@@ -309,7 +309,7 @@ public:
             if (!choice || *choice == 2) return;
             if (*choice == 0) break;
         }
-        const auto available = eligible_classes(rules,c);
+        const auto available = creation_classes(rules,c);
         std::vector<std::string> labels;
         for (const auto i : available) labels.push_back(rules.classes[i].label);
         const auto selected_class = pick(labels,"CREATE CHARACTER / CLASS"); if (!selected_class) return;

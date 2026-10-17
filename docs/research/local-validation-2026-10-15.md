@@ -718,3 +718,51 @@ normalizing carriage returns, and one existing harness SIGTERM diagnostic
 failure. That signal failure did not reproduce in its isolated test, 20 further
 bounded SIGTERM/SIGHUP checks, or the final full run. Harness implementation
 is unchanged; this does not establish that the intermittent failure is fixed.
+
+### Class-specific creation floors (2026-10-17)
+
+A private probe resumes each original ability handler at its first class-code
+read after racial clamping, injects a synthetic score, and stops before the
+common presentation callback at GAME.OVR offset 0x1B54B. The original blocks
+raise scores to the class table's minimum, leaving already higher scores alone.
+Four supported single-class codes, six abilities and nine input scores
+(0, 2, 3, 6, 8, 9, 12, 18, 255) pass **216 cases**, with no RNG draws. The
+fighter flag is clear for this primitive probe to exclude percentile processing.
+
+| Class | Native code | STR, INT, WIS, DEX, CON, CHA floors |
+| --- | --- | --- |
+| Cleric | 0 | 6, 6, 9, 0, 0, 0 |
+| Fighter | 2 | 9, 0, 6, 6, 7, 0 |
+| Magic-user | 5 | 0, 9, 6, 6, 0, 0 |
+| Thief | 6 | 6, 6, 0, 9, 0, 0 |
+
+Zero means no class floor for that ability. These independently observed numeric
+facts are selected in the AD&D rules via optional per-class `creationMinimum`
+vectors; title IDs and native class codes do not enter the shared engine.
+No upstream source is copied or translated. The private reproduction and report
+are `.cache/goldbox-validation/emulate_original_class_floors.py` and
+`original-class-floors-report.json`, using the existing per-case 10,000-instruction/
+100 ms, ten-second total and 15-second outer process limits.
+
+The engine's creation choice query considers floors without changing the draft.
+Completion raises scores before exceptional strength. Impossible combinations
+whose floors exceed racial/gender caps are unavailable and fail explicitly.
+The existing strict eligibility query and saved-party validation retain their
+ordinary requirements; loading an existing character never raises its scores.
+Rules without creation floors keep their prior score-based choices.
+
+This preserves the current UI's roll-then-class flow; the original chooses its
+class earlier and may draw exceptional strength between ability rolls. Age
+modifiers, native class-selection order, the earlier Random(256) draw and exact
+draw alignment remain unfinished. This is a class-floor milestone rather than
+full character-creation parity.
+
+Verification: the bounded serialized two-job build and all 26 public CTest
+suites passed (30.19 seconds); the optional private integration suite skipped
+for unconfigured inputs. After making empty-vector initialization explicit to
+remove a compiler warning, the build and all three affected party/RNG/SDL-host
+suites passed again (0.48 seconds). Hygiene, attribution and whitespace checks
+passed. The SDL regression creates a class requiring 12 from a raw ability of 3,
+then verifies the raised value survives save/load. Synthetic tests also cover
+all four floor vectors, unchanged RNG state, impossible caps, malformed rules,
+legacy rules without floors and existing saved characters below creation floors.

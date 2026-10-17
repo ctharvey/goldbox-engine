@@ -30,13 +30,19 @@ Each race can optionally supply `adjustments`, one signed integer (-100..100)
 per ability in the configured order. Absent adjustments preserve unmodified
 rolling. Modifiers apply once to rolled scores before eligibility checks; saves
 already contain adjusted values and do not reapply them on load.
+An optional class `creationMinimum` contains one floor (0..1000) per ability.
+Creation choices include a class when raising scores to those floors would meet
+its ordinary requirements without exceeding racial/gender maxima. Finishing
+the draft raises scores before exceptional strength; it consumes no extra draws
+for the floors. Absent configuration retains strict score-based eligibility.
+Saved-party validation still uses `minimum` and never applies creation floors.
 
 ## Current AD&D profile
 
 Pool selects `adnd-first-edition-creation-v1`: six player races; cleric, fighter,
 magic-user and thief; six PCs; names limited to 15 ASCII characters. The installed
 manual confirms race/gender ability caps and single-class availability. Basic
-class minima and upstream alignment choices are provisional profile facts,
+saved-party class minima and upstream alignment choices are provisional profile facts,
 not verified original-game compatibility. Neither Krynn nor Buck Rogers is
 implicitly assigned this profile.
 
@@ -46,8 +52,9 @@ Pool selects the best of six 3d6 trials for each ability, matching the isolated
 original human raw-score loop. Five seeded sets and final RNG states are public
 numeric regression fixtures from 540 original runtime draws. The selected rules
 now clamp racial/gender bounds, matching the isolated original bound blocks.
-Rolls without any eligible class still retry at most 256 times; native class
-minimum adjustments and the prototype's class-choice order remain unimplemented.
+Rolls without a usable creation class still retry at most 256 times. Verified
+class creation floors now apply at completion; the prototype's class-choice
+order still differs from the original.
 
 Pool's `random` profile selects `algorithm: lcg32-high16-mod-v1`, multiplier
 134775813, increment 1 and startup seed 1. Character rolls, rerolls, exceptional

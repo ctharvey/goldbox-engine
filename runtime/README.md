@@ -210,6 +210,9 @@ can produce legal scores of 19. Racial/gender bounds now clamp scores without
 rerolling; exceptional strength rolls 1..100 and caps the result. Full original
 creation-sequence parity and age
 caps remain unverified; see [creation rules](../docs/character-creation.md).
+Class choices account for optional creation floors. Completing a character raises
+scores to the selected class's configured floors; the final confirmation displays
+the raised scores. Loading an existing party preserves its saved abilities.
 
 Pool allows up to six members and names up to 15 printable ASCII characters.
 Names must be distinct ignoring case. At least one member is required before

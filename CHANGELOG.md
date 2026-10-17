@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Apply optional class-specific creation floors and offer supported classes that
+  can meet their requirements through those floors. Verify 216 isolated original
+  class-floor cases without RNG consumption; cover completion, incompatible caps
+  and unchanged saved parties. Native creation ordering and age remain unfinished.
+
 - Select rules-driven racial/gender clamping instead of whole-set rerolls.
   Roll exceptional strength on 1..100, then clamp to its configured cap.
   Verify 504 original bound cases and 72 percentile cases; preserve legacy

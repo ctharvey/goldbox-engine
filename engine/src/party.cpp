@@ -117,11 +117,16 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     }
     for (const auto& v : j::array(field("classes"),"classes")) {
         const auto& o = j::object(v,"class");
-        j::fields_only(o,{"id","label","minimum","alignments","percentile"},"class");
+        j::fields_only(o,{"id","label","minimum","alignments","percentile","creationMinimum"},"class");
         CreationClass c{id(j::field(o,"id","class")),label(j::field(o,"label","class")),
-            scores(j::field(o,"minimum","class"),r.abilities.size()),ids(j::field(o,"alignments","class")),false};
+            scores(j::field(o,"minimum","class"),r.abilities.size()),ids(j::field(o,"alignments","class")),false,{}};
         const auto& flag = j::field(o,"percentile","class"); require(flag.is_bool(),"Invalid percentile flag");
         c.percentile = flag.as_bool(); require(!c.percentile || r.percentile_ability.has_value(),"Missing percentile policy");
+        if (const auto* value = o.if_contains("creationMinimum")) {
+            const auto& values = j::array(*value,"class creation minimum");
+            require(values.size() == r.abilities.size(),"Class creation minimum count mismatch");
+            for (const auto& n : values) c.creation_minimum.push_back(number(n,0,1000));
+        }
         for (const auto& a : c.alignments) (void)find(r.alignments,a);
         r.classes.push_back(std::move(c));
     }
@@ -152,7 +157,8 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     }
     unique(r.races); return r;
 }
-std::vector<std::size_t> eligible_classes(const CreationRules& rules, const Character& c) {
+namespace {
+std::vector<std::size_t> class_choices(const CreationRules& rules, const Character& c, bool creation) {
     std::vector<std::size_t> result;
     if (!race_scores(rules,c)) return result;
     const auto& race = find(rules.races,c.race);
@@ -160,11 +166,24 @@ std::vector<std::size_t> eligible_classes(const CreationRules& rules, const Char
         const auto& choice = rules.classes[i];
         if (std::find(race.classes.begin(),race.classes.end(),choice.id) == race.classes.end()) continue;
         bool eligible = true;
-        for (std::size_t j = 0; j < c.abilities.size(); ++j)
-            if (c.abilities[j].value < choice.minimum[j]) eligible = false;
+        if (creation && !choice.creation_minimum.empty())
+            require(choice.creation_minimum.size() == c.abilities.size(),"Class creation minimum count mismatch");
+        for (std::size_t j = 0; j < c.abilities.size(); ++j) {
+            const auto floor = creation && !choice.creation_minimum.empty() ? choice.creation_minimum[j] : 0;
+            require(floor >= 0 && floor <= 1000,"Class creation minimum out of range");
+            const auto value = std::max(c.abilities[j].value,floor);
+            if (value < choice.minimum[j] || value > race.maximum.at(c.gender)[j]) eligible = false;
+        }
         if (eligible) result.push_back(i);
     }
     return result;
+}
+}
+std::vector<std::size_t> eligible_classes(const CreationRules& rules, const Character& c) {
+    return class_choices(rules,c,false);
+}
+std::vector<std::size_t> creation_classes(const CreationRules& rules, const Character& c) {
+    return class_choices(rules,c,true);
 }
 template<class Random>
 std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::string_view race,
@@ -201,7 +220,7 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
             }
             c.abilities.push_back({value,0});
         }
-        if (!eligible_classes(rules,c).empty()) return c.abilities;
+        if (!creation_classes(rules,c).empty()) return c.abilities;
     }
     throw std::runtime_error("No eligible ability roll within 256 attempts");
 }
@@ -227,6 +246,14 @@ Character finish_character_impl(const CreationRules& rules, Character draft, Ran
     draft.status = "okay";
     (void)find(rules.genders,draft.gender);
     const auto& choice = find(rules.classes,draft.character_class);
+    if (!choice.creation_minimum.empty()) {
+        const auto available = creation_classes(rules,draft);
+        const auto selected = static_cast<std::size_t>(&choice-rules.classes.data());
+        require(std::find(available.begin(),available.end(),selected) != available.end(),
+            "Character cannot use class creation minimums");
+        for (std::size_t i = 0; i < draft.abilities.size(); ++i)
+            draft.abilities[i].value = std::max(draft.abilities[i].value,choice.creation_minimum[i]);
+    }
     for (auto& score : draft.abilities) score.percentile = 0;
     if (choice.percentile && rules.percentile_ability &&
         *rules.percentile_ability < draft.abilities.size() &&

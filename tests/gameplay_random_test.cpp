@@ -194,6 +194,43 @@ int main(int argc, char** argv) {
             same(finished.abilities,read_party(serialize_party({finished},rules),rules)[0].abilities);
         }
     }
+    // Original class-floor facts. Choice preview and completion agree, with no draws.
+    struct FloorObservation { const char* character_class; std::array<int,6> floor; };
+    for (const auto& observed : {
+        FloorObservation{"cleric",{6,6,9,0,0,0}}, FloorObservation{"fighter",{9,0,6,6,7,0}},
+        FloorObservation{"magic-user",{0,9,6,6,0,0}}, FloorObservation{"thief",{6,6,0,9,0,0}}}) {
+        for (const auto value : {3,6,8,9,12,17}) {
+            Character draft{"Floor","human","male",observed.character_class,
+                std::string_view(observed.character_class) == "thief" ? "neutral-good" : "lawful-good",
+                std::vector<AbilityValue>(6,{value,0})};
+            const auto before = draft.abilities;
+            assert(creation_classes(rules,draft).size() == 4);
+            if (value == 3) assert(eligible_classes(rules,draft).empty());
+            HighWordLcg32 rng(0x12345678,profile.random->multiplier(),1);
+            const auto finished = finish_character(rules,draft,rng);
+            for (std::size_t i = 0; i < 6; ++i)
+                assert(finished.abilities[i].value == std::max(value,observed.floor[i]));
+            assert(rng.state() == 0x12345678);
+            same(before,draft.abilities); // Preview and completion don't mutate the original draft.
+            same(finished.abilities,read_party(serialize_party({finished},rules),rules)[0].abilities);
+        }
+    }
+    auto incompatible = rules;
+    incompatible.classes[0].creation_minimum[0] = 19; // Human maximum is 18.
+    Character low{"Low","human","male","cleric","lawful-good",std::vector<AbilityValue>(6,{3,0})};
+    assert(creation_classes(incompatible,low).size() == 3);
+    HighWordLcg32 untouched(1,profile.random->multiplier(),1);
+    rejects([&] { (void)finish_character(incompatible,low,untouched); });
+    assert(untouched.state() == 1);
+    Character old_fighter{"Legacy","human","male","fighter","lawful-good",
+        {{9,0},{3,0},{3,0},{3,0},{3,0},{3,0}}};
+    const auto old_party = read_party(serialize_party({old_fighter},rules),rules);
+    same(old_fighter.abilities,old_party[0].abilities); // Creation floors never rewrite existing saves.
+    auto legacy_creation = rules;
+    for (auto& choice : legacy_creation.classes) choice.creation_minimum.clear();
+    assert(creation_classes(legacy_creation,low).empty());
+    rejects([&] { (void)finish_character(legacy_creation,low,untouched); });
+    assert(untouched.state() == 1);
 
     // Typed ECL reads, original inclusive byte bounds, zero draw and 255 edge.
     for (const auto upper : {0,20,254,255}) {

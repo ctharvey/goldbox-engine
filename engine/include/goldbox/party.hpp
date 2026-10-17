@@ -25,6 +25,7 @@ struct CreationClass {
     std::vector<int> minimum;
     std::vector<std::string> alignments;
     bool percentile{};
+    std::vector<int> creation_minimum; // Optional creation-only floors; saved values remain unchanged.
 };
 enum class CreationBounds { reject, clamp };
 struct CreationRules {
@@ -53,6 +54,7 @@ CreationRules read_creation_rules(const std::filesystem::path& path);
 std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
     std::string_view gender, std::mt19937& random);
 std::vector<std::size_t> eligible_classes(const CreationRules& rules, const Character& draft);
+std::vector<std::size_t> creation_classes(const CreationRules& rules, const Character& draft);
 Character finish_character(const CreationRules& rules, Character draft, std::mt19937& random);
 std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
     std::string_view gender, HighWordLcg32& random);

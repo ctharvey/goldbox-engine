@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
         Character c; c.name = "Hero"; c.race = race.id; c.gender = gender.id;
         for (int attempt = 0; attempt < 20; ++attempt) {
             c.abilities = roll_abilities(rules,race.id,gender.id,random);
-            const auto choices = eligible_classes(rules,c); assert(!choices.empty());
+            const auto choices = creation_classes(rules,c); assert(!choices.empty());
             const auto& clazz = rules.classes[choices.front()];
             c.character_class = clazz.id; c.alignment = clazz.alignments.front();
             validate_character(rules,finish_character(rules,c,random));
@@ -89,6 +89,7 @@ int main(int argc, char** argv) {
     auto custom = rules; custom.id = "other-family"; custom.abilities.resize(2); custom.races.resize(1);
     custom.genders.resize(1); custom.classes.resize(1); custom.percentile_ability.reset();
     custom.classes[0].minimum = {1,1}; custom.classes[0].percentile = false;
+    custom.classes[0].creation_minimum.clear();
     custom.races[0].minimum = {1,1}; custom.races[0].maximum = {{"male",{18,18}}};
     custom.races[0].adjustments.clear();
     custom.races[0].percentile_maximum = {{"male",0}}; custom.races[0].classes = {custom.classes[0].id};
@@ -96,6 +97,7 @@ int main(int argc, char** argv) {
     other.abilities = roll_abilities(custom,other.race,other.gender,random);
     validate_character(custom,finish_character(custom,other,random)); assert(other.abilities.size() == 2);
     auto impossible = rules; impossible.dice_count = 1; impossible.dice_sides = 2; impossible.drop_lowest = 0;
+    for (auto& choice : impossible.classes) choice.creation_minimum.clear();
     rejects([&] { (void)roll_abilities(impossible,"human","male",random); });
     // Alternate ability layout: signed adjustments apply once and do not consume extra draws.
     custom.races[0].minimum = {1,1}; custom.races[0].maximum = {{"male",{100,100}}};
@@ -122,7 +124,11 @@ int main(int argc, char** argv) {
         changed(original,"\"bounds\": \"clamp\"","\"bounds\": true"),
         changed(original,"\"rollMaximum\": 100","\"rollMaximum\": 0"),
         changed(original,"\"rollMaximum\": 100","\"rollMaximum\": 101"),
-        changed(original,"\"rollMaximum\": 100","\"rollMaximum\": false")}) {
+        changed(original,"\"rollMaximum\": 100","\"rollMaximum\": false"),
+        changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6]"),
+        changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, -1, 0, 0, 0]"),
+        changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, true, 0, 0, 0]"),
+        changed(original,"\"creationMinimum\": [6, 6, 9, 0, 0, 0]","\"creationMinimum\": [6, 6, 1001, 0, 0, 0]")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

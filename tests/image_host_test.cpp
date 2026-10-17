@@ -310,10 +310,10 @@ int main(int argc, char** argv) {
     session.ecl_record = program({9,0,42,1,0,0x4a,0});
     CreationRules creation;
     creation.id = "synthetic-party"; creation.party_limit = 2; creation.name_limit = 15;
-    creation.dice_count = 3; creation.dice_sides = 6;
+    creation.dice_count = 1; creation.dice_sides = 2; creation.bounds = CreationBounds::clamp;
     creation.abilities = {{"might","MIGHT"}}; creation.genders = {{"any","Any"}};
     creation.alignments = {{"neutral","Neutral"}};
-    creation.classes = {{"adventurer","Adventurer",{3},{"neutral"},false}};
+    creation.classes = {{"adventurer","Adventurer",{12},{"neutral"},false,{12}}};
     creation.races = {{"visitor","Visitor",{3},{{"any",{18}}},{{"any",0}},{"adventurer"}}};
     session.character_rules = creation;
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
@@ -325,9 +325,11 @@ int main(int argc, char** argv) {
         SDLK_DOWN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_F5,SDLK_ESCAPE});
     assert(session.party.size() == 1 && session.party[0].name == "ALICE");
     assert(session.party[0].abilities.size() == 1 && session.state.memory[0x4a00] == 42);
+    assert(session.party[0].abilities[0].value == 12); // Creation-only floor permits this class from a raw 3.
     session.party.clear();
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.party.size() == 1 && session.party[0].name == "ALICE");
+    assert(session.party[0].abilities[0].value == 12);
     auto second_member = session.party.front(); second_member.name = "BOB";
     session.party.push_back(second_member); session.loaded_character = 1;
     session.party_memory = PartyMemoryLayout{"ssi-selected-character-v1",0x5000,256,0x4fff,
