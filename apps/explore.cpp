@@ -265,11 +265,25 @@ int main(int argc, char** argv) {
 #ifndef GOLDBOX_RENDERER
         if (window) throw std::runtime_error("Build with GOLDBOX_BUILD_RENDERER=ON for --window");
 #endif
+#ifdef GOLDBOX_RENDERER
+        std::optional<goldbox::formats::WallGraphics> graphics;
+        if (window && argc > 1 && std::string_view(argv[1]) == "--walls") {
+            if (argc < 9) throw std::runtime_error("--walls requires definitions, tiles, shared tiles and three bank IDs");
+            graphics = goldbox::formats::load_wall_graphics(
+                goldbox::formats::DaxArchive::from_file(argv[2]),
+                goldbox::formats::DaxArchive::from_file(argv[3]),
+                goldbox::formats::DaxArchive::from_file(argv[4]),
+                {record_id(argv[5]),record_id(argv[6]),record_id(argv[7])});
+            argc -= 7;
+            argv += 7;
+        }
+#endif
         if (argc != 7) {
             if (harness) throw ProtocolError("Harness mode requires six resource/save arguments");
             std::cout << "Usage: goldbox_explore [--harness|--window] <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id> <local-save.json>\n"
                          "Explicit map/ECL pairing required. Unverified exploration pilot; no complete game support.\n"
                          "With --harness as the first argument, the same six arguments run the JSONL protocol instead.\n";
+            std::cout << "With --window, optional --walls <WALLDEF.DAX> <8X8D.DAX> <shared-8X8D.DAX> <bank1> <bank2> <bank3> precedes the six arguments.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
@@ -299,7 +313,7 @@ int main(int argc, char** argv) {
             return run_harness(session, source_identity, save);
         }
 #ifdef GOLDBOX_RENDERER
-        if (window) return goldbox::run_exploration_window(session, source_identity, save);
+        if (window) return goldbox::run_exploration_window(session, source_identity, save, graphics ? &*graphics : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

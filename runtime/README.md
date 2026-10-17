@@ -28,13 +28,33 @@ Turning alone does not execute an ECL movement event. Backward movement preserve
 facing. Resizing letterboxes a 960x640 logical view; the window sleeps until an
 input/window event rather than rendering continuously.
 
-This is a **procedural preview**, not original graphics or a verified game UI.
+The default mode is a **procedural preview**; optional original wall artwork is
+described below. Neither mode is a verified original-game UI.
 It starts at (0,0), north, with empty state unless a matching engine save is
 loaded. The map overview reveals all cells. Text currently uses SDL's limited
 ASCII debug font, with bounded wrapping/history and a scrolling menu selection.
-RmlUi, production fonts, original wall/sprite decoding, audio and QuickJS-NG
+RmlUi, production fonts, original sprite decoding, audio and QuickJS-NG
 remain future work. Unsupported ECL/combat reports a diagnostic; changes made
 before a VM failure retain the existing partial-progress semantics.
+
+To use original wall artwork instead of procedural walls, insert this before
+the six profile/map/ECL/save arguments, after `--window`:
+
+```text
+--walls /private/WALLDEF1.DAX /private/8X8D1.DAX /private/8X8D1.DAX 1 3 5
+```
+
+The three paths are definition, bank tiles and shared tiles archives. The three
+selectors explicitly bind five walls each to GEO IDs 1..5,6..10,11..15. This
+example selects artwork, **not a verified map association**. Use 255 for an
+absent bank; 127 continues the previous combined record (first 127 selects
+record 0). All nonzero wall IDs used by the map must have a selected bank.
+Missing records/tiles and unsupported layouts fail before opening the window.
+
+This mode composes the original preprojected pieces in a square 88x88 native
+view rather than distorting them onto ray-cast surfaces. Bright magenta is
+transparent. Backdrops remain placeholders; ECL does not yet select or change
+wall banks automatically. See [graphics format and limits](../docs/formats/graphics-v1.md).
 
 Reuse decision: use SDL3's zlib-licensed platform/input/rendering/font services
 instead of implementing platform backends. Validated with SDL 3.2.28 at

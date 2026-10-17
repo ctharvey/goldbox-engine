@@ -1,5 +1,24 @@
 # Third-party licensing and provenance
 
+## EGA wall graphics (2026-10-16)
+
+`formats/src/graphics.cpp` adapts the MIT EGA header and packed-nibble decoding
+from Gold Box Explorer `src/Common/Plugins/Dax/EgaBlock.cs` and
+`EgaBlockSpecification.cs`, revision `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f`.
+Copyright (c) 2018 Bil Simser; notice preserved in
+`licenses/gold-box-explorer-MIT.txt`. The C++ version returns bounded indexed
+images, rejects mismatched sizes/counts and removes System.Drawing, filename
+palette guessing and count adjustments. Independent wall assembly and explicit
+bank loading were added to that MIT file. No SSI pixel data is included.
+
+SSI Engine `EGAImage.java`, `Palette.java`, `WallDef.java`,
+`DungeonWallSetBuilder.java`, `DungeonRenderer.java` and `DungeonMap.java` at
+`51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` were research references for format,
+bank and perspective facts; no Java source was ported. Gold Box Explorer's
+`DaxWallDefFile.cs` (including its cited Simeon Pilgrim layout source) and
+`EgaVgaPalette.cs` were cross-checks only. Exact paths and distinctions are in
+the registry. The independent native compositor is in `runtime/view.cpp`.
+
 **Canonical machine-readable attribution registry:** [attribution/sources.json](attribution/sources.json), with [maintenance rules](attribution/README.md). It distinguishes implemented adaptations, external dependencies and research-only references; the sections below provide human-readable detail. Keep both updated in the same change.
 
 ## Actually used (M2)

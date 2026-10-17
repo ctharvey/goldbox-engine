@@ -21,12 +21,21 @@ class WindowHost final : public EclHost {
 public:
     ExplorationSession& session;
     SDL_Renderer* renderer;
+    const formats::WallGraphics* graphics;
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     bool running{true};
     std::deque<std::string> lines;
     std::vector<std::string> choices;
     std::size_t selected{};
 
-    WindowHost(ExplorationSession& value, SDL_Renderer* target) : session(value), renderer(target) {}
+    WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls)
+        : session(value), renderer(target), graphics(walls) {
+        if (graphics) {
+            texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,88,88));
+            if (!texture) throw std::runtime_error(SDL_GetError());
+            checked(SDL_SetTextureScaleMode(texture.get(),SDL_SCALEMODE_NEAREST));
+        }
+    }
     void color(int r, int g, int b) {
         checked(SDL_SetRenderDrawColor(renderer, r, g, b, 255));
     }
@@ -57,12 +66,22 @@ public:
         color(207,176,112);
         label(24,22,"GOLDBOX  /  EXPLORATION");
         color(145,157,167);
-        label(24,42,"Procedural preview | original artwork and campaign parity unverified");
+        label(24,42,graphics ? "Imported wall artwork | explicit banks; backdrop and parity unverified" :
+            "Procedural preview | original artwork and campaign parity unverified");
         color(28,37,48); rectangle(24,72,600,180);
         color(49,43,37); rectangle(24,252,600,180);
         const double dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
         const auto facing = static_cast<unsigned>(session.facing);
-        for (int x = 0; x < 600; ++x) {
+        if (graphics) {
+            const auto frame = compose_wall_view(session,*graphics);
+            const auto palette = formats::ega_palette();
+            std::vector<formats::Rgba> rgba;
+            rgba.reserve(frame.pixels.size());
+            for (const auto pixel : frame.pixels) rgba.push_back(palette[pixel]);
+            checked(SDL_UpdateTexture(texture.get(),nullptr,rgba.data(),88*4));
+            const SDL_FRect destination{144,72,360,360};
+            checked(SDL_RenderTexture(renderer,texture.get(),nullptr,&destination));
+        } else for (int x = 0; x < 600; ++x) {
             const double camera = (2.0 * (x + 0.5) / 600 - 1) * 0.66;
             const auto hit = cast_wall(session.map, session.row, session.column,
                 dx[facing] - dy[facing] * camera, dy[facing] + dx[facing] * camera);
@@ -141,7 +160,15 @@ public:
 } // namespace
 
 int run_exploration_window(ExplorationSession& session, std::string_view identity,
-    const std::filesystem::path& save) {
+    const std::filesystem::path& save, const formats::WallGraphics* graphics) {
+    if (graphics) {
+        for (const auto& cell : session.map.cells) {
+            for (const auto id : {cell.north,cell.east,cell.south,cell.west}) {
+                if (id && (id > 15 || !graphics->present[id-1]))
+                    throw std::runtime_error("GEO wall has no selected graphics bank");
+            }
+        }
+    }
     SDL_SetMainReady();
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
@@ -153,7 +180,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    WindowHost host(session,raw_renderer);
+    WindowHost host(session,raw_renderer,graphics);
     host.text("Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented.",false);
     const auto trigger = [&](formats::EclEventKind kind) {
         const auto result = session.trigger(kind,host);

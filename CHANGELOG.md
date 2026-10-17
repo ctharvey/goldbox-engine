@@ -2,6 +2,13 @@
 
 ## 2026-10-16
 
+- Decode bounded SSI EGA images and 156-byte wall definitions, shared tiles,
+  split/continuation banks and transparency. Add explicit original-artwork
+  selection to the SDL view with a native 88x88 perspective compositor.
+  Add synthetic malformed-input, bank and pixel/occlusion tests, preserve MIT
+  attribution, and record read-only original-resource validation. Automatic
+  ECL wall-bank selection, backdrops and scene parity remain unfinished.
+
 - Add an optional SDL3 exploration renderer: procedural first-person walls,
   revealed map overview, movement/turning, ECL text and menus, save/load, and
   event-driven redraw. Keep headless builds and the JSONL protocol available.

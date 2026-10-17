@@ -6,7 +6,7 @@ An open-source, GPL-3.0-or-later-licensed, OpenXcom-inspired framework for playi
 DAX/GEO/ECL decoding, selector routing, a minimal ECL VM, and terminal exploration
 with state persistence are implemented. A standalone Pool of Radiance map/event
 has been exercised against user-owned Steam resources. Full campaign startup,
-combat, original-asset rendering, and embedded JS remain unimplemented; game compatibility is
+combat, complete original-asset rendering, and embedded JS remain unimplemented; game compatibility is
 still unverified. See the [local validation scope](docs/research/local-validation-2026-10-15.md).
 
 ## What actually works today
@@ -25,6 +25,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - Minimal deterministic ECL VM with typed memory, conditional branches, subroutines, text, menus, indexed memory reads and combat host callbacks.
 - Terminal map movement and local save/restore, including original-event output and persisted menu state in one standalone map/ECL pair.
 - Optional SDL3 exploration window with procedural walls, map overview, event text/menus and save/load; see [renderer controls and limits](runtime/README.md).
+- SSI EGA tile and wall-definition decoding with explicit wall-bank rendering; original archive checks pass for one Pool installation, while automatic visual bindings and scene parity remain unverified.
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run

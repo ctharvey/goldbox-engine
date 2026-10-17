@@ -52,7 +52,7 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 
 ## M3 — Playable vertical slice
 - [x] Navigate one imported map in the standalone terminal pilot
-- [x] Optional procedural SDL3 view over exploration, ECL text/menus and save/load (synthetic UI validation; original artwork and graphical parity pending)
+- [x] Optional SDL3 view over exploration, ECL text/menus and save/load; explicit original wall banks now decode/render, with automatic bindings and graphical parity pending
 - [x] Execute a supported original menu event and persist its resulting state (narrow map-18 validation only)
 - [ ] Display journal text sourced from user-provided materials
 - [ ] Toggle external mod without corrupting imported content

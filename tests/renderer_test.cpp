@@ -7,6 +7,7 @@
 #undef NDEBUG
 #endif
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -53,6 +54,42 @@ int main(int argc, char** argv) {
             assert(hit.distance > 0 && std::isfinite(hit.distance));
         }
 
+    formats::WallGraphics graphics;
+    const formats::IndexedImage solid{8,8,std::vector<std::uint8_t>(64,4)};
+    graphics.walls[0] = formats::decode_wall_definitions(std::vector<std::uint8_t>(156,0),
+        std::span(&solid,1))[0];
+    graphics.present[0] = true;
+    session.map = {};
+    auto& origin = session.map.cells[3*16+4];
+    std::uint8_t* edges[]{&origin.north,&origin.east,&origin.south,&origin.west};
+    for (unsigned d = 0; d < 4; ++d) {
+        origin = {};
+        *edges[d] = 1;
+        session.facing = static_cast<Direction>(d);
+        const auto frame = compose_wall_view(session,graphics);
+        assert(frame.width == 88 && frame.height == 88 && frame.pixels[44*88+44] == 4);
+        assert(session.row == 3 && session.column == 4);
+    }
+    session.facing = Direction::north;
+    origin = {2,0,0,0,0,0};
+    session.map.cells[16+4].north = 1;
+    graphics.present[1] = true;
+    graphics.walls[1] = graphics.walls[0];
+    for (auto& view : graphics.walls[1]) std::fill(view.pixels.begin(),view.pixels.end(),2);
+    assert(compose_wall_view(session,graphics).pixels[44*88+44] == 2);
+    graphics.walls[1][6].pixels[36*56+28] = 13;
+    assert(compose_wall_view(session,graphics).pixels[44*88+44] == 4);
+    origin.north = 1;
+    // Transparency reveals the background; unresolved wall banks fail closed.
+    for (auto& view : graphics.walls[0]) std::fill(view.pixels.begin(),view.pixels.end(),13);
+    auto frame = compose_wall_view(session,graphics);
+    assert(frame.pixels[20*88+44] == 0 && frame.pixels[70*88+44] == 6);
+    graphics.present[0] = false;
+    bool unresolved = false;
+    try { (void)compose_wall_view(session,graphics); } catch (const std::exception&) { unresolved = true; }
+    assert(unresolved);
+    graphics.present[0] = true;
+
     // Real SDL loop with synthetic input: movement, event menu, save/restore,
     // resize-safe software rendering, and clean shutdown without a display.
     session = {};
@@ -77,5 +114,13 @@ int main(int argc, char** argv) {
     assert(session.state.memory[0x4a03] == 1);
     assert(std::filesystem::is_regular_file(save));
     std::filesystem::remove(save);
+    // Exercise indexed-to-RGBA upload and the imported graphics path as well.
+    session.map.cells[1].east = 1;
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_SPACE);
+    key(SDLK_RETURN);
+    key(SDLK_ESCAPE);
+    assert(run_exploration_window(session,"renderer-synthetic",save,&graphics) == 0);
+    assert(session.state.memory[0x4a03] == 0);
     SDL_Quit();
 }
