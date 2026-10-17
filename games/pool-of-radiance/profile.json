@@ -5,6 +5,7 @@
   "formatFamily": "goldbox-dos",
   "archiveFormat": "dax-v1",
   "eventDialect": "unverified",
+  "imageDialect": "ssi-images-3-v1",
   "eventDispatch": {"dialect": "ssi-five-entry-v1", "codeBase": 39168, "squareInfoAddress": 49231,
     "positionAddresses": [49227, 49228, 49229]},
   "rulesProfile": "adnd-first-edition-unimplemented",

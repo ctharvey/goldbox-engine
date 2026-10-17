@@ -1,5 +1,17 @@
 # Third-party licensing and provenance
 
+## ECL picture/sprite host (2026-10-16)
+
+SSI Engine `VirtualMachine.java`, `Engine.java`, `ClassicMode.java`,
+`RendererState.java` and Pool properties at
+`51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` were consulted for image callback
+arguments, clearing, distance indexing and timed replacement. These remain
+research-only GPLv3 references; no Java implementation was copied or ported.
+The C++ VM callbacks, `engine/src/image_presentation.cpp` and SDL integration
+are independent project code. Existing attributed decoders supply the images.
+The implementation rejects unimplemented timing/replacement behavior rather
+than claiming parity. Exact upstream paths are retained in the registry.
+
 ## EGA wall graphics (2026-10-16)
 
 `formats/src/graphics.cpp` adapts the MIT EGA header and packed-nibble decoding

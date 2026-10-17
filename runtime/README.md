@@ -56,6 +56,27 @@ view rather than distorting them onto ray-cast surfaces. Bright magenta is
 transparent. Backdrops remain placeholders; ECL does not yet select or change
 wall banks automatically. See [graphics format and limits](../docs/formats/graphics-v1.md).
 
+For ECL-selected pictures/sprites, also insert `--images /private/PIC1.DAX
+/private/SPRIT1.DAX` before the six core arguments. `--walls` and `--images`
+may appear in either order. The caller explicitly selects the current archives;
+the engine does not guess a disk/group from a picture ID. Pool's profile opts
+into `imageDialect: ssi-images-3-v1`; absent/disabled profiles retain unsupported
+image behavior, including the existing headless/harness diagnostics.
+
+Supported callbacks are PICTURE (0x0e), three-operand SPRITE_START (0x0c),
+SPRITE_ADVANCE (0x0d) and SPRITE_OFF (0x31). Picture 255 or SPRITE_OFF clears
+both displays. Pictures show frame zero, while sprites use the requested distance
+frame and move one frame nearer on advance. Walls and map bounds clamp distance.
+Missing records, invalid distances and images outside the 88x88 view stop the
+event explicitly, retaining any earlier VM progress. Failed image-resource loads
+preserve the preceding image state. Picture animation, inter-command delays and
+timed sprite-to-picture replacement are not implemented; non-255 replacement
+requests are rejected. Four-operand sprite dialects remain unsupported.
+
+Image presentation lives outside ECL memory. Saves preserve existing engine
+state; images are transient and cleared after loading a save. This does not
+establish original scene/timing parity or full original-event compatibility.
+
 Reuse decision: use SDL3's zlib-licensed platform/input/rendering/font services
 instead of implementing platform backends. Validated with SDL 3.2.28 at
 `7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`; no upstream source or artwork copied.

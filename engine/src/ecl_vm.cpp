@@ -53,13 +53,22 @@ std::size_t EclHost::menu(std::span<const std::string>, std::string_view, bool) 
     throw EclDecodeError("Menu host unavailable");
 }
 void EclHost::combat(EclState&) { throw EclDecodeError("Combat host unavailable"); }
+void EclHost::picture(std::uint8_t) { throw EclDecodeError("Picture host unavailable"); }
+void EclHost::sprite_start(EclSpriteRequest) { throw EclDecodeError("Sprite host unavailable"); }
+void EclHost::sprite_advance() { throw EclDecodeError("Sprite host unavailable"); }
+void EclHost::clear_images() { throw EclDecodeError("Image host unavailable"); }
 
-std::vector<EclOpcodeSpec> minimal_vm_opcodes() {
+std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images) {
+    require(images == EclImageDialect::disabled || images == EclImageDialect::sprite3,"Unknown image dialect");
     auto result = routing_ecl_opcodes();
     result.push_back({0x15, "MENU_VERTICAL", 3, 2});
     result.push_back({0x2b, "MENU_HORIZONTAL", 2, 1});
     result.push_back({0x24, "COMBAT", 0});
     result.push_back({0x2a, "COPY_MEM", 3});
+    if (images == EclImageDialect::sprite3) {
+        result.push_back({0x0c,"SPRITE_START3",3});
+        result.push_back({0x31,"SPRITE_OFF",0});
+    }
     return result;
 }
 
@@ -68,6 +77,11 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
     EclState& state, EclHost& host, EclLimits limits) {
     EclExecution result;
     try {
+        const auto image_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0c; });
+        const bool images_enabled = image_spec != opcodes.end();
+        if (images_enabled) require(image_spec->operand_count == 3 && image_spec->variable_count_operand == -1 &&
+            std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0c; }) == 1,
+            "Conflicting VM opcode definition");
         require(limits.steps > 0 && limits.stack_depth > 0, "ECL execution limits must be positive");
         const auto entries = decode_ecl_program_entries(record, dialect, opcodes);
         const auto code = record.subspan(entries.record_prefix_size);
@@ -96,7 +110,7 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             if (next != boundaries.begin()) require(std::prev(next)->second <= offset, "ECL branch inside operand data");
             boundaries[offset] = end;
             // Decode arity from profile, but reject semantic conflicts explicitly.
-            const auto expected = minimal_vm_opcodes();
+            const auto expected = minimal_vm_opcodes(EclImageDialect::sprite3);
             const auto spec = std::find_if(expected.begin(), expected.end(), [&](const auto& s) { return s.opcode == instruction.opcode; });
             if (spec != expected.end()) {
                 const auto actual = std::find_if(opcodes.begin(), opcodes.end(), [&](const auto& s) { return s.opcode == instruction.opcode; });
@@ -188,6 +202,27 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                 break;
             }
             case 0x24: host.combat(state); break;
+            case 0x0e: {
+                if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 14");
+                const auto id = numeric(args[0]);
+                require(id <= 255,"Picture ID outside byte range");
+                if (id == 255) host.clear_images();
+                else host.picture(static_cast<std::uint8_t>(id));
+                break;
+            }
+            case 0x0c: {
+                const auto id = numeric(args[0]), distance = numeric(args[1]), picture = numeric(args[2]);
+                require(id <= 255 && distance <= 2 && picture <= 255,"Invalid sprite request");
+                host.sprite_start({static_cast<std::uint8_t>(id),static_cast<std::uint8_t>(distance),
+                    static_cast<std::uint8_t>(picture)});
+                break;
+            }
+            case 0x0d:
+                if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 13");
+                host.sprite_advance(); break;
+            case 0x31:
+                if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 49");
+                host.clear_images(); break;
             default: throw EclDecodeError("Unsupported VM opcode " + std::to_string(instruction.opcode));
             }
         }

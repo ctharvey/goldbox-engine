@@ -27,6 +27,7 @@ struct GameProfile {
         std::optional<std::array<std::uint16_t, 3>> position_addresses;
     };
     std::optional<EventDispatch> event_dispatch;
+    std::string image_dialect{"disabled"};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

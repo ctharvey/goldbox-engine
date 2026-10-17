@@ -2,6 +2,14 @@
 
 ## 2026-10-16
 
+- Connect an opt-in three-operand ECL image dialect to typed host callbacks and
+  SDL picture/sprite display from explicitly selected archives. Add transient
+  presentation state, wall-clamped sprite distances, clearing and resource-error
+  handling; preserve headless diagnostics and clear images on save restore.
+  Add VM/state/SDL tests and read-only local resource checks. Animation, timed
+  replacement pictures, four-operand sprite variants and scene parity remain
+  unsupported or unverified.
+
 - Add bounded monochrome 8x8 strips and per-frame EGA picture/sprite decoding
   with explicit independent/XOR-first modes and standard/sprite/combat palettes.
   Preserve raw timing and offsets without mutating input; reject malformed or

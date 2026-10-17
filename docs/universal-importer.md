@@ -36,6 +36,12 @@ numeric code base, square-info address, and X/Y/direction addresses. Pool uses
 The core contains no title-name checks. Curse's new configuration remains
 synthetically tested only; no original Curse validation was performed.
 
+Optional `imageDialect` selects the reusable `ssi-images-3-v1` callback dialect
+or `disabled` (the default). Pool opts in to three-operand sprite commands;
+Curse remains disabled. Unsupported values fail profile validation. Image
+archives remain explicitly selected by the caller; this is not automatic
+campaign resource binding or a compatibility claim.
+
 ## Compatibility acceptance per game/version
 
 1. Fingerprint user-supplied install files without ever uploading or committing them.

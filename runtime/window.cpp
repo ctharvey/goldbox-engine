@@ -23,18 +23,53 @@ public:
     SDL_Renderer* renderer;
     const formats::WallGraphics* graphics;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
+    std::optional<ImagePresentation> images;
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
     bool running{true};
     std::deque<std::string> lines;
     std::vector<std::string> choices;
     std::size_t selected{};
 
-    WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls)
+    WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
+        const ImageArchives* archives)
         : session(value), renderer(target), graphics(walls) {
+        if (archives) images.emplace(*archives);
         if (graphics) {
             texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,88,88));
             if (!texture) throw std::runtime_error(SDL_GetError());
             checked(SDL_SetTextureScaleMode(texture.get(),SDL_SCALEMODE_NEAREST));
         }
+    }
+    void update_image() {
+        image_texture.reset();
+        const auto* frame = images ? images->frame() : nullptr;
+        if (frame) {
+            image_texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,
+                frame->image.width,frame->image.height));
+            if (!image_texture) throw std::runtime_error(SDL_GetError());
+            checked(SDL_SetTextureScaleMode(image_texture.get(),SDL_SCALEMODE_NEAREST));
+            checked(SDL_SetTextureBlendMode(image_texture.get(),SDL_BLENDMODE_BLEND));
+            const auto palette = formats::ega_palette(images->palette());
+            std::vector<formats::Rgba> rgba;
+            for (const auto pixel : frame->image.pixels) rgba.push_back(palette[pixel]);
+            checked(SDL_UpdateTexture(image_texture.get(),nullptr,rgba.data(),frame->image.width*4));
+        }
+    }
+    void picture(std::uint8_t id) override {
+        if (!images) throw std::runtime_error("No image archives selected");
+        images->picture(id); update_image();
+    }
+    void sprite_start(EclSpriteRequest request) override {
+        if (!images) throw std::runtime_error("No image archives selected");
+        images->sprite_start(request,session); update_image();
+    }
+    void sprite_advance() override {
+        if (!images) throw std::runtime_error("No image archives selected");
+        images->sprite_advance(); update_image();
+    }
+    void clear_images() override {
+        if (images) images->clear();
+        update_image();
     }
     void color(int r, int g, int b) {
         checked(SDL_SetRenderDrawColor(renderer, r, g, b, 255));
@@ -66,7 +101,7 @@ public:
         color(207,176,112);
         label(24,22,"GOLDBOX  /  EXPLORATION");
         color(145,157,167);
-        label(24,42,graphics ? "Imported wall artwork | explicit banks; backdrop and parity unverified" :
+        label(24,42,graphics || images ? "Imported artwork | explicit resources; timing and parity unverified" :
             "Procedural preview | original artwork and campaign parity unverified");
         color(28,37,48); rectangle(24,72,600,180);
         color(49,43,37); rectangle(24,252,600,180);
@@ -96,6 +131,16 @@ public:
             // A thin cap gives untextured walls a readable silhouette.
             color(int(196 * shade), int(173 * shade), int(132 * shade));
             rectangle(24.0f + x, 252 - height / 2, width, 2);
+        }
+        if (image_texture) {
+            const auto* frame = images->frame();
+            if (images->palette() == formats::EgaPaletteKind::standard) {
+                color(0,0,0); rectangle(144,72,360,360);
+            }
+            constexpr float scale = 360.0f/88;
+            const SDL_FRect destination{144+frame->x_offset*scale,72+frame->y_offset*scale,
+                frame->image.width*scale,frame->image.height*scale};
+            checked(SDL_RenderTexture(renderer,image_texture.get(),nullptr,&destination));
         }
         color(207,176,112); label(664,72,"MAP OVERVIEW (REVEALED)");
         for (int row = 0; row < 16; ++row) for (int col = 0; col < 16; ++col) {
@@ -160,7 +205,7 @@ public:
 } // namespace
 
 int run_exploration_window(ExplorationSession& session, std::string_view identity,
-    const std::filesystem::path& save, const formats::WallGraphics* graphics) {
+    const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images) {
     if (graphics) {
         for (const auto& cell : session.map.cells) {
             for (const auto id : {cell.north,cell.east,cell.south,cell.west}) {
@@ -180,7 +225,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    WindowHost host(session,raw_renderer,graphics);
+    WindowHost host(session,raw_renderer,graphics,images);
     host.text("Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented.",false);
     const auto trigger = [&](formats::EclEventKind kind) {
         const auto result = session.trigger(kind,host);
@@ -222,6 +267,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                 if (!input) throw std::runtime_error("Cannot read save");
                 const std::string json{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
                 restore_exploration(session,json,identity);
+                host.clear_images();
                 host.text("State restored.",false);
             }
         } catch (const std::exception& error) {

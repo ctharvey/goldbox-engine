@@ -2,6 +2,7 @@
 #pragma once
 #include "goldbox/exploration.hpp"
 #include "goldbox/formats/graphics.hpp"
+#include "goldbox/image_presentation.hpp"
 #include <filesystem>
 
 namespace goldbox {
@@ -17,5 +18,6 @@ WallHit cast_wall(const formats::GeoMap& map, int row, int column, double dx, do
 // 13 is transparent in wall artwork. Backdrop is a placeholder, not imported.
 formats::IndexedImage compose_wall_view(const ExplorationSession& session, const formats::WallGraphics& graphics);
 int run_exploration_window(ExplorationSession& session, std::string_view source_identity,
-    const std::filesystem::path& save, const formats::WallGraphics* graphics = nullptr);
+    const std::filesystem::path& save, const formats::WallGraphics* graphics = nullptr,
+    const ImageArchives* images = nullptr);
 } // namespace goldbox

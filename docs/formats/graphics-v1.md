@@ -50,7 +50,7 @@ It does not mutate exploration or VM state. SDL uploads the indexed result as
 RGBA and scales it with nearest-neighbor sampling, preserving its square aspect.
 
 The caller supplies the map/ECL and wall-bank relationship. ECL-driven bank
-selection/switching, imported backdrops, sprites, doors and original-game scene
+selection/switching, imported backdrops, interactive doors and original-game scene
 parity are **not implemented or verified**. Save identity remains about engine
 content/state; an explicit visual bank selection is not a parity baseline.
 
@@ -104,8 +104,9 @@ Independent frames may differ in size. XOR-first frames must share dimensions;
 every later packed frame is XORed with the **original first frame**, not the
 preceding decoded frame. Decoding does not mutate source bytes and rejects
 truncated headers/pixels or trailing data rather than returning partial output.
-SPRIT frames are not automatically treated as animation; distance selection and
-ECL picture/sprite callbacks remain unimplemented.
+SPRIT frames are not automatically treated as animation. The optional image host
+now supports explicit distance selection and ECL picture/sprite callbacks; see
+the runtime README for profile selection and supported/unsupported operations.
 
 Palette policy is explicit and separate from indexed decoding. Standard EGA is
 opaque. Sprite policy makes index 0 transparent and maps index 13 to opaque
@@ -130,3 +131,27 @@ timeout 30 ./build/tests/goldbox_image_sequence_tests ega /private/CPIC1.DAX
 
 The validator prints record/frame counts and diagnostics only. This does not
 export images, interpret ECL selection or establish original-game scene parity.
+
+## ECL image host integration
+
+The optional `imageDialect` profile field enables `ssi-images-3-v1`; absent or
+`disabled` preserves unsupported VM image behavior. Pool's profile selects it;
+Curse remains disabled. Opcode 0x0c must have three operands, with conflicting
+or duplicate definitions rejected. Host callbacks receive typed numeric IDs,
+distance and replacement-picture values; the VM never opens archives or calls
+SDL. Missing hosts stop with diagnostics and do not emit new JSONL event types.
+
+The independent `ImagePresentation` component owns transient decoded frames.
+PICTURE shows the first XOR-decoded frame, 255 clears; SPRITE_START selects an
+independent frame at distance 0..2, clamped to blocking GEO edges. ADVANCE steps
+toward zero, OFF clears both picture and sprite. Standard/sprite palettes are
+applied at upload, honoring native offsets. The SDL loop draws after events and
+in menus; it does not invent original inter-instruction timing or animation.
+Timed replacement-picture requests are explicitly unsupported. Images are not
+part of the prototype save format and are cleared on restore.
+
+SSI Engine's `VirtualMachine.java`, `Engine.java`, `ClassicMode.java`,
+`RendererState.java` and Pool properties at the pinned revision were consulted
+for callback arity/argument order, clear semantics, distance indexing and timed
+replacement behavior. They are research references only; no Java code was
+ported. The C++ host/state/SDL integration is independently implemented.

@@ -14,7 +14,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto parsed = j::read_json(file);
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
-        "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch"}, "game profile");
+        "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -68,6 +68,11 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
             }
             profile.event_dispatch->position_addresses = addresses;
         }
+    }
+    if (const auto* images = root.if_contains("imageDialect")) {
+        profile.image_dialect = j::string(*images,"imageDialect");
+        if (profile.image_dialect != "disabled" && profile.image_dialect != "ssi-images-3-v1")
+            throw std::runtime_error("Unsupported image dialect");
     }
     return profile;
 }

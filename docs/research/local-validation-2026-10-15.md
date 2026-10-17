@@ -162,3 +162,30 @@ these additional image families remain unverified or unimplemented.
 | CPIC8.DAX | ega | 28 | 28 | 10325 | `dda82c9521fad757cf8dd35756393d76937a471224895ac99da92218c2a92f30` |
 
 No pixels, glyph bitmaps or proprietary extracted content are included.
+
+## ECL image host validation (2026-10-16)
+
+The presentation layer selected all 92 picture records and all 88 sprite
+records across the same eight archive groups fingerprinted above. Available
+sprite distance frames were selected and compared with the decoder's indexed
+pixels; all supported images fit the native 88x88 viewport. All eight group
+checks returned zero errors. Picture selection is static frame zero; this does
+not validate animation or timing.
+
+A private independently authored GEO/ECL fixture then drove the actual SDL
+window using the installed PIC1 record 1 and SPRIT1 record 2. Search executed
+PICTURE and displayed the selected original image; rest executed SPRITE_START
+with no replacement picture and displayed an original sprite over the view;
+initialize executed SPRITE_OFF and cleared the artwork. Screenshots remain
+outside the repository. The event fixture, not an original SSI event, selected
+these assets. No original campaign resource binding or matched-scene parity
+is claimed.
+
+Synthetic CTest covers VM argument order, typed IDs, disabled/missing hosts,
+conflicting and duplicate sprite dialect definitions, clear semantics,
+distance advancement, both sides of blocking walls, missing/oversized resources,
+failed-request state retention and the real SDL callback/upload loop. Existing
+headless/harness unsupported-opcode diagnostics remain covered unchanged.
+Images are transient presentation state and are cleared on restoring engine
+state. Timed replacement pictures, four-operand sprite commands, original
+inter-command delays and picture animation remain unsupported or unverified.

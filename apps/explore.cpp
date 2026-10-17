@@ -267,7 +267,16 @@ int main(int argc, char** argv) {
 #endif
 #ifdef GOLDBOX_RENDERER
         std::optional<goldbox::formats::WallGraphics> graphics;
-        if (window && argc > 1 && std::string_view(argv[1]) == "--walls") {
+        std::optional<goldbox::ImageArchives> images;
+        while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" || std::string_view(argv[1]) == "--images")) {
+            if (std::string_view(argv[1]) == "--images") {
+                if (argc < 5 || images) throw std::runtime_error("--images requires one PIC and one SPRIT archive");
+                images.emplace(goldbox::ImageArchives{goldbox::formats::DaxArchive::from_file(argv[2]),
+                    goldbox::formats::DaxArchive::from_file(argv[3])});
+                argc -= 3; argv += 3;
+                continue;
+            }
+            if (graphics) throw std::runtime_error("Duplicate --walls selection");
             if (argc < 9) throw std::runtime_error("--walls requires definitions, tiles, shared tiles and three bank IDs");
             graphics = goldbox::formats::load_wall_graphics(
                 goldbox::formats::DaxArchive::from_file(argv[2]),
@@ -284,6 +293,7 @@ int main(int argc, char** argv) {
                          "Explicit map/ECL pairing required. Unverified exploration pilot; no complete game support.\n"
                          "With --harness as the first argument, the same six arguments run the JSONL protocol instead.\n";
             std::cout << "With --window, optional --walls <WALLDEF.DAX> <8X8D.DAX> <shared-8X8D.DAX> <bank1> <bank2> <bank3> precedes the six arguments.\n";
+            std::cout << "Optional --images <PIC.DAX> <SPRIT.DAX> also precedes the six resource arguments.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
@@ -296,7 +306,8 @@ int main(int argc, char** argv) {
         session.map = goldbox::formats::decode_geo16_record(raw_map, geo_id);
         session.ecl_record = std::move(ecl);
         session.dialect = {config.dialect, config.code_base, config.square_info_address, true, config.position_addresses};
-        session.opcodes = goldbox::minimal_vm_opcodes();
+        session.opcodes = goldbox::minimal_vm_opcodes(profile.image_dialect == "ssi-images-3-v1" ?
+            goldbox::EclImageDialect::sprite3 : goldbox::EclImageDialect::disabled);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
         std::ostringstream identity;
         identity << profile.id << ':' << fs::path(argv[2]).filename().string() << ':' << unsigned(geo_id) << ':'
@@ -313,7 +324,8 @@ int main(int argc, char** argv) {
             return run_harness(session, source_identity, save);
         }
 #ifdef GOLDBOX_RENDERER
-        if (window) return goldbox::run_exploration_window(session, source_identity, save, graphics ? &*graphics : nullptr);
+        if (window) return goldbox::run_exploration_window(session, source_identity, save,
+            graphics ? &*graphics : nullptr, images ? &*images : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

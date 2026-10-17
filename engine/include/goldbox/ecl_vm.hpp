@@ -13,6 +13,10 @@ struct EclState {
     std::map<std::uint16_t, std::string> strings;
     int comparison{};
 };
+enum class EclImageDialect { disabled, sprite3 };
+struct EclSpriteRequest {
+    std::uint8_t sprite{}, distance{}, replacement_picture{};
+};
 
 class EclHost {
 public:
@@ -21,6 +25,10 @@ public:
     // The host supplies deterministic choices; no OS input inside the VM.
     virtual std::size_t menu(std::span<const std::string> choices, std::string_view prompt, bool vertical);
     virtual void combat(EclState& state);
+    virtual void picture(std::uint8_t id);
+    virtual void sprite_start(EclSpriteRequest request);
+    virtual void sprite_advance();
+    virtual void clear_images();
 };
 
 struct EclLimits {
@@ -48,6 +56,6 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEvent
     const formats::EclDispatchDialect& dialect, std::span<const formats::EclOpcodeSpec> opcodes,
     EclState& state, EclHost& host, EclLimits limits = {});
 
-std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes();
+std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled);
 
 } // namespace goldbox
