@@ -85,6 +85,23 @@ int main(int argc, char** argv) {
         return 0;
     }
 #endif
+    if (argc == 3 && std::string_view(argv[1]) == "icon-parts") {
+        const auto parts = DaxArchive::from_file(argv[2]);
+        unsigned decoded = 0;
+        for (const auto& entry : parts.records()) {
+            try {
+                const auto images = decode_ega_images(parts.extract(entry.id));
+                if (images.images.size() != 1) throw std::runtime_error("Icon part has multiple images");
+                ++decoded;
+            } catch (const std::exception& error) {
+                std::cout << "icon part=" << unsigned(entry.id) << " decoded=" << decoded
+                    << " diagnostic=" << error.what() << '\n';
+                return 1;
+            }
+        }
+        std::cout << "icon parts=" << decoded << " decoded\n";
+        return 0;
+    }
     if (argc == 5 && std::string_view(argv[1]) == "portraits") {
         // Read-only local-resource validation; report counts, never original pixels or text.
         const auto profile = read_game_profile(argv[2]);

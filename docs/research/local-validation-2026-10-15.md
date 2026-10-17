@@ -1037,3 +1037,47 @@ Verification: the serialized two-job build and all 26 public CTest suites pass
 (21.81 seconds); optional private integration skips without configured inputs.
 The final incomplete-resource preflight regression also passes in the affected
 SDL suite (0.67 seconds). Hygiene, attribution and whitespace checks pass.
+
+### Combat-icon reference boundary — 2026-10-17
+
+The next native creation call is the distinct icon chooser at file offset
+1D1AC. Its state includes head/weapon parts, size and six color fields. The
+existing Gold Box Explorer EgaBlock reference handles raw decoding and the
+combat palette, not this customization compositor; no new upstream code is
+adopted. The existing format adapter already supplies that palette.
+
+The new read-only `goldbox_image_host_tests icon-parts <archive>` probe validates
+every source record through the existing strict decoder: CHEAD.DAX has 56
+single-image parts; CBODY.DAX has 128. Missing files and raw EGA decoding are
+therefore not the pending dependency. None of the original pixels are printed
+or added to fixtures. The affected public SDL suite passes again (0.62 seconds).
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| CHEAD.DAX | 3442 | `aecd2ebbcd0f6c9d6fe7fb490591ea0357c1ced8917be059cfd4e60e60d701d4` |
+| CBODY.DAX | 23978 | `9928778ce936d070675233abeb008b27656838b0b41bc5a398a62f9b42151601` |
+
+A bounded 240-second preview reference was launched from a fresh private copy.
+Enter passed the installed edition's wheel prompt, repeating the earlier
+verified route without a lookup. The original proceeded through dwarf/male/
+fighter/alignment, score acceptance, name entry and portrait Keep. Its icon
+screen displays OLD/NEW ready and action previews, with Parts, Color-1, Color-2,
+Size and Exit; the Parts submenu offers Head and Weapon. This establishes the
+screen sequence, not pixel parity. The controller reached its safety deadline,
+terminated its owned processes and left no reference window running.
+
+Remaining verification dependency: establish deterministic native image
+expectations for pose composition, size and all six recoloring channels before
+implementing a matching icon adapter. The current comparison controller remains
+an unpaired preview; its success cannot stand in for a rendered-icon comparison.
+Neither ordinary opaque portrait layering nor raw-part decode success proves
+those operations. Full creation parity is not claimed. Combat-icon composition
+and its private original-image oracle remain unfinished.
+
+Tool friction: the first sandboxed reference launch returned invalid JSON from
+the WSL launcher and no cleanup acknowledgment. Inspection confirmed no engine
+or window remained; the authorized elevated retry launched correctly. Computer
+Use initially captured an occluding window; explicitly activating the returned
+DOSBox window corrected it. Unicode text entry did not reach DOSBox's name
+prompt; a key event did. After the reference deadline, a further input reported
+no foreground process; no retry was sent to a stale window.

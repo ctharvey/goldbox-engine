@@ -2,6 +2,10 @@
 
 ## 2026-10-17
 
+- Add a read-only combat-icon part probe. Verify all 56 CHEAD and 128 CBODY
+  records with the existing decoder, and inspect the original customization
+  screen. Icon composition/recoloring still needs deterministic reference data.
+
 - Add rules-configured character portraits with H/B cycling and K to keep,
   imported artwork preview, saved selections and roster viewing. Verify native
   selector behavior and original HEAD3/BODY3 compositions; regress cancellation,
