@@ -90,6 +90,48 @@ int main(int argc, char** argv) {
     assert(unresolved);
     graphics.present[0] = true;
 
+    // Color backdrops are opt-in, use the current GEO cell immediately, and
+    // reflect ECL memory without changing either state or map context.
+    const GameProfile::ColorBackdrop backdrop{{0x49fd,0x49fe}};
+    session.state.memory[0x49fd] = 3;
+    session.state.memory[0x49fe] = 2;
+    constexpr std::uint8_t expected_sky[]{0,15,4,11,13,2,9,14,0,15,4,11,13,2,9,14};
+    origin.raw_event = 7;
+    for (unsigned i = 0; i < 16; ++i) {
+        session.state.memory[0x49fd] = i;
+        frame = compose_wall_view(session,graphics,&backdrop);
+        assert(frame.pixels[42*88] == expected_sky[i]);
+        assert(frame.pixels[43*88] == 15 && frame.pixels[44*88] == 7);
+        assert(frame.pixels[45*88] == 7 && frame.pixels[46*88] == 6);
+        assert(frame.pixels.back() == 6 && origin.raw_event == 7);
+        assert(session.state.memory[0x49fd] == i);
+    }
+    origin.raw_event = 0x87;
+    frame = compose_wall_view(session,graphics,&backdrop);
+    assert(frame.pixels[0] == 4);
+    session.state.memory[0x49fe] = 16;
+    bool invalid_sky = false;
+    try { (void)compose_wall_view(session,graphics,&backdrop); }
+    catch (const std::exception&) { invalid_sky = true; }
+    assert(invalid_sky);
+    // Opaque walls cover the background, transparent pieces reveal it.
+    session.state.memory[0x49fe] = 3;
+    graphics.walls[0][6].pixels[36*56+28] = 5;
+    frame = compose_wall_view(session,graphics,&backdrop);
+    assert(frame.pixels[44*88+44] == 5 && frame.pixels[0] == 11);
+    graphics.walls[0][6].pixels[36*56+28] = 13;
+    session.dialect = {"ssi-five-entry-v1",0x9900,0xc04f,true,std::nullopt};
+    session.opcodes = minimal_vm_opcodes();
+    for (int i = 0; i < 5; ++i) session.ecl_record.insert(session.ecl_record.end(),{1,1,20,0x99});
+    session.ecl_record.insert(session.ecl_record.end(),{9,0,7,1,0xfe,0x49,0});
+    struct SilentHost : EclHost { void text(std::string_view,bool) override {} } host;
+    assert(session.trigger(formats::EclEventKind::search,host).exited);
+    assert(compose_wall_view(session,graphics,&backdrop).pixels[0] == 14);
+    const auto colors_save = serialize_exploration(session,"backdrop-synthetic");
+    session.state.memory[0x49fe] = 0;
+    restore_exploration(session,colors_save,"backdrop-synthetic");
+    assert(compose_wall_view(session,graphics,&backdrop).pixels[0] == 14);
+
     // Real SDL loop with synthetic input: movement, event menu, save/restore,
     // resize-safe software rendering, and clean shutdown without a display.
     session = {};
@@ -120,7 +162,7 @@ int main(int argc, char** argv) {
     key(SDLK_SPACE);
     key(SDLK_RETURN);
     key(SDLK_ESCAPE);
-    assert(run_exploration_window(session,"renderer-synthetic",save,&graphics) == 0);
+    assert(run_exploration_window(session,"renderer-synthetic",save,&graphics,nullptr,&backdrop) == 0);
     assert(session.state.memory[0x4a03] == 0);
     SDL_Quit();
 }

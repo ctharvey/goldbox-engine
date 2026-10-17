@@ -42,6 +42,12 @@ Curse remains disabled. Unsupported values fail profile validation. Image
 archives remain explicitly selected by the caller; this is not automatic
 campaign resource binding or a compatibility claim.
 
+Optional `colorBackdrop: {"skyColorAddresses": [18941, 18942]}` opts Pool into
+the researched SSI color background in original-wall mode. Addresses are two
+unsigned 16-bit integers ordered outdoors/indoors. Absent configuration preserves
+the placeholder background. Unknown fields, invalid addresses or array sizes
+are rejected; no game name is checked in core code.
+
 ## Compatibility acceptance per game/version
 
 1. Fingerprint user-supplied install files without ever uploading or committing them.

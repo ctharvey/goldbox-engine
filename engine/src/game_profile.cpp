@@ -14,7 +14,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto parsed = j::read_json(file);
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
-        "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect"}, "game profile");
+        "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
+        "colorBackdrop"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -26,7 +27,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "eventDialect", "game profile"), "profile.eventDialect"),
         j::string(j::field(root, "rulesProfile", "game profile"), "profile.rulesProfile"),
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
-        {}, std::nullopt
+        {}, std::nullopt, "disabled", std::nullopt
     };
     static const std::regex id_pattern(R"(^[a-z0-9][a-z0-9._-]{0,127}$)");
     if (!std::regex_match(profile.id, id_pattern) || profile.id.find("..") != std::string::npos ||
@@ -73,6 +74,19 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         profile.image_dialect = j::string(*images,"imageDialect");
         if (profile.image_dialect != "disabled" && profile.image_dialect != "ssi-images-3-v1")
             throw std::runtime_error("Unsupported image dialect");
+    }
+    if (const auto* value = root.if_contains("colorBackdrop")) {
+        const auto& backdrop = j::object(*value,"colorBackdrop");
+        j::fields_only(backdrop,{"skyColorAddresses"},"colorBackdrop");
+        const auto& values = j::array(j::field(backdrop,"skyColorAddresses","colorBackdrop"),"skyColorAddresses");
+        if (values.size() != 2) throw std::runtime_error("skyColorAddresses requires outdoors/indoors");
+        GameProfile::ColorBackdrop config{};
+        for (std::size_t i = 0; i < 2; ++i) {
+            const auto address = j::integer(values[i],"sky color address");
+            if (address < 0 || address > 65535) throw std::runtime_error("Invalid sky color address");
+            config.sky_color_addresses[i] = static_cast<std::uint16_t>(address);
+        }
+        profile.color_backdrop = config;
     }
     return profile;
 }

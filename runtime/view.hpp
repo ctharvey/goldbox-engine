@@ -3,6 +3,7 @@
 #include "goldbox/exploration.hpp"
 #include "goldbox/formats/graphics.hpp"
 #include "goldbox/image_presentation.hpp"
+#include "goldbox/game_profile.hpp"
 #include <filesystem>
 
 namespace goldbox {
@@ -15,9 +16,11 @@ struct WallHit {
 // exactly as in ExplorationSession::move. Throws on invalid origin/direction.
 WallHit cast_wall(const formats::GeoMap& map, int row, int column, double dx, double dy);
 // Native 88x88 perspective view using preprojected wall pieces. Palette index
-// 13 is transparent in wall artwork. Backdrop is a placeholder, not imported.
-formats::IndexedImage compose_wall_view(const ExplorationSession& session, const formats::WallGraphics& graphics);
+// 13 is transparent in wall artwork. Without color configuration, the backdrop
+// remains a placeholder. Color rendering reads state but never changes it.
+formats::IndexedImage compose_wall_view(const ExplorationSession& session, const formats::WallGraphics& graphics,
+    const GameProfile::ColorBackdrop* backdrop = nullptr);
 int run_exploration_window(ExplorationSession& session, std::string_view source_identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics = nullptr,
-    const ImageArchives* images = nullptr);
+    const ImageArchives* images = nullptr, const GameProfile::ColorBackdrop* backdrop = nullptr);
 } // namespace goldbox

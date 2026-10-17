@@ -33,7 +33,7 @@ described below. Neither mode is a verified original-game UI.
 It starts at (0,0), north, with empty state unless a matching engine save is
 loaded. The map overview reveals all cells. Text currently uses SDL's limited
 ASCII debug font, with bounded wrapping/history and a scrolling menu selection.
-RmlUi, production fonts, original sprite decoding, audio and QuickJS-NG
+RmlUi, production fonts, audio and QuickJS-NG
 remain future work. Unsupported ECL/combat reports a diagnostic; changes made
 before a VM failure retain the existing partial-progress semantics.
 
@@ -53,8 +53,15 @@ Missing records/tiles and unsupported layouts fail before opening the window.
 
 This mode composes the original preprojected pieces in a square 88x88 native
 view rather than distorting them onto ray-cast surfaces. Bright magenta is
-transparent. Backdrops remain placeholders; ECL does not yet select or change
-wall banks automatically. See [graphics format and limits](../docs/formats/graphics-v1.md).
+transparent. Profiles with `colorBackdrop` use the researched SSI color background
+in this mode: 43 sky rows, one white horizon row, two light-gray rows and 42 brown
+floor rows. Pool selects outdoors/indoors sky values from ECL memory at 0x49FD/0x49FE;
+the current GEO cell's high event bit selects indoors. Changes appear on the next
+draw and existing saves preserve those memory values. Invalid sky selectors fail
+explicitly. Profiles without this configuration keep the placeholder background.
+This is an independently implemented color mode, not an imported backdrop image
+or verified original scene. ECL does not yet select or change wall banks automatically.
+See [graphics format and limits](../docs/formats/graphics-v1.md).
 
 For ECL-selected pictures/sprites, also insert `--images /private/PIC1.DAX
 /private/SPRIT1.DAX` before the six core arguments. `--walls` and `--images`

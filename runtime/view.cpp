@@ -5,12 +5,25 @@
 #include <stdexcept>
 
 namespace goldbox {
-formats::IndexedImage compose_wall_view(const ExplorationSession& session, const formats::WallGraphics& graphics) {
+formats::IndexedImage compose_wall_view(const ExplorationSession& session, const formats::WallGraphics& graphics,
+    const GameProfile::ColorBackdrop* backdrop) {
     (void)session.map.cell(session.row,session.column);
     const auto direction = static_cast<unsigned>(session.facing);
     if (direction > 3) throw std::runtime_error("Invalid graphics view direction");
     formats::IndexedImage frame{88,88,std::vector<std::uint8_t>(88*88,0)};
     std::fill(frame.pixels.begin()+44*88,frame.pixels.end(),6);
+    if (backdrop) {
+        // Independently implemented from SSI COLOR-mode format observations;
+        // research-only references are recorded in attribution/sources.json.
+        constexpr std::uint8_t sky_colors[]{0,15,4,11,13,2,9,14,0,15,4,11,13,2,9,14};
+        const auto indoor = session.map.cell(session.row,session.column).event_high_bit();
+        const auto sky = session.state.memory[backdrop->sky_color_addresses[indoor ? 1 : 0]];
+        if (sky >= std::size(sky_colors)) throw std::runtime_error("Unsupported backdrop sky color selector");
+        std::fill(frame.pixels.begin(),frame.pixels.begin()+43*88,sky_colors[sky]);
+        std::fill(frame.pixels.begin()+43*88,frame.pixels.begin()+44*88,15);
+        std::fill(frame.pixels.begin()+44*88,frame.pixels.begin()+46*88,7);
+        std::fill(frame.pixels.begin()+46*88,frame.pixels.end(),6);
+    }
     constexpr int dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
     const auto wall_at = [&](int forward, int lateral, unsigned side) -> unsigned {
         const int row = session.row + dy[direction]*forward + dx[direction]*lateral;

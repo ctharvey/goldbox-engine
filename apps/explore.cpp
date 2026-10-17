@@ -325,7 +325,8 @@ int main(int argc, char** argv) {
         }
 #ifdef GOLDBOX_RENDERER
         if (window) return goldbox::run_exploration_window(session, source_identity, save,
-            graphics ? &*graphics : nullptr, images ? &*images : nullptr);
+            graphics ? &*graphics : nullptr, images ? &*images : nullptr,
+            profile.color_backdrop ? &*profile.color_backdrop : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

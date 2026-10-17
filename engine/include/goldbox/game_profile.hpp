@@ -28,6 +28,10 @@ struct GameProfile {
     };
     std::optional<EventDispatch> event_dispatch;
     std::string image_dialect{"disabled"};
+    struct ColorBackdrop {
+        std::array<std::uint16_t,2> sky_color_addresses; // Outdoors, indoors.
+    };
+    std::optional<ColorBackdrop> color_backdrop;
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

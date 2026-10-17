@@ -50,7 +50,7 @@ It does not mutate exploration or VM state. SDL uploads the indexed result as
 RGBA and scales it with nearest-neighbor sampling, preserving its square aspect.
 
 The caller supplies the map/ECL and wall-bank relationship. ECL-driven bank
-selection/switching, imported backdrops, interactive doors and original-game scene
+selection/switching, image backdrops, interactive doors and original-game scene
 parity are **not implemented or verified**. Save identity remains about engine
 content/state; an explicit visual bank selection is not a parity baseline.
 
@@ -155,3 +155,31 @@ SSI Engine's `VirtualMachine.java`, `Engine.java`, `ClassicMode.java`,
 for callback arity/argument order, clear semantics, distance indexing and timed
 replacement behavior. They are research references only; no Java code was
 ported. The C++ host/state/SDL integration is independently implemented.
+
+## Color dungeon background
+
+The optional profile `colorBackdrop` object contains exactly `skyColorAddresses`,
+two unsigned 16-bit ECL memory addresses ordered outdoors/indoors. It opts the
+original-wall compositor into SSI COLOR mode. Pool configures 0x49FD/0x49FE;
+other profiles remain unchanged. No title name is checked in the renderer.
+
+The current GEO cell's high event bit selects indoors when set. The selected
+memory byte must be 0..15 and indexes EGA colors
+`0,15,4,11,13,2,9,14,0,15,4,11,13,2,9,14`.
+The native 88x88 background has sky at rows 0..42, white at row 43, light gray
+at rows 44..45, and brown at rows 46..87. Walls are composited over it; sprites
+retain their separate transparency policy. The renderer reads these values
+without changing game state. ECL changes appear on the next draw, and the
+existing memory save/restore preserves them. Script overrides of the square-info
+memory byte are not used to select indoors: the current imported GEO cell is
+the renderer's context, including before any event has run.
+
+This is a researched color mode, not a new image decoder or proof of original
+scene parity. Image backdrops, lighting/time-of-day behavior and automatic wall
+bank selection remain unfinished. The default procedural ray-cast preview is
+unchanged; this mode applies when original walls are selected.
+
+SSI Engine's pinned Pool properties, VirtualMemory, RendererState and
+DungeonRenderer were consulted for addresses, indoor selection, palette indices
+and band dimensions. The C++ rendering loops are independent; no Java source was
+copied or translated. Tests use synthetic maps, memory and ECL only.

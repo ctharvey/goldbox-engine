@@ -94,14 +94,15 @@
         "src/main/java/data/image/ExtendedEGAImage.java",
         "src/main/java/data/image/ExtendedEGADependentImages.java",
         "src/main/java/ui/classic/ClassicMode.java",
-        "src/main/java/ui/classic/RendererState.java"
+        "src/main/java/ui/classic/RendererState.java",
+        "src/main/java/shared/ViewDungeonPosition.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,
       "licenseUrl": "https://github.com/TiCoKH/ssi-engine/blob/master/LICENSE",
       "copyrightNotice": "Upstream authors, as documented by source history",
       "localFiles": [],
-      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics; cross-check graphics headers, shared/additional tile ordering, bank continuation, transparency and native perspective geometry; cross-check PIC first-frame XOR semantics and per-frame metadata; research picture/sprite host calls, clearing, distance selection and unsupported timed replacement",
+      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics; cross-check graphics headers, shared/additional tile ordering, bank continuation, transparency and native perspective geometry; cross-check PIC first-frame XOR semantics and per-frame metadata; research picture/sprite host calls, clearing, distance selection and unsupported timed replacement; cross-check COLOR backdrop addresses, indoor selector, sky palette indices and native band geometry",
       "modifications": "No Java source copied or translated. Independent bounded C++ implementation informed by observable behavior; profile address facts transcribed from configuration. No upstream engine, dependency or rules implementation adopted. Independent C++ host callbacks/presentation state; no Java source translated. Three-operand image dialect is explicitly selected by profile; timed replacement is not emulated.",
       "reviewed": "2026-10-16"
     },

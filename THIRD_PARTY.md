@@ -126,3 +126,10 @@ search for event tables was not adopted.
 The exact immutable paths and research/adaptation distinction remain in
 `attribution/sources.json`. Existing MIT adaptations and their notices remain
 unchanged. Synthetic success does not establish original-game compatibility.
+
+The independently implemented SSI color backdrop also consults that same SSI
+Engine revision's Pool properties, `VirtualMemory.java`, `ViewDungeonPosition.java`,
+`RendererState.java` and `DungeonRenderer.java` for memory addresses, indoor
+selection, sky palette indices and native band sizes. These remain research-only
+references; no Java source was copied or translated. Original scene parity and
+script overrides of the indoor context remain unverified.

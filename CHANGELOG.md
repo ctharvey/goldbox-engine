@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Add an opt-in SSI color dungeon background behind original wall artwork.
+  Pool's profile supplies sky-color addresses; GEO context selects indoors or
+  outdoors. Render native sky/horizon/floor bands, reflect ECL memory changes,
+  reject invalid selectors, and cover color selection, wall layering and saved
+  memory with synthetic tests. Original-scene parity remains unverified.
+
 - Controller Low-finding fixes: bounded config size/duplicate keys/NUL bytes, menu and
   completion render validation, reader OSErrors reported as failures, lock opened
   `O_NOFOLLOW` and taken before the marker is read, Windows job accounting via
