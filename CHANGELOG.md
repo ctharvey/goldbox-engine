@@ -2,6 +2,10 @@
 
 ## 2026-10-17
 
+- Establish a private original-save/character-sheet baseline and inventory
+  candidate character-dependent events. Document WHO selection and matching
+  world state as remaining checkpoint requirements; no event parity claimed.
+
 - Connect normalized parties to ECL through an optional profile-selected,
   read-only memory adapter: LOAD_CHAR, names, abilities, exceptional scores and
   party count. Persist loaded-character selection; reject unsupported fields,

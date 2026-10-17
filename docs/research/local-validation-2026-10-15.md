@@ -290,3 +290,53 @@ timeout 30 ./build/tests/goldbox_image_host_tests initialize /private/profile.js
 ```
 
 Public CTest remains synthetic and does not access an installation.
+
+## Character-dependent checkpoint investigation (2026-10-17)
+
+The approved next acceptance target is a matched original character-dependent
+event, followed by save/reload. It is not yet achieved.
+
+A bounded reference run used the existing private DOSBox/game copy. Observed
+startup checkpoints were wheel prompt -> Enter -> party menu -> Load -> slot A.
+The original loaded six characters at displayed coordinates (15,4), facing west.
+Opening View exposed the first character's six ability scores. The six ordinary
+ability bytes at offsets 0x10..0x15 in its 285-byte native character record matched
+the visible sheet. This supports those offsets for this record, not all character
+layouts or creation rules. No installed executable/configuration was modified.
+The owned reference process tree was stopped and cleanup verified.
+
+Private metadata-only evidence binds the baseline to:
+
+| Resource | Bytes | SHA-256 |
+|---|---:|---|
+| SAVGAMA.DAT | 13137 | abca248371287c43c99e1b34e03394819fca3cf406bed184e7e4fbfe4f0c08f1 |
+| CHRDATA1.SAV | 285 | d7ba1321e1fca8464d1220e77c26ce92173d60cb67b0f155c71868926cfa6c8e |
+
+A private investigative control-flow inventory decoded the five declared lifecycle
+instructions, followed typed branch/table targets and fallthroughs, skipped inline
+strings by their declared lengths, and rejected overlapping instruction intervals.
+It used opcode facts from the already-pinned SSI Engine reference and its explicit
+Pool configuration; it did not search for byte patterns. It found party references
+in 20 of 29 ECL records. This is a conservative structural inventory, not an
+execution trace: conditional feasibility, subroutine state and original-game
+reachability are not established by following both possible successors.
+
+The current map-18 program references additional unsupported character fields;
+the read-only name/ability adapter alone is insufficient. Candidate name output
+in ECL5 record 7 includes PRINT at code offset 893 and a structural predecessor
+WHO (0x39) at offset 805. Other candidates include name output in ECL3 record 14
+and ECL8 record 13, with additional script/state dependencies. No candidate has
+yet been reproduced as the same event in both engines.
+
+Next implementation: research and implement the configurable WHO party-selection
+host semantics, including its relation to loaded-character and selected-PC state.
+Then establish the actual reference route and matching world/quest baseline for
+one event; implement only fields/effects that route requires. The supplied native
+save is not an engine save: copying its coordinates and visible party scores does
+not reproduce its world state. Do not report MATCH or event parity until both
+sides execute the same checkpoint from equivalent state.
+
+Original saves, character bytes, names, extracted scripts and screenshots remain
+outside the repository. The private investigation is not a public importer or
+a replacement for the tested C++ decoders. No build was needed for this research;
+the last implementation milestone remains 113d5f0 with 23 passing CTest suites.
