@@ -200,6 +200,14 @@ and alignment, enter a name, and confirm Add to party. Escape cancels the curren
 selection/draft; F10 resets the entire launch session. View and Remove character
 operate on the current roster, with confirmation before removal.
 
+Pool uses its profile-selected compatibility RNG for creation and ECL RANDOM.
+Each ability keeps the best of six 3d6 trials. The default startup seed is 1;
+`--seed <decimal-or-0x-uint32>` selects another reproducible stream. Engine saves
+preserve its current state. F10 returns to the launch seed, while loading a legacy
+save with no RNG state requires a new seeded session before further rolls.
+Full original creation-sequence parity, racial adjustments and age caps remain
+unverified; see [creation rules](../docs/character-creation.md).
+
 Pool allows up to six members and names up to 15 printable ASCII characters.
 Names must be distinct ignoring case. At least one member is required before
 starting through this startup menu. Failed map initialization preserves your

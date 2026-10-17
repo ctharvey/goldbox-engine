@@ -66,5 +66,13 @@
         "percentile": true
       }
     ]
-  }
+  },
+  "random": {
+    "algorithm": "lcg32-high16-mod-v1",
+    "multiplier": 134775813,
+    "increment": 1,
+    "seed": 1,
+    "eclDialect": "ssi-byte-upper-v1"
+  },
+  "characterCreationDice": {"count": 3, "sides": 6, "dropLowest": 0, "keepBestOf": 6}
 }

@@ -61,6 +61,13 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME goldbox_rng_debug_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/rng_debug_test.py $<TARGET_FILE:goldbox_rng_probe>)
 set_tests_properties(goldbox_rng_debug_tests PROPERTIES TIMEOUT 30)
+add_executable(goldbox_gameplay_random_tests gameplay_random_test.cpp)
+find_package(Boost 1.75 CONFIG REQUIRED)
+target_include_directories(goldbox_gameplay_random_tests PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(goldbox_gameplay_random_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_gameplay_random_tests COMMAND goldbox_gameplay_random_tests
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
+set_tests_properties(goldbox_gameplay_random_tests PROPERTIES TIMEOUT 20)
 add_test(NAME goldbox_rng_original_integration_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/rng_original_integration_test.py $<TARGET_FILE:goldbox_rng_probe>)
 set_tests_properties(goldbox_rng_original_integration_tests PROPERTIES

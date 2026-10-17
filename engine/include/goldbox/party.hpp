@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "goldbox/random.hpp"
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -32,6 +33,7 @@ struct CreationRules {
     std::vector<CreationClass> classes;
     std::optional<std::size_t> percentile_ability;
     int percentile_at{};
+    int keep_best_of{1};
 };
 struct AbilityValue { int value{}, percentile{}; };
 struct Character {
@@ -47,6 +49,9 @@ std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string
     std::string_view gender, std::mt19937& random);
 std::vector<std::size_t> eligible_classes(const CreationRules& rules, const Character& draft);
 Character finish_character(const CreationRules& rules, Character draft, std::mt19937& random);
+std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
+    std::string_view gender, HighWordLcg32& random);
+Character finish_character(const CreationRules& rules, Character draft, HighWordLcg32& random);
 void validate_character(const CreationRules& rules, const Character& character);
 void add_character(Party& party, const CreationRules& rules, Character character);
 std::string serialize_party(const Party& party, const CreationRules& rules);

@@ -52,6 +52,9 @@ std::vector<int> scores(const bj::value& value, std::size_t count) {
     for (const auto& v : a) result.push_back(number(v,1,1000));
     return result;
 }
+int die(HighWordLcg32& random, int sides) {
+    return 1+random.draw(static_cast<std::uint16_t>(sides));
+}
 int die(std::mt19937& random, int sides) {
     const auto limit = std::numeric_limits<std::uint32_t>::max() -
         std::numeric_limits<std::uint32_t>::max()%static_cast<unsigned>(sides);
@@ -151,18 +154,26 @@ std::vector<std::size_t> eligible_classes(const CreationRules& rules, const Char
     }
     return result;
 }
-std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
-    std::string_view gender, std::mt19937& random) {
+template<class Random>
+std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::string_view race,
+    std::string_view gender, Random& random) {
+    require(rules.dice_count >= 1 && rules.dice_count <= 10 && rules.dice_sides >= 2 && rules.dice_sides <= 100 &&
+        rules.drop_lowest >= 0 && rules.drop_lowest < rules.dice_count,"Invalid ability dice");
+    require(rules.keep_best_of >= 1 && rules.keep_best_of <= 16,"Invalid ability trial count");
     Character c; c.race = race; c.gender = gender;
     for (int attempt = 0; attempt < 256; ++attempt) {
         c.abilities.clear();
         for (std::size_t i = 0; i < rules.abilities.size(); ++i) {
-            std::vector<int> dice;
-            for (int j = 0; j < rules.dice_count; ++j) dice.push_back(die(random,rules.dice_sides));
-            std::sort(dice.begin(),dice.end());
-            int score = 0;
-            for (int j = rules.drop_lowest; j < rules.dice_count; ++j) score += dice[j];
-            c.abilities.push_back({score,0});
+            int best = 0;
+            for (int trial = 0; trial < rules.keep_best_of; ++trial) {
+                std::vector<int> dice;
+                for (int j = 0; j < rules.dice_count; ++j) dice.push_back(die(random,rules.dice_sides));
+                std::sort(dice.begin(),dice.end());
+                int score = 0;
+                for (int j = rules.drop_lowest; j < rules.dice_count; ++j) score += dice[j];
+                best = std::max(best,score);
+            }
+            c.abilities.push_back({best,0});
         }
         if (!eligible_classes(rules,c).empty()) return c.abilities;
     }
@@ -185,7 +196,8 @@ void validate_character(const CreationRules& rules, const Character& c) {
             "Invalid percentile ability");
     }
 }
-Character finish_character(const CreationRules& rules, Character draft, std::mt19937& random) {
+template<class Random>
+Character finish_character_impl(const CreationRules& rules, Character draft, Random& random) {
     draft.status = "okay";
     (void)find(rules.genders,draft.gender);
     const auto& choice = find(rules.classes,draft.character_class);
@@ -197,6 +209,16 @@ Character finish_character(const CreationRules& rules, Character draft, std::mt1
         if (maximum) draft.abilities[*rules.percentile_ability].percentile = die(random,maximum);
     }
     validate_character(rules,draft); return draft;
+}
+std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
+    std::string_view gender, std::mt19937& random) { return roll_abilities_impl(rules,race,gender,random); }
+std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
+    std::string_view gender, HighWordLcg32& random) { return roll_abilities_impl(rules,race,gender,random); }
+Character finish_character(const CreationRules& rules, Character draft, std::mt19937& random) {
+    return finish_character_impl(rules,std::move(draft),random);
+}
+Character finish_character(const CreationRules& rules, Character draft, HighWordLcg32& random) {
+    return finish_character_impl(rules,std::move(draft),random);
 }
 void add_character(Party& party, const CreationRules& rules, Character character) {
     require(party.size() < rules.party_limit,"Party is full"); validate_character(rules,character);

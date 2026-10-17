@@ -56,12 +56,17 @@ transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations
 with a process timeout. No complete combat implementation is supplied.
 
-RANDOM remains unsupported by the VM. Independent analysis and bounded execution
+RANDOM is enabled only by the profile's `random.eclDialect: ssi-byte-upper-v1`
+and requires explicit RNG state. Independent analysis and bounded execution
 of the fingerprinted original DOS Pool of Radiance handler establish a
 build-specific rule: narrow the resolved upper operand to one byte, draw using
 runtime bound `min(upperByte + 1, 255)`, and consume one PRNG draw even when the
 result must be zero. Upper bounds 0..254 are inclusive; 255 yields 0..254.
-This is compatibility research, not a shared rule for all ECL dialects. See the
+This is a profile-selected rule, not a shared rule for all ECL dialects. Invalid
+operands/destinations fail without consuming a draw. Saves preserve algorithm,
+parameters, dialect and current state; restore rejects mismatched configuration.
+Legacy saves without RNG state remain readable, but RANDOM fails explicitly
+until a new seeded session is started. See the
 [original RNG and handler evidence](../research/local-validation-2026-10-15.md#original-ecl-random-caller-verification-2026-10-17)
 for the generator formula, tested operand forms and remaining parity limits.
 

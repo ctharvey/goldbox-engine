@@ -34,6 +34,9 @@ struct ExplorationSession {
     Party party;
     std::optional<PartyMemoryLayout> party_memory{};
     std::uint8_t loaded_character{};
+    // Immutable initial configuration used to validate saved RNG parameters.
+    std::optional<HighWordLcg32> initial_random{};
+    EclRandomDialect random_dialect{EclRandomDialect::disabled};
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);

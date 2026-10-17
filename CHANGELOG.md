@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Use profile-selected, saved RNG state for character creation and ECL RANDOM.
+  Pool rolls the best of six 3d6 trials per ability; five human raw-score vectors
+  and final states match 540 isolated original-runtime draws. Add explicit startup
+  seeds and deterministic fresh-process save/reload coverage. Racial adjustments,
+  age caps and complete original creation-sequence parity remain unfinished.
+
 - Add deterministic scripted input and exact ordered engine-event assertions to
   the existing comparison harness, usable from the CLI or Python without an LLM.
   Exercise the real engine's movement, menus, memory and save/load in CI; stop on

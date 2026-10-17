@@ -579,3 +579,52 @@ not observe live game roll calls, capture an atomic whole-game snapshot, validat
 native save/reload, or align gameplay draw consumption. The gameplay ECL RANDOM
 instruction remains unsupported; existing party creation still uses its previous
 generator. Native gameplay parity is not established by the comparison window.
+
+### Gameplay RNG and raw human character rolls (2026-10-17)
+
+The engine now selects RNG parameters and ECL RANDOM semantics through the game
+profile. Pool uses the verified 32-bit generator for character creation and ECL,
+sharing one saved stream. The startup seed defaults to 1 and can be overridden
+with `--seed`. Fresh-process scripted tests verify RANDOM results and restored
+continuation; legacy saves without a random field retain unknown RNG state.
+No original resources are required for those public tests.
+
+This reuses the engine's existing parameterized RNG and party model. The dice
+policy is an independent implementation of observed behavior, rather than a new
+copy of upstream interpreter or character-creation code. Existing third-party
+attribution remains unchanged.
+
+A private bounded probe executes the installed original character ability loop
+from GAME.OVR file offset 0x1AB90 through the stop before 0x1AC4F. It uses the
+original dice helper and resident runtime, synthetic character memory and human
+race code 7. Each ability retains the best of six 3d6 trials: 18 draws per ability,
+108 per six-ability block. Five starting states produce these numeric facts:
+
+| Seed | STR, INT, WIS, DEX, CON, CHA | Final state (decimal) |
+| --- | --- | --- |
+| 0 | 14, 11, 13, 14, 15, 15 | 1638965300 |
+| 1 | 16, 13, 14, 16, 17, 14 | 2628645125 |
+| 0xFFFFFFFF | 16, 13, 14, 13, 16, 13 | 649285475 |
+| 0x12345678 | 15, 15, 14, 15, 15, 16 | 1040758828 |
+| 0x2E4D0932 | 15, 16, 14, 15, 17, 14 | 2883502598 |
+
+All 540 runtime draws have bound 6. Public regression tests check these scores
+and final states against the engine. The probe limits each ability to 10,000
+instructions/100 ms and the complete run to ten seconds, with a separate
+15-second process deadline. The reproduction script and numeric report remain
+private at `.cache/goldbox-validation/emulate_original_creation_rolls.py` and
+`original-creation-rolls-report.json`. No original bytes or disassembly are added.
+
+This verifies only the raw human subloop from the declared starting state.
+The original draws Random(256) earlier in creation and subsequently performs
+racial, age, class and gender processing, including exceptional strength.
+The engine still has provisional eligibility rejection and percentile-cap
+policies; racial adjustments, native percentile timing and complete creation
+draw alignment remain unfinished. This milestone does not establish native
+save/reload, live input timing or full character/event parity.
+
+The serialized two-job build passed. CTest passed all 26 public suites in
+19.55 seconds; the optional private original-RNG integration suite skipped
+because its private inputs were not configured for this run. Hygiene,
+attribution and whitespace checks passed. This run includes synthetic
+fresh-process RANDOM/save/reload and numeric raw-character regression coverage.

@@ -16,7 +16,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
-        "characterCreationRules", "partyMemory"}, "game profile");
+        "characterCreationRules", "partyMemory", "random", "characterCreationDice"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -90,6 +90,38 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         if (path.empty() || path.is_absolute()) throw std::runtime_error("Creation rules path must be relative");
         profile.character_rules = read_creation_rules(file.parent_path()/path);
         if (profile.character_rules->id != profile.rules_profile) throw std::runtime_error("Creation rules ID mismatch");
+    }
+    if (const auto* value = root.if_contains("random")) {
+        const auto& object = j::object(*value,"random profile");
+        j::fields_only(object,{"algorithm","multiplier","increment","seed","eclDialect"},"random profile");
+        if (j::string(j::field(object,"algorithm","random"),"random algorithm") != "lcg32-high16-mod-v1")
+            throw std::runtime_error("Unsupported random algorithm");
+        const auto word = [&](const char* key) {
+            const auto n = j::integer(j::field(object,key,"random"),key);
+            if (n < 0 || n > UINT32_MAX) throw std::runtime_error("Random parameter outside uint32");
+            return static_cast<std::uint32_t>(n);
+        };
+        profile.random.emplace(word("seed"),word("multiplier"),word("increment"));
+        if (const auto* dialect = object.if_contains("eclDialect")) {
+            const auto name = j::string(*dialect,"random eclDialect");
+            if (name == "ssi-byte-upper-v1") profile.random_dialect = EclRandomDialect::byte_upper;
+            else if (name != "disabled") throw std::runtime_error("Unsupported ECL random dialect");
+        }
+    }
+    if (const auto* value = root.if_contains("characterCreationDice")) {
+        if (!profile.character_rules) throw std::runtime_error("Creation dice require character rules");
+        const auto& object = j::object(*value,"character creation dice");
+        j::fields_only(object,{"count","sides","dropLowest","keepBestOf"},"character creation dice");
+        const auto bounded = [&](const char* key, int minimum, int maximum) {
+            const auto n = j::integer(j::field(object,key,"creation dice"),key);
+            if (n < minimum || n > maximum) throw std::runtime_error("Invalid character creation dice");
+            return static_cast<int>(n);
+        };
+        auto& rules = *profile.character_rules;
+        rules.dice_count = bounded("count",1,10);
+        rules.dice_sides = bounded("sides",2,100);
+        rules.drop_lowest = bounded("dropLowest",0,rules.dice_count-1);
+        rules.keep_best_of = bounded("keepBestOf",1,16);
     }
     if (const auto* value = root.if_contains("picturePeriodMs")) {
         const auto period = j::integer(*value,"picturePeriodMs");

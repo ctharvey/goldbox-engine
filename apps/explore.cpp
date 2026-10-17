@@ -5,6 +5,7 @@
 #include "view.hpp"
 #endif
 
+#include <charconv>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -263,6 +264,21 @@ int main(int argc, char** argv) {
     if (harness) { --argc; ++argv; }
     try {
         if (window && harness) throw std::runtime_error("Window and harness modes are separate");
+        std::optional<std::uint32_t> seed;
+        for (int i = 1; i < argc; ++i) if (std::string_view(argv[i]) == "--seed") {
+            if (seed || i+1 >= argc) throw std::runtime_error("--seed requires one unsigned 32-bit value");
+            std::string_view text(argv[i+1]);
+            int base = 10;
+            if (text.starts_with("0x") || text.starts_with("0X")) { text.remove_prefix(2); base = 16; }
+            std::uint32_t value{};
+            const auto result = std::from_chars(text.data(),text.data()+text.size(),value,base);
+            if (text.empty() || result.ec != std::errc{} || result.ptr != text.data()+text.size())
+                throw std::runtime_error("Invalid --seed value");
+            seed = value;
+            for (int j = i; j+2 < argc; ++j) argv[j] = argv[j+2];
+            argc -= 2; --i;
+        }
+
 #ifndef GOLDBOX_RENDERER
         if (window) throw std::runtime_error("Build with GOLDBOX_BUILD_RENDERER=ON for --window");
 #endif
@@ -321,6 +337,7 @@ int main(int argc, char** argv) {
         if (argc != 7) {
             if (harness) throw ProtocolError("Harness mode requires six resource/save arguments");
             std::cout << "Usage: goldbox_explore [--harness|--window] <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id> <local-save.json>\n"
+                         "Optional --seed <decimal-or-0x-uint32> overrides the profile startup seed.\n"
                          "Explicit map/ECL pairing required. Unverified exploration pilot; no complete game support.\n"
                          "With --harness as the first argument, the same six arguments run the JSONL protocol instead.\n";
             std::cout << "With --window, optional --walls <WALLDEF.DAX> <8X8D.DAX> <shared-8X8D.DAX> <bank1> <bank2> <bank3> precedes the six arguments.\n";
@@ -349,6 +366,14 @@ int main(int argc, char** argv) {
         auto ecl = goldbox::formats::DaxArchive::from_file(argv[4]).extract(ecl_id);
         goldbox::ExplorationSession session;
         session.character_rules = profile.character_rules;
+        session.initial_random = profile.random;
+        if (seed) {
+            if (!profile.random) throw std::runtime_error("--seed requires a profile random generator");
+            session.initial_random.emplace(*seed,profile.random->multiplier(),profile.random->increment());
+        }
+        session.state.random = session.initial_random;
+        session.random_dialect = profile.random_dialect;
+
         session.party_memory = profile.party_memory;
 #ifdef GOLDBOX_RENDERER
         session.wall_banks = initial_banks;

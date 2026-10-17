@@ -32,17 +32,28 @@ class minima and upstream alignment choices are provisional profile facts,
 not verified original-game compatibility. Neither Krynn nor Buck Rogers is
 implicitly assigned this profile.
 
-The prototype rolls four six-sided dice, drops the lowest, and rejects complete
-rolls outside race/gender limits or without any eligible class. At most 256
-attempts are made. Dice use an explicit caller-supplied MT19937 generator with
-a bounded unbiased mapping; tests use fixed seeds. UI creation seeds its own
-generator from SDL's performance counter, separately from ECL execution.
+The shared rules retain four six-sided dice with the lowest dropped. A game
+profile can override `characterCreationDice: {count, sides, dropLowest, keepBestOf}`;
+Pool selects the best of six 3d6 trials for each ability, matching the isolated
+original human raw-score loop. Five seeded sets and final RNG states are public
+numeric regression fixtures from 540 original runtime draws. Complete rolls
+outside race/gender limits or without any eligible class are still rejected,
+with at most 256 attempts; this rejection policy is provisional.
+
+Pool's `random` profile selects `algorithm: lcg32-high16-mod-v1`, multiplier
+134775813, increment 1 and startup seed 1. Character rolls, rerolls, exceptional
+strength and ECL RANDOM consume the same session stream. `--seed` accepts a
+decimal or hexadecimal uint32 override; F10 restores the launch seed. Profiles
+without this configuration keep the existing caller-supplied MT19937 path.
 Exceptional strength is a configured percentile ability: fighter strength 18
 receives a uniform percentile within the configured race/gender cap (100 is
-shown as 00). This is a provisional distribution, not an original RNG claim.
+shown as 00). The human male Random(100)+1 primitive is verified, while native
+percentile timing and other race/gender policies remain provisional.
 
 Racial stat adjustments are not yet applied; ordinary 4d6 rolls cannot generate
-19 even when a race cap permits it. Multi-classing, HP/AC, portraits, equipment,
+19 even when a race cap permits it. The original also draws before the raw
+ability loop and applies age/class/gender processing afterward; complete
+character-creation draw alignment is unverified. Multi-classing, HP/AC, portraits, equipment,
 spells, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
 
@@ -54,6 +65,9 @@ published, including class eligibility, alignment, percentile, duplicate names
 and capacity. Missing/mismatched rules fail; no-party legacy saves load an empty
 roster. Party state is included in the window's initialization rollback snapshot
 and F10 launch-state reset. Saves store normalized values, not character bytes.
+Configured RNG state is saved alongside the party and restored atomically after
+algorithm/parameter/dialect checks. Legacy saves without RNG state load with
+unknown RNG state; Pool creation and RANDOM then require a new seeded session.
 
 Synthetic tests cover deterministic rolling, every supported race/gender,
 exceptional caps, alternate ability lists, invalid rules/parties, capacity,

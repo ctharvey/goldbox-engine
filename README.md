@@ -144,10 +144,12 @@ seed on both sides remains isolated, not a live trace of the game's next rolls.
 With `--dosbox`, the window captures and compares on startup; the capture button
 repeats both steps with a fresh reference launch.
 
-The new `HighWordLcg32` compatibility primitive accepts caller-supplied multiplier
-and increment; only the debug adapter selects Pool's constants and memory map.
-The gameplay VM still rejects RANDOM, and party creation still uses its existing
-generator. Matching this screen does not establish gameplay/event parity.
+The `HighWordLcg32` compatibility primitive accepts caller-supplied multiplier
+and increment. Pool's game profile now selects this generator for both character
+creation and ECL RANDOM, with one shared stream preserved in engine saves.
+The startup seed defaults to 1; `goldbox_explore --seed <decimal-or-0x-uint32>`
+overrides it in terminal, window or harness mode. Matching this screen does not
+establish complete gameplay/event parity.
 Original-code calls have instruction/time budgets and process deadlines; public
 CI uses only synthetic inputs and does not require original games or Unicorn.
 
@@ -260,9 +262,9 @@ staging, `arm` and `disarm` commands and mirrored action/menu mappings. Rejected
 staging/arming commands are fatal in scripted mode. Prepare the reference's known
 starting state first; engine acknowledgments do not acknowledge DOS game state.
 Scripted PASS verifies engine assertions, **not original-game parity**. This mode
-does not inject a DOS seed, control native input-processing timing or add gameplay
-RANDOM support. The seeded original-runtime comparison remains its separate
-automated RNG test.
+does not inject a DOS seed or control native input-processing timing. Engine
+RANDOM and seeded save/reload run in the scripted tests; the original-runtime
+comparison remains a separate automated RNG test.
 
 Version-1 session configuration (trusted local execution input; the controller
 spawns with `shell=False` and never interpolates shell text; validated fully

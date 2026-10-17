@@ -159,7 +159,7 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
     }
     try {
         SessionHost session_host(*this,host);
-        return execute_ecl(ecl_record, kind, dialect, opcodes, state, session_host, limits);
+        return execute_ecl(ecl_record, kind, dialect, opcodes, state, session_host, limits, random_dialect);
     } catch (const std::exception& error) {
         EclExecution failure; failure.diagnostic = error.what(); return failure;
     }
@@ -177,6 +177,16 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
     auto object = bj::object{{"schemaVersion", 1}, {"sourceIdentity", source_identity},
         {"dialect", session.dialect.id}, {"row", session.row}, {"column", session.column},
         {"facing", static_cast<unsigned>(session.facing)}, {"memory", std::move(memory)}, {"strings", std::move(strings)}};
+    if (session.state.random) {
+        const auto& rng = *session.state.random;
+        if (session.random_dialect != EclRandomDialect::disabled &&
+            session.random_dialect != EclRandomDialect::byte_upper) throw std::runtime_error("Unknown RNG dialect");
+        if (!session.initial_random || rng.multiplier() != session.initial_random->multiplier() ||
+            rng.increment() != session.initial_random->increment()) throw std::runtime_error("RNG profile mismatch");
+        object["random"] = bj::object{{"algorithm","lcg32-high16-mod-v1"},{"multiplier",rng.multiplier()},
+            {"increment",rng.increment()},{"state",rng.state()},
+            {"eclDialect",session.random_dialect == EclRandomDialect::byte_upper ? "ssi-byte-upper-v1" : "disabled"}};
+    }
     if (session.character_rules) {
         object["party"] = bj::parse(serialize_party(session.party,*session.character_rules));
     } else if (!session.party.empty()) throw std::runtime_error("Party requires creation rules");
@@ -212,7 +222,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
     j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks",
-        "area", "mapRecord", "mapSource", "party", "loadedCharacter"}, "save");
+        "area", "mapRecord", "mapSource", "party", "loadedCharacter", "random"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -229,6 +239,19 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     const auto& memory = j::array(j::field(root, "memory", "save"), "save memory");
     if (memory.size() != session.state.memory.size()) throw std::runtime_error("Save memory size mismatch");
     EclState state;
+    if (const auto* value = root.if_contains("random")) {
+        const auto& object = j::object(*value,"saved RNG");
+        j::fields_only(object,{"algorithm","multiplier","increment","state","eclDialect"},"saved RNG");
+        if (!session.initial_random ||
+            j::string(j::field(object,"algorithm","saved RNG"),"RNG algorithm") != "lcg32-high16-mod-v1" ||
+            bounded(j::field(object,"multiplier","saved RNG"),UINT32_MAX) != session.initial_random->multiplier() ||
+            bounded(j::field(object,"increment","saved RNG"),UINT32_MAX) != session.initial_random->increment() ||
+            j::string(j::field(object,"eclDialect","saved RNG"),"RNG dialect") !=
+                (session.random_dialect == EclRandomDialect::byte_upper ? "ssi-byte-upper-v1" : "disabled"))
+            throw std::runtime_error("Saved RNG profile mismatch");
+        state.random.emplace(static_cast<std::uint32_t>(bounded(j::field(object,"state","saved RNG"),UINT32_MAX)),
+            session.initial_random->multiplier(),session.initial_random->increment());
+    } // Legacy saves remain readable, with unknown rather than invented RNG state.
     for (std::size_t i = 0; i < memory.size(); ++i) state.memory[i] = static_cast<std::uint8_t>(bounded(memory[i], 255));
     for (const auto& value : j::array(j::field(root, "strings", "save"), "save strings")) {
         const auto& item = j::object(value, "saved string");

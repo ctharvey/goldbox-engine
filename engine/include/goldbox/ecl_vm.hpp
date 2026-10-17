@@ -2,6 +2,7 @@
 #pragma once
 
 #include "goldbox/formats/ecl_dispatch.hpp"
+#include "goldbox/random.hpp"
 
 #include <array>
 #include <map>
@@ -13,7 +14,9 @@ struct EclState {
     std::array<std::uint8_t, 65536> memory{};
     std::map<std::uint16_t, std::string> strings;
     int comparison{};
+    std::optional<HighWordLcg32> random{};
 };
+enum class EclRandomDialect { disabled, byte_upper };
 enum class EclImageDialect { disabled, sprite3 };
 enum class EclAreaDialect { disabled, map3 };
 enum class EclPartyDialect { disabled, load_character };
@@ -66,7 +69,8 @@ struct EclExecution {
 // calls the host. Failure preserves changes already made (no rollback claim).
 EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEventKind kind,
     const formats::EclDispatchDialect& dialect, std::span<const formats::EclOpcodeSpec> opcodes,
-    EclState& state, EclHost& host, EclLimits limits = {});
+    EclState& state, EclHost& host, EclLimits limits = {},
+    EclRandomDialect random = EclRandomDialect::disabled);
 
 std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
     EclAreaDialect area = EclAreaDialect::disabled, EclPartyDialect party = EclPartyDialect::disabled);

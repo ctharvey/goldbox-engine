@@ -90,6 +90,27 @@ class ScriptedHarnessTests(unittest.TestCase):
             self.assertTrue(child.process.stdout.closed)
             self.assertTrue(child.process.stderr.closed)
 
+    def test_seeded_random_save_restore_in_fresh_process(self):
+        (self.root / 'ECL.DAX').write_bytes(dax(bytes(
+            [1, 1, 20, 0x99] * 5 + [8, 0, 20, 1, 0, 0x4a, 0])))
+        settings = json.loads(self.config.read_text())
+        settings['engine']['command'][2:2] = ['--seed', '0x12345678']
+        self.config.write_text(json.dumps(settings))
+        def complete(identifier, value, state):
+            return event('complete', id=identifier, status='ok',
+                         **{'state/memory/18944': value, 'state/random/state': state})
+        scenario = dict(schemaVersion=1, commands=['east', 'save', 'west', 'load', 'west', 'quit'], expect=[
+            event('ready', protocol=1), complete(1,0,0xcb5b9059), complete(2,0,0xcb5b9059),
+            complete(3,4,0x79ffb5be), complete(4,0,0xcb5b9059), complete(5,4,0x79ffb5be),
+            complete(6,4,0x79ffb5be)])
+        result = self.invoke(scenario)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        fresh = dict(schemaVersion=1, commands=['load', 'west', 'quit'], expect=[
+            event('ready', protocol=1), complete(1,0,0xcb5b9059), complete(2,4,0x79ffb5be),
+            complete(3,4,0x79ffb5be)])
+        result = self.invoke(fresh)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_native_fixture_scripted_input(self):
         # Also runnable on Windows without a native C++ build; the rest of this
         # suite exercises the real engine in CI.

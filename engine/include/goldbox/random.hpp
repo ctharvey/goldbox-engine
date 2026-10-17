@@ -10,6 +10,8 @@ public:
     HighWordLcg32(std::uint32_t seed, std::uint32_t multiplier, std::uint32_t increment)
         : state_(seed), multiplier_(multiplier), increment_(increment) {}
     std::uint32_t state() const { return state_; }
+    std::uint32_t multiplier() const { return multiplier_; }
+    std::uint32_t increment() const { return increment_; }
     std::uint16_t draw(std::uint16_t bound) {
         state_ = static_cast<std::uint32_t>(
             static_cast<std::uint64_t>(state_) * multiplier_ + increment_);

@@ -301,7 +301,10 @@ public:
         const auto gender = pick_option(rules.genders,"CREATE CHARACTER / GENDER"); if (!gender) return;
         c.gender = rules.genders[*gender].id;
         while (true) {
-            c.abilities = roll_abilities(rules,c.race,c.gender,creation_random);
+            if (session.initial_random && !session.state.random)
+                throw std::runtime_error("This legacy save has no random state; start a new seeded game to roll characters");
+            c.abilities = session.state.random ? roll_abilities(rules,c.race,c.gender,*session.state.random) :
+                roll_abilities(rules,c.race,c.gender,creation_random);
             const auto choice = pick({"KEEP SCORES","REROLL","CANCEL"},character_summary(c));
             if (!choice || *choice == 2) return;
             if (*choice == 0) break;
@@ -319,7 +322,9 @@ public:
         const auto alignment = pick(labels,"CREATE CHARACTER / ALIGNMENT"); if (!alignment) return;
         c.alignment = class_rule.alignments[*alignment];
         const auto name = character_name(rules.name_limit); if (!name) return;
-        c.name = *name; c = finish_character(rules,std::move(c),creation_random);
+        c.name = *name;
+        c = session.state.random ? finish_character(rules,std::move(c),*session.state.random) :
+            finish_character(rules,std::move(c),creation_random);
         const auto confirm = pick({"ADD TO PARTY","CANCEL"},character_summary(c));
         if (confirm && *confirm == 0) add_character(session.party,rules,std::move(c));
     }

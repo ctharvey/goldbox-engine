@@ -91,9 +91,11 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
 
 EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind,
     const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes,
-    EclState& state, EclHost& host, EclLimits limits) {
+    EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random) {
     EclExecution result;
     try {
+        require(random == EclRandomDialect::disabled || random == EclRandomDialect::byte_upper,
+            "Unknown ECL random dialect");
         const auto image_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0c; });
         const bool images_enabled = image_spec != opcodes.end();
         const auto party_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0a; });
@@ -184,6 +186,16 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             case 0x14:
                 state.comparison = numeric(args[0]) == numeric(args[1]) && numeric(args[2]) == numeric(args[3]) ? 0 : 1;
                 break;
+            case 8: {
+                require(random == EclRandomDialect::byte_upper,"Unsupported VM opcode 8 (random dialect disabled)");
+                require(state.random.has_value(),"RNG state unavailable; legacy saves require an explicit new seed");
+                const auto upper = numeric(args[0]) & 255u;
+                auto candidate = *state.random;
+                const auto value = candidate.draw(static_cast<std::uint16_t>(std::min(upper+1,255u)));
+                store(args[1],value); // Invalid destinations do not consume the stream.
+                state.random = candidate;
+                break;
+            }
             case 9:
                 if (args[0].type >= 0x80) {
                     require(args[1].type == 0x81, "Invalid ECL string destination");
