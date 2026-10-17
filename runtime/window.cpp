@@ -312,18 +312,32 @@ public:
             class_index = available[*selected]; c.character_class = rules.classes[*class_index].id;
             return true;
         };
+        const auto pick_alignment = [&] {
+            const auto& class_rule = rules.classes[*class_index];
+            labels.clear();
+            for (const auto& a : class_rule.alignments) {
+                const auto it = std::find_if(rules.alignments.begin(),rules.alignments.end(),
+                    [&](const auto& v) { return v.id == a; });
+                labels.push_back(it->label);
+            }
+            const auto selected = pick(labels,"CREATE CHARACTER / ALIGNMENT");
+            if (!selected) return false;
+            c.alignment = class_rule.alignments[*selected]; return true;
+        };
         if (!rules.races[*race].starting_ages.empty()) {
             for (const auto value : rules.races[*race].maximum.at(c.gender)) c.abilities.push_back({value,0});
             if (!pick_class()) return;
+            if (!pick_alignment()) return;
             if (session.initial_random && !session.state.random)
                 throw std::runtime_error("This legacy save has no random state; start a new seeded game");
-            c.age = session.state.random ? roll_starting_age(rules,c.race,c.character_class,*session.state.random) :
-                roll_starting_age(rules,c.race,c.character_class,creation_random);
         }
         while (true) {
             if (session.initial_random && !session.state.random)
                 throw std::runtime_error("This legacy save has no random state; start a new seeded game to roll characters");
-            c.abilities = session.state.random ? roll_abilities(rules,c.race,c.gender,*session.state.random) :
+            if (class_index && !rules.races[*race].starting_ages.empty())
+                c = session.state.random ? roll_character(rules,c,*session.state.random) :
+                    roll_character(rules,c,creation_random);
+            else c.abilities = session.state.random ? roll_abilities(rules,c.race,c.gender,*session.state.random) :
                 roll_abilities(rules,c.race,c.gender,creation_random);
             const auto available = creation_classes(rules,c);
             const bool qualifies = !class_index ||
@@ -334,17 +348,11 @@ public:
             if (qualifies && *choice == 0) break;
         }
         if (!class_index && !pick_class()) return;
-        const auto& class_rule = rules.classes[*class_index];
-        labels.clear();
-        for (const auto& a : class_rule.alignments) {
-            const auto it = std::find_if(rules.alignments.begin(),rules.alignments.end(),[&](const auto& v) { return v.id == a; });
-            labels.push_back(it->label);
-        }
-        const auto alignment = pick(labels,"CREATE CHARACTER / ALIGNMENT"); if (!alignment) return;
-        c.alignment = class_rule.alignments[*alignment];
+        if (c.alignment.empty() && !pick_alignment()) return;
         const auto name = character_name(rules.name_limit); if (!name) return;
         c.name = *name;
-        c = session.state.random ? finish_character(rules,std::move(c),*session.state.random) :
+        if (c.age) validate_character(rules,c); // Prepared rolls already include the percentile at its native point.
+        else c = session.state.random ? finish_character(rules,std::move(c),*session.state.random) :
             finish_character(rules,std::move(c),creation_random);
         const auto confirm = pick({"ADD TO PARTY","CANCEL"},character_summary(c));
         if (confirm && *confirm == 0) add_character(session.party,rules,std::move(c));

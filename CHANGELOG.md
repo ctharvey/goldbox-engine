@@ -2,6 +2,13 @@
 
 ## 2026-10-17
 
+- Match the tested original character-generation sequence: initial random draw,
+  age, racial/age modifiers, clamps, class floors and in-order exceptional strength.
+  Add configurable ordered age adjustments and 353 original numeric snapshots
+  with exact state checks. Select alignment before rolls and avoid confirmation
+  redrawing percentiles. Full interactive parity and remaining character fields
+  are still unfinished.
+
 - Generate, display and save optional starting age from configurable race/class
   dice using the shared RNG. Verify 102 isolated original cases across all 17
   supported pairs. Select class before age/abilities for configured creators;

@@ -12,6 +12,12 @@
 namespace goldbox {
 struct CreationChoice { std::string id, label; };
 struct StartingAgeDice { int base{}, count{}, sides{}; };
+struct CreationAgeAdjustment {
+    int minimum{}, maximum{};
+    std::vector<int> values;
+    std::vector<bool> positive_only;
+    bool wrap_byte{};
+};
 struct CreationRace {
     std::string id, label;
     std::vector<int> minimum;
@@ -21,6 +27,7 @@ struct CreationRace {
     // Empty preserves legacy unadjusted rolling; otherwise one signed value per ability.
     std::vector<int> adjustments;
     std::map<std::string,StartingAgeDice> starting_ages{};
+    std::vector<CreationAgeAdjustment> age_adjustments{};
 };
 struct CreationClass {
     std::string id, label;
@@ -42,6 +49,7 @@ struct CreationRules {
     int keep_best_of{1};
     CreationBounds bounds{CreationBounds::reject};
     std::optional<int> percentile_roll_maximum;
+    std::vector<std::uint16_t> initial_random_bounds{};
 };
 struct AbilityValue { int value{}, percentile{}; };
 struct Character {
@@ -57,6 +65,10 @@ std::optional<std::uint16_t> roll_starting_age(const CreationRules& rules, std::
     std::string_view character_class, std::mt19937& random);
 std::optional<std::uint16_t> roll_starting_age(const CreationRules& rules, std::string_view race,
     std::string_view character_class, HighWordLcg32& random);
+// Prepare age/abilities with class known. Existing age means a score reroll;
+// name/alignment are validated separately after the UI supplies them.
+Character roll_character(const CreationRules& rules, Character draft, std::mt19937& random);
+Character roll_character(const CreationRules& rules, Character draft, HighWordLcg32& random);
 // Explicit generator, bounded rejection and fixed dice mapping: reproducible across STL implementations.
 std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
     std::string_view gender, std::mt19937& random);

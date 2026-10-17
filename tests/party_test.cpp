@@ -138,7 +138,12 @@ int main(int argc, char** argv) {
         changed(original,"\"count\": 5","\"count\": 0"),
         changed(original,"\"base\": 40","\"base\": 65535"),
         changed(original,"\"sides\": 4","\"sides\": true"),
-        changed(original,"\"fighter\": {\"base\": 40","\"unknown\": {\"base\": 40")}) {
+        changed(original,"\"fighter\": {\"base\": 40","\"unknown\": {\"base\": 40"),
+        changed(original,"\"initialRandomBounds\": [256]","\"initialRandomBounds\": [65536]"),
+        changed(original,"\"values\": [0, 0, -1, 0, 0, 0]","\"values\": [0]"),
+        changed(original,"\"values\": [0, 0, -1, 0, 0, 0]","\"values\": [0, 0, -101, 0, 0, 0]"),
+        changed(original,"\"positiveOnly\": [\"strength\"]","\"positiveOnly\": [\"unknown\"]"),
+        changed(original,"\"wrapByte\": true","\"wrapByte\": 1")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

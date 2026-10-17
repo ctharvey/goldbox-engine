@@ -3,6 +3,7 @@
   "id": "adnd-first-edition-creation-v1",
   "partyLimit": 6,
   "nameLimit": 15,
+  "initialRandomBounds": [256],
   "dice": {
     "count": 4,
     "sides": 6,
@@ -192,6 +193,13 @@
     {
       "id": "dwarf",
       "label": "Dwarf",
+      "ageAdjustments": [
+        {"minimum": 1, "maximum": 50, "values": [0, 0, -1, 0, 0, 0], "wrapByte": true},
+        {"minimum": 51, "maximum": 65535, "values": [1, 0, 0, 0, 0, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 151, "maximum": 65535, "values": [-1, 1, 1, 0, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 251, "maximum": 65535, "values": [-2, 0, 1, -2, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 351, "maximum": 65535, "values": [-1, 1, 1, -1, -1, 0], "positiveOnly": ["strength"], "wrapByte": true}
+      ],
       "startingAge": {
         "fighter": {"base": 40, "count": 5, "sides": 4},
         "thief": {"base": 75, "count": 3, "sides": 6}
@@ -235,6 +243,13 @@
     {
       "id": "elf",
       "label": "Elf",
+      "ageAdjustments": [
+        {"minimum": 1, "maximum": 175, "values": [0, 0, -1, 0, 0, 0], "wrapByte": true},
+        {"minimum": 176, "maximum": 65535, "values": [1, 0, 0, 0, 0, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 551, "maximum": 65535, "values": [-1, 1, 1, 0, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 876, "maximum": 65535, "values": [-2, 0, 1, -2, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 1201, "maximum": 65535, "values": [-1, 1, 1, -1, -1, 0], "positiveOnly": ["strength"], "wrapByte": true}
+      ],
       "startingAge": {
         "fighter": {"base": 130, "count": 5, "sides": 6},
         "magic-user": {"base": 150, "count": 5, "sides": 6},
@@ -280,6 +295,13 @@
     {
       "id": "gnome",
       "label": "Gnome",
+      "ageAdjustments": [
+        {"minimum": 1, "maximum": 90, "values": [0, 0, -1, 0, 0, 0], "wrapByte": true},
+        {"minimum": 91, "maximum": 65535, "values": [1, 0, 0, 0, 0, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 301, "maximum": 65535, "values": [-1, 1, 1, 0, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 451, "maximum": 65535, "values": [-2, 0, 1, -2, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 601, "maximum": 65535, "values": [-1, 1, 1, -1, -1, 0], "positiveOnly": ["strength"], "wrapByte": true}
+      ],
       "startingAge": {
         "fighter": {"base": 60, "count": 5, "sides": 4},
         "thief": {"base": 80, "count": 5, "sides": 4}
@@ -322,6 +344,13 @@
     {
       "id": "half-elf",
       "label": "Half-elf",
+      "ageAdjustments": [
+        {"minimum": 1, "maximum": 40, "values": [0, 0, -1, 0, 0, 0], "wrapByte": true},
+        {"minimum": 41, "maximum": 65535, "values": [1, 0, 0, 0, 0, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 101, "maximum": 65535, "values": [-1, 1, 1, 0, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 176, "maximum": 65535, "values": [-2, 0, 1, -2, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 251, "maximum": 65535, "values": [-1, 1, 1, -1, -1, 0], "positiveOnly": ["strength"], "wrapByte": true}
+      ],
       "startingAge": {
         "cleric": {"base": 40, "count": 2, "sides": 4},
         "fighter": {"base": 22, "count": 3, "sides": 4},
@@ -368,6 +397,13 @@
     {
       "id": "halfling",
       "label": "Halfling",
+      "ageAdjustments": [
+        {"minimum": 1, "maximum": 33, "values": [0, 0, -1, 0, 0, 0], "wrapByte": true},
+        {"minimum": 34, "maximum": 65535, "values": [1, 0, 0, 0, 0, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 69, "maximum": 65535, "values": [-1, 1, 1, 0, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 102, "maximum": 65535, "values": [-2, 0, 1, -2, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 145, "maximum": 65535, "values": [-1, 1, 1, -1, -1, 0], "positiveOnly": ["strength"], "wrapByte": true}
+      ],
       "startingAge": {
         "fighter": {"base": 20, "count": 3, "sides": 4},
         "thief": {"base": 40, "count": 2, "sides": 4}
@@ -411,6 +447,13 @@
     {
       "id": "human",
       "label": "Human",
+      "ageAdjustments": [
+        {"minimum": 1, "maximum": 20, "values": [0, 0, -1, 0, 0, 0], "wrapByte": true},
+        {"minimum": 21, "maximum": 65535, "values": [1, 0, 0, 0, 0, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 41, "maximum": 65535, "values": [-1, 1, 1, 0, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 61, "maximum": 65535, "values": [-2, 0, 1, -2, -1, 0], "positiveOnly": ["strength"], "wrapByte": true},
+        {"minimum": 91, "maximum": 65535, "values": [-1, 1, 1, -1, -1, 0], "positiveOnly": ["strength"], "wrapByte": true}
+      ],
       "startingAge": {
         "cleric": {"base": 18, "count": 1, "sides": 4},
         "fighter": {"base": 15, "count": 1, "sides": 4},

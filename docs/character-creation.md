@@ -42,6 +42,13 @@ Generation adds the configured dice to the base (count 1..10, sides 2..100), wit
 a result bounded to 1..65535. Missing age configuration consumes no draws.
 Every supported class must have a valid entry when a race opts in; unknown,
 missing, malformed and overflowing entries fail explicitly.
+Optional `initialRandomBounds` declares up to 16 setup draws before starting age;
+Pool selects `[256]`. Each race can supply up to 32 ordered `ageAdjustments`.
+Entries have inclusive `minimum`/`maximum` ages and per-ability signed `values`.
+All applicable entries accumulate before racial clamping. `positiveOnly` lists
+ability IDs whose adjustment is skipped at zero; optional `wrapByte` selects
+unsigned byte arithmetic. These settings reproduce the original ordered byte
+operations without putting title IDs or native memory offsets in the core.
 
 ## Current AD&D profile
 
@@ -59,16 +66,20 @@ original human raw-score loop. Five seeded sets and final RNG states are public
 numeric regression fixtures from 540 original runtime draws. The selected rules
 now clamp racial/gender bounds, matching the isolated original bound blocks.
 Rolls without a usable creation class still retry at most 256 times. Verified
-class creation floors now apply at completion. With starting-age configuration,
-the UI selects class before rolling age and abilities; other profiles retain
+class creation floors apply during the complete character roll. With starting-age configuration,
+the UI selects class and alignment before rolling age and abilities; other profiles retain
 their existing roll-then-class flow. Reroll keeps the selected age and class.
 
 The supplied rules define independently verified starting-age dice for all
 17 supported race/class pairs. For seed 0x12345678, a human fighter starts at
 19 years (15+1d4), an elf fighter at 148 (130+5d6), and a dwarf fighter at 52
 (40+5d4). Age is displayed in the character summary and saved beside abilities.
-**Age-based ability modifiers are not yet applied.** Matching the age generator
-does not make the current ability scores match the complete original creator.
+Age-based ability modifiers now apply before racial/gender clamping. Class
+floors follow clamping, and exceptional strength rolls immediately after its
+ability, before later ability rolls. The initial setup draw also consumes the
+shared stream. This matches 353 isolated original-code snapshots, including age
+threshold boundaries and exceptional-strength cases, with exact final states.
+It does not establish full interactive creation or all native character fields.
 
 Pool's `random` profile selects `algorithm: lcg32-high16-mod-v1`, multiplier
 134775813, increment 1 and startup seed 1. Character rolls, rerolls, exceptional
@@ -78,9 +89,9 @@ without this configuration keep the existing caller-supplied MT19937 path.
 Exceptional strength is a configured percentile ability: fighter strength 18
 rolls 1..100 and clamps to the configured race/gender cap (100 is shown as 00).
 This makes the maximum more frequent when the cap is below 100, matching 72
-isolated original cases. Native percentile timing remains unimplemented: the
-original can draw immediately after strength, before later abilities, while
-this creator draws at character completion after selecting a class.
+isolated original cases. The complete creator now draws it at the original
+point after strength. Confirmation validates prepared scores without drawing
+another percentile.
 
 The rules now apply independently verified racial modifiers: dwarf CON +1 and
 CHA -1; elf DEX +1 and CON -1; halfling STR -1 and DEX +1. Gnome, half-elf and
@@ -90,9 +101,19 @@ verify legal scores of 19 and their party save roundtrip. Modifiers consume no
 additional random draws. The original also draws before the raw
 ability loop, applies age processing before the racial clamps and class floors
 afterward; complete
-character-creation draw alignment and age modifiers are unverified. Multi-classing, HP/AC, portraits, equipment,
+live interactive creation parity remains unverified. Multi-classing, HP/AC, portraits, equipment,
 spells, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
+
+`roll_character` prepares a draft with known race/gender/class. A draft without
+age consumes setup draws and generates age; an existing age means an ability
+reroll, retaining that age and skipping setup. Invalid inputs leave the caller's
+RNG unchanged. Supply/validate name and alignment before adding the result to a
+party. The older `roll_abilities`, `roll_starting_age` and `finish_character`
+interfaces remain lower-level helpers; they do not reproduce the whole sequence
+when combined in arbitrary order. Do not call the legacy randomizing completion
+helper on a prepared roll. Actual DOS reroll/cancellation/idle timing remains
+unverified; engine reroll behavior is deterministic and tested separately.
 
 ## Saves and lifecycle
 

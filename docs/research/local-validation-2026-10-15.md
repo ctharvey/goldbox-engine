@@ -806,3 +806,73 @@ for unconfigured inputs. Hygiene, attribution and whitespace checks passed.
 Synthetic tests cover all 17 seeded age fixtures, exact final RNG states,
 continuation after restore, unknown legacy ages, rejected age values/dice/class
 references, and SDL creation with age preserved through save/load.
+
+### Combined seeded character-generation comparison (2026-10-17)
+
+The engine now executes the tested numeric creation sequence as one prepared
+roll: a setup Random(256) draw, starting age, then each ability's best-of-six
+3d6 result, racial adjustment, ordered age effects, racial/gender clamp, class
+floor and (when applicable) exceptional strength before the next ability.
+Age effects use data-defined inclusive age ranges, signed per-ability changes,
+positive-only guards and optional unsigned-byte wrapping. The latter preserves
+the original byte operations rather than assuming unbounded integer arithmetic.
+
+The private combined oracle executes the fingerprinted original blocks:
+GAME.OVR 0x19F9D..0x19FAE for the initial random draw/store, 0x1A862..0x1AB60
+for age, and 0x1AB90..0x1B54B for each ability. Synthetic records select known
+race/class/gender values and the native single-class flag. Rendering callbacks,
+menus and allocations are excluded; original dice, runtime and age/class
+processing execute directly. No instruction bytes are pattern-scanned to infer
+ECL entry points, and no original resources are committed.
+
+Three bounded probes produce numeric snapshots:
+
+- All 17 supported race/class pairs, both genders and six seeds (0, 1,
+  FFFFFFFF, 12345678, 2E4D0932, 23): 204 snapshots and 22,872 runtime draws.
+- Male human fighters from seeds 0..255: 256 snapshots and 28,165 draws,
+  including five exceptional-strength cases. Seed 18 produces age 17, scores
+  [18,14,13,12,16,13], percentile 29 and final state 1273674349 after 111 draws.
+- Explicit ages immediately below, at and above all four modifier thresholds,
+  across six races and both genders, using fighter class and seed 12345678:
+  144 snapshots and 15,552 draws. These start immediately before abilities,
+  with age supplied, so they exclude setup/age draws.
+
+Public CI stores 353 numeric snapshots: the first matrix, all five exceptional
+cases, and every age-boundary case. It checks age, all scores, percentiles and
+exact final state, then validates party persistence. Expectations come from
+original execution, not from recomputing the engine's formula. Further tests
+exercise save/restore continuation and deterministic age-preserving rerolls,
+invalid-input RNG atomicity, and the SDL path's lack of a confirmation-time
+percentile redraw. The existing lower-level raw-roll/dice tests remain intact.
+
+Private reproduction/report names under `.cache/goldbox-validation/` are
+`emulate_original_creation_sequence.py` / `original-creation-sequence-report.json`,
+`emulate_original_creation_strength.py` / `original-creation-strength-report.json`,
+and `emulate_original_creation_age_boundaries.py` /
+`original-creation-age-boundaries-report.json`. Each execution is bounded to
+25,000 instructions/100 ms per original block, 45 seconds per complete probe
+and a separate 50-second outer process timeout.
+
+This independently extends the existing party roller and configurable rules;
+no upstream implementation is copied or translated. The setup byte written to
+the native record is currently consumed for RNG alignment but its unrelated
+character-field meaning is not modeled. Numeric kernel matching does not prove
+live input/idle/cancellation/reroll parity, complete native character records,
+HP, spells, equipment, multiclass creation, portraits or exact UI presentation.
+Alignment is selected before rolling in the configured engine flow; an
+interactive original-game checkpoint comparison is still outstanding.
+
+Two additional original post-processing checks verify byte-edge behavior:
+elf CON 2 at age 1201 wraps through 255 and clamps to 18; human STR 0 at age 91
+remains zero under the positive-only guards, then clamps to 3. Synthetic dice
+configurations force these inputs through the same engine roll path. These
+are arithmetic compatibility checks, not claims about ordinary starting ages.
+The private reproducer is `emulate_original_age_byte_edges.py` in the same cache.
+
+Verification: the bounded serialized two-job build and all 26 public CTest
+suites passed in 20.05 seconds; the optional private integration suite skipped
+for unconfigured inputs. After adding the save/replay and byte-edge checks,
+the affected generation suite passed again (0.24 seconds). Hygiene, attribution
+and whitespace checks passed. The SDL synthetic creator verifies four draws
+(setup, age, ability, percentile), final state 0xF25CF394, percentile 45 and
+save/load continuation, detecting any extra confirmation-time draw.

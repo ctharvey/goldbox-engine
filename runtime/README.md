@@ -201,10 +201,12 @@ selection/draft; F10 resets the entire launch session. View and Remove character
 operate on the current roster, with confirmation before removal.
 
 When a race configures starting-age dice (including Pool's supported races),
-class selection precedes age and ability rolling. Age uses the shared session
+class and alignment selection precede age and ability rolling. Age uses the shared session
 RNG, remains fixed during score rerolls, appears in the summary, and survives
-save/load. Age-based ability adjustments remain unimplemented; exact original
-creation scores and draw ordering are not yet reproduced.
+save/load. Complete rolls apply configured age modifiers before racial clamps
+and class floors, and draw exceptional strength before later abilities. Numeric
+generation matches the tested isolated original routines; live interaction,
+cancellation and idle-loop draw timing remain unverified.
 
 Pool uses its profile-selected compatibility RNG for creation and ECL RANDOM.
 Each ability keeps the best of six 3d6 trials. The default startup seed is 1;
@@ -216,9 +218,9 @@ can produce legal scores of 19. Racial/gender bounds now clamp scores without
 rerolling; exceptional strength rolls 1..100 and caps the result. Full original
 creation-sequence parity and age
 caps remain unverified; see [creation rules](../docs/character-creation.md).
-Class choices account for optional creation floors. Completing a character raises
-scores to the selected class's configured floors; the final confirmation displays
-the raised scores. Loading an existing party preserves its saved abilities.
+Class choices account for optional creation floors. Complete rolls include those
+floors in the score review; legacy creators apply them at completion. The final
+confirmation preserves prepared percentiles. Loading a party preserves its abilities.
 
 Pool allows up to six members and names up to 15 printable ASCII characters.
 Names must be distinct ignoring case. At least one member is required before

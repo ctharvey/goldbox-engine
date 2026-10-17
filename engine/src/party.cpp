@@ -64,6 +64,11 @@ int die(std::mt19937& random, int sides) {
     }
     throw std::runtime_error("Dice rejection limit exceeded");
 }
+void discard_draw(HighWordLcg32& random, std::uint16_t bound) { (void)random.draw(bound); }
+void discard_draw(std::mt19937& random, std::uint16_t bound) {
+    if (bound) (void)die(random,bound);
+    else (void)random();
+}
 bool race_scores(const CreationRules& rules, const Character& c) {
     const auto& race = find(rules.races,c.race); (void)find(rules.genders,c.gender);
     const auto& maximum = race.maximum.at(c.gender);
@@ -82,10 +87,15 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     const auto parsed = j::read_json(path);
     const auto& root = j::object(parsed,"creation rules");
     j::fields_only(root,{"schemaVersion","id","partyLimit","nameLimit","dice","abilities","genders",
-        "alignments","races","classes","percentile"},"creation rules");
+        "alignments","races","classes","percentile","initialRandomBounds"},"creation rules");
     const auto field = [&](const char* key) -> const bj::value& { return j::field(root,key,"creation rules"); };
     require(number(field("schemaVersion"),1,1) == 1,"Unsupported creation schema");
     CreationRules r; r.id = id(field("id"));
+    if (const auto* value = root.if_contains("initialRandomBounds")) {
+        const auto& bounds = j::array(*value,"initial random bounds");
+        require(bounds.size() <= 16,"Too many initial random draws");
+        for (const auto& bound : bounds) r.initial_random_bounds.push_back(number(bound,0,65535));
+    }
     r.party_limit = number(field("partyLimit"),1,8); r.name_limit = number(field("nameLimit"),1,32);
     const auto& dice = j::object(field("dice"),"creation dice");
     j::fields_only(dice,{"count","sides","dropLowest","bounds"},"creation dice");
@@ -134,7 +144,7 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     for (const auto& v : j::array(field("races"),"races")) {
         const auto& o = j::object(v,"race");
         j::fields_only(o,{"id","label","minimum","maximum","percentileMaximum","classes","adjustments",
-            "startingAge"},"race");
+            "startingAge","ageAdjustments"},"race");
         CreationRace race; race.id = id(j::field(o,"id","race")); race.label = label(j::field(o,"label","race"));
         race.minimum = scores(j::field(o,"minimum","race"),r.abilities.size());
         if (const auto* value = o.if_contains("adjustments")) {
@@ -144,6 +154,29 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
         }
         race.classes = ids(j::field(o,"classes","race"));
         for (const auto& c : race.classes) (void)find(r.classes,c);
+        if (const auto* value = o.if_contains("ageAdjustments")) {
+            const auto& entries = j::array(*value,"age adjustments");
+            require(entries.size() <= 32,"Too many age adjustments");
+            for (const auto& entry : entries) {
+                const auto& age = j::object(entry,"age adjustment");
+                j::fields_only(age,{"minimum","maximum","values","positiveOnly","wrapByte"},"age adjustment");
+                CreationAgeAdjustment modifier;
+                modifier.minimum = number(j::field(age,"minimum","age"),1,65535);
+                modifier.maximum = number(j::field(age,"maximum","age"),modifier.minimum,65535);
+                const auto& values = j::array(j::field(age,"values","age"),"age values");
+                require(values.size() == r.abilities.size(),"Age adjustment count mismatch");
+                for (const auto& n : values) modifier.values.push_back(number(n,-100,100));
+                modifier.positive_only.assign(r.abilities.size(),false);
+                if (const auto* positive = age.if_contains("positiveOnly")) for (const auto& name : ids(*positive)) {
+                    const auto& ability = find(r.abilities,name);
+                    modifier.positive_only[static_cast<std::size_t>(&ability-r.abilities.data())] = true;
+                }
+                if (const auto* wrap = age.if_contains("wrapByte")) {
+                    require(wrap->is_bool(),"Invalid age wrap policy"); modifier.wrap_byte = wrap->as_bool();
+                }
+                race.age_adjustments.push_back(std::move(modifier));
+            }
+        }
         if (const auto* value = o.if_contains("startingAge")) {
             const auto& ages = j::object(*value,"starting age");
             require(ages.size() == race.classes.size(),"Starting age class count mismatch");
@@ -225,13 +258,13 @@ std::vector<std::size_t> creation_classes(const CreationRules& rules, const Char
 }
 template<class Random>
 std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::string_view race,
-    std::string_view gender, Random& random) {
+    std::string_view gender, Random& random, const Character* context = nullptr) {
     require(rules.dice_count >= 1 && rules.dice_count <= 10 && rules.dice_sides >= 2 && rules.dice_sides <= 100 &&
         rules.drop_lowest >= 0 && rules.drop_lowest < rules.dice_count,"Invalid ability dice");
     require(rules.keep_best_of >= 1 && rules.keep_best_of <= 16,"Invalid ability trial count");
     require(rules.bounds == CreationBounds::reject || rules.bounds == CreationBounds::clamp,
         "Unknown ability bounds policy");
-    Character c; c.race = race; c.gender = gender;
+    Character c = context ? *context : Character{}; c.race = race; c.gender = gender;
     const auto& race_rule = find(rules.races,race);
     const auto& adjustments = race_rule.adjustments;
     (void)find(rules.genders,gender);
@@ -251,16 +284,71 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
             }
             // A fixed per-ability modifier commutes with keeping the best trial.
             auto value = best+(adjustments.empty() ? 0 : adjustments[i]);
+            if (context && c.age) for (const auto& modifier : race_rule.age_adjustments) {
+                require(modifier.minimum >= 1 && modifier.maximum >= modifier.minimum && modifier.maximum <= 65535 &&
+                    modifier.values.size() == rules.abilities.size() &&
+                    modifier.positive_only.size() == rules.abilities.size(),"Invalid age adjustment");
+                if (*c.age < modifier.minimum || *c.age > modifier.maximum ||
+                    (modifier.positive_only[i] && value <= 0)) continue;
+                require(modifier.values[i] >= -100 && modifier.values[i] <= 100,"Age adjustment out of range");
+                value += modifier.values[i];
+                if (modifier.wrap_byte) value = static_cast<std::uint8_t>(value);
+            }
             if (rules.bounds == CreationBounds::clamp) {
                 const auto low = race_rule.minimum.at(i), high = race_rule.maximum.at(c.gender).at(i);
                 require(low <= high,"Conflicting ability limits");
                 value = std::clamp(value,low,high);
             }
-            c.abilities.push_back({value,0});
+            AbilityValue ability{value,0};
+            if (context) {
+                const auto& choice = find(rules.classes,c.character_class);
+                if (!choice.creation_minimum.empty()) {
+                    require(choice.creation_minimum.size() == rules.abilities.size(),"Class floor count mismatch");
+                    ability.value = std::max(ability.value,choice.creation_minimum[i]);
+                }
+                if (choice.percentile && rules.percentile_ability == i && ability.value == rules.percentile_at) {
+                    const auto maximum = race_rule.percentile_maximum.at(c.gender);
+                    if (maximum) ability.percentile = std::min(die(random,
+                        rules.percentile_roll_maximum.value_or(maximum)),maximum);
+                }
+            }
+            c.abilities.push_back(ability);
         }
-        if (!creation_classes(rules,c).empty()) return c.abilities;
+        if (context || !creation_classes(rules,c).empty()) return c.abilities;
     }
     throw std::runtime_error("No eligible ability roll within 256 attempts");
+}
+template<class Random>
+Character roll_character_impl(const CreationRules& rules, Character draft, Random& random) {
+    auto candidate = random;
+    const auto& race = find(rules.races,draft.race);
+    const auto& choice = find(rules.classes,draft.character_class);
+    const auto selected = static_cast<std::size_t>(&choice-rules.classes.data());
+    auto preview = draft; preview.abilities.clear();
+    for (const auto n : race.maximum.at(draft.gender)) preview.abilities.push_back({n,0});
+    const auto available = creation_classes(rules,preview);
+    require(std::find(available.begin(),available.end(),selected) != available.end(),"Unavailable creation class");
+    require(!rules.percentile_roll_maximum ||
+        (*rules.percentile_roll_maximum >= 1 && *rules.percentile_roll_maximum <= 100),"Invalid percentile dice");
+    if (!draft.age) {
+        require(rules.initial_random_bounds.size() <= 16,"Too many initial random draws");
+        require(rules.initial_random_bounds.empty() || !race.starting_ages.empty(),
+            "Initial random draws require starting age configuration");
+        for (const auto bound : rules.initial_random_bounds) discard_draw(candidate,bound);
+        draft.age = roll_starting_age_impl(rules,draft.race,draft.character_class,candidate);
+    }
+    require(race.age_adjustments.empty() || draft.age.has_value(),"Age state unavailable");
+    require(!draft.age || *draft.age > 0,"Invalid character age");
+    draft.abilities = roll_abilities_impl(rules,draft.race,draft.gender,candidate,&draft);
+    draft.status = "okay";
+    random = candidate;
+    return draft;
+}
+Character roll_character(const CreationRules& rules, Character draft, std::mt19937& random) {
+    return roll_character_impl(rules,std::move(draft),random);
+}
+Character roll_character(const CreationRules& rules, Character draft, HighWordLcg32& random) {
+    return roll_character_impl(rules,std::move(draft),random);
 }
 void validate_character(const CreationRules& rules, const Character& c) {
     require(!c.age || *c.age > 0,"Invalid character age");
