@@ -7,6 +7,7 @@
   "eventDialect": "unverified",
   "imageDialect": "ssi-images-3-v1",
   "areaDialect": "ssi-area-map3-v1",
+  "picturePeriodMs": 400,
   "colorBackdrop": {"skyColorAddresses": [18941, 18942]},
   "portrait": {"headIdAddress": 28129, "width": 88, "height": 88,
     "headOffset": [0, 0], "bodyOffset": [0, 40]},

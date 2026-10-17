@@ -15,7 +15,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
-        "colorBackdrop", "portrait", "areaDialect"}, "game profile");
+        "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -74,6 +74,11 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         profile.image_dialect = j::string(*images,"imageDialect");
         if (profile.image_dialect != "disabled" && profile.image_dialect != "ssi-images-3-v1")
             throw std::runtime_error("Unsupported image dialect");
+    }
+    if (const auto* value = root.if_contains("picturePeriodMs")) {
+        const auto period = j::integer(*value,"picturePeriodMs");
+        if (period < 0 || period > 60000) throw std::runtime_error("Invalid picture animation period");
+        profile.picture_period_ms = static_cast<std::uint32_t>(period);
     }
     if (const auto* value = root.if_contains("colorBackdrop")) {
         const auto& backdrop = j::object(*value,"colorBackdrop");

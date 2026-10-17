@@ -27,7 +27,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - Profile-selected dungeon map loading through an explicit resource resolver, with map-aware save/restore; original map-18 initialization now completes in a read-only map/wall resource probe. Campaign/program switching and graphical parity remain unfinished.
 - Optional SDL3 exploration window with procedural walls, map overview, event text/menus and save/load; see [renderer controls and limits](runtime/README.md).
 - SSI EGA tile and wall-definition decoding with explicit wall-bank rendering; original archive checks pass for one Pool installation, while automatic visual bindings and scene parity remain unverified.
-- Monochrome tile strips and independent/XOR-first picture/sprite decoding, with explicit palette policies; checked against local Pool picture, sprite and combat-image archives. An opt-in ECL host displays static pictures and non-replacement sprites from explicitly selected archives; original timing and scene parity remain unverified.
+- Monochrome tile strips and independent/XOR-first picture/sprite decoding, with explicit palette policies; checked against local Pool picture, sprite and combat-image archives. An opt-in ECL host displays profile-timed pictures and non-replacement sprites from explicitly selected archives; original timing and scene parity remain unverified.
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run

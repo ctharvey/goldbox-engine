@@ -162,11 +162,18 @@ distance and replacement-picture values; the VM never opens archives or calls
 SDL. Missing hosts stop with diagnostics and do not emit new JSONL event types.
 
 The independent `ImagePresentation` component owns transient decoded frames.
-PICTURE shows the first XOR-decoded frame, 255 clears; SPRITE_START selects an
+PICTURE starts at the first XOR-decoded frame, 255 clears; SPRITE_START selects an
 independent frame at distance 0..2, clamped to blocking GEO edges. ADVANCE steps
 toward zero, OFF clears both picture and sprite. Standard/sprite palettes are
-applied at upload, honoring native offsets. The SDL loop draws after events and
-in menus; it does not invent original inter-instruction timing or animation.
+applied at upload, honoring native offsets. The SDL loop animates pictures while idle and in menus using bounded event waits.
+Optional profile `picturePeriodMs` selects a fixed interval (0 disables, maximum
+60000 ms). Missing fields preserve static behavior. Pool selects a provisional
+400 ms policy based on SSI Engine ClassicMode, not verified original timing.
+The raw frame delay remains uninterpreted. Sprite distance frames and composed
+portraits never animate. Presentation accepts explicit elapsed time, preserves
+fractional intervals, skips missed frames without catch-up loops, and resets
+on successful replacement/clear. Failed resource loads retain the prior timer.
+There are no invented inter-instruction delays.
 Timed replacement-picture requests are explicitly unsupported. Images are not
 part of the prototype save format and are cleared on restore.
 

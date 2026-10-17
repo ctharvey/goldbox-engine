@@ -73,12 +73,16 @@ image behavior, including the existing headless/harness diagnostics.
 
 Supported callbacks are PICTURE (0x0e), three-operand SPRITE_START (0x0c),
 SPRITE_ADVANCE (0x0d) and SPRITE_OFF (0x31). Picture 255 or SPRITE_OFF clears
-both displays. Pictures show frame zero, while sprites use the requested distance
+both displays. Pictures start at frame zero, while sprites use the requested distance
 frame and move one frame nearer on advance. Walls and map bounds clamp distance.
 Missing records, invalid distances and images outside the 88x88 view stop the
 event explicitly, retaining any earlier VM progress. Failed image-resource loads
-preserve the preceding image state. Picture animation, inter-command delays and
-timed sprite-to-picture replacement are not implemented; non-255 replacement
+preserve the preceding image state. Optional profile `picturePeriodMs` animates
+normal pictures while idle and in menus; absent/zero keeps them static. Pool uses
+a provisional 400 ms interval from SSI Engine research. Sprite distance frames
+and portraits remain static, and raw frame delays are not interpreted. Original
+timing parity, inter-command delays and timed sprite-to-picture replacement
+are not implemented; non-255 replacement
 requests are rejected. Four-operand sprite dialects remain unsupported.
 
 Image presentation lives outside ECL memory. Saves preserve existing engine

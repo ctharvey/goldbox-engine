@@ -40,6 +40,7 @@ public:
     std::deque<std::string> lines;
     std::vector<std::string> choices;
     std::size_t selected{};
+    Uint64 image_clock{};
 
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
         const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
@@ -65,6 +66,7 @@ public:
         if (wall_archives && session.wall_banks) install_walls(load_banks(session,*session.wall_banks));
     }
     void update_image() {
+        image_clock = SDL_GetTicks();
         image_texture.reset();
         const auto* frame = images ? images->frame() : nullptr;
         if (frame) {
@@ -78,6 +80,20 @@ public:
             for (const auto pixel : frame->image.pixels) rgba.push_back(palette[pixel]);
             checked(SDL_UpdateTexture(image_texture.get(),nullptr,rgba.data(),frame->image.width*4));
         }
+    }
+    void animate() {
+        const auto now = SDL_GetTicks();
+        const auto elapsed = now - image_clock;
+        image_clock = now;
+        if (images && images->advance_time(elapsed)) update_image();
+    }
+    bool wait(SDL_Event& event) {
+        const auto delay = images ? images->animation_wait_ms() : 0;
+        if (!delay) { checked(SDL_WaitEvent(&event)); return true; }
+        SDL_ClearError();
+        if (SDL_WaitEventTimeout(&event,static_cast<Sint32>(std::min(delay,60000u)))) return true;
+        if (*SDL_GetError()) throw std::runtime_error(SDL_GetError());
+        return false;
     }
     formats::WallGraphics load_banks(const ExplorationSession& context, std::array<std::uint8_t,3> banks) {
         if (!wall_archives) throw std::runtime_error("No wall archives selected");
@@ -250,9 +266,10 @@ public:
         choices.assign(values.begin(),values.end());
         selected = 0;
         while (running) {
+            animate();
             draw();
             SDL_Event event;
-            checked(SDL_WaitEvent(&event));
+            if (!wait(event)) continue;
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) {
                 running = false;
@@ -295,9 +312,10 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
         if (!result.exited) host.text("Event stopped: " + result.diagnostic,false);
     };
     while (host.running) {
+        host.animate();
         host.draw();
         SDL_Event event;
-        checked(SDL_WaitEvent(&event));
+        if (!host.wait(event)) continue;
         if (event.type == SDL_EVENT_QUIT) break;
         if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
         const auto key = event.key.key;

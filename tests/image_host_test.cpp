@@ -162,7 +162,26 @@ int main(int argc, char** argv) {
     assert(display.frame()->image.pixels[1] == 2 && display.palette() == EgaPaletteKind::standard);
     rejects([&] { display.picture(8); });
     assert(display.frame()->image.pixels[1] == 2);
+    assert(!display.advance_time(10000) && display.animation_wait_ms() == 0);
+    assets.picture_period_ms = 400;
+    assert(!display.advance_time(399) && display.animation_wait_ms() == 1);
+    assert(display.advance_time(1) && display.frame()->image.pixels[1] == (2^3));
+    assert(display.advance_time(400) && display.frame()->image.pixels[1] == (2^4));
+    assert(display.advance_time(400) && display.frame()->image.pixels[1] == 2);
+    assert(!display.advance_time(1200));
+    assert(display.advance_time(850) && display.animation_wait_ms() == 350);
+    display.picture(7);
+    (void)display.advance_time(UINT64_MAX);
+    const std::uint8_t huge_expected[]{2,2^3,2^4};
+    assert(display.frame()->image.pixels[1] == huge_expected[(UINT64_MAX/400)%3]);
+    assert(display.animation_wait_ms() == 400-UINT64_MAX%400);
+    display.picture(7); // Replacement restarts timing; failed loads preserve it.
+    assert(display.animation_wait_ms() == 400);
+    assert(!display.advance_time(100));
+    rejects([&] { display.picture(8); });
+    assert(display.animation_wait_ms() == 300);
     display.sprite_start({7,2,255},session);
+    assert(!display.advance_time(UINT64_MAX) && display.animation_wait_ms() == 0);
     assert(display.frame()->image.pixels[1] == 4 && display.palette() == EgaPaletteKind::sprite);
     display.sprite_advance(); assert(display.frame()->image.pixels[1] == 3);
     display.sprite_advance(); display.sprite_advance(); assert(display.frame()->image.pixels[1] == 2);
@@ -193,6 +212,7 @@ int main(int argc, char** argv) {
     assets.portraits = PortraitArchives{archive(7,part(3)),archive(9,part(4))};
     const formats::EgaPortraitLayout layout{88,88,{0,0},{0,40}};
     display.portrait(7,9,layout);
+    assert(!display.advance_time(400) && display.animation_wait_ms() == 0);
     assert(display.frame()->image.pixels[0] == 3 && display.frame()->image.pixels[40*88] == 4);
     assert(display.palette() == EgaPaletteKind::standard);
     rejects([&] { display.portrait(8,9,layout); });

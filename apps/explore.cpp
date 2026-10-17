@@ -324,6 +324,7 @@ int main(int argc, char** argv) {
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
 #ifdef GOLDBOX_RENDERER
+        if (images) images->picture_period_ms = profile.picture_period_ms;
         if (portraits) {
             if (!images || !profile.portrait) throw std::runtime_error("Portraits require --images and a portrait profile");
             images->portraits = std::move(portraits);

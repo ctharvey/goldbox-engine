@@ -2,6 +2,10 @@
 
 ## 2026-10-16
 
+- Animate decoded pictures through an explicit profile interval during idle and
+  menu waits. Preserve static sprites/portraits, bound timer waits, and keep
+  original timing unverified (Pool uses a provisional 400 ms research policy).
+
 - Execute profile-selected three-operand LOAD_AREA_MAP through a reusable,
   read-only map resolver. Validate geometry/positions before switching, preserve
   the current ECL program, bind map-aware saves to the supplied resource identity,

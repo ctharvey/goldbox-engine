@@ -9,8 +9,10 @@ arguments, clearing, distance indexing and timed replacement. These remain
 research-only GPLv3 references; no Java implementation was copied or ported.
 The C++ VM callbacks, `engine/src/image_presentation.cpp` and SDL integration
 are independent project code. Existing attributed decoders supply the images.
-The implementation rejects unimplemented timing/replacement behavior rather
-than claiming parity. Exact upstream paths are retained in the registry.
+ClassicMode fixed 400 ms picture scheduling and RendererState frame wrapping
+also informed an explicit profile presentation policy and independently written
+elapsed-time state. This is provisional original timing; raw frame delays remain
+uninterpreted. Timed sprite replacement remains unsupported. Exact upstream paths are retained in the registry.
 
 ## EGA wall graphics (2026-10-16)
 

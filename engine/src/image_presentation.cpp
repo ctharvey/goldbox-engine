@@ -19,6 +19,7 @@ void ImagePresentation::picture(std::uint8_t id) {
     frames_ = std::move(decoded);
     index_ = 0;
     sprite_ = false;
+    elapsed_ms_ = 0;
 }
 void ImagePresentation::sprite_start(EclSpriteRequest request, const ExplorationSession& session) {
     // Upstream schedules a timed replacement at nearest distance. Until timing
@@ -53,6 +54,7 @@ void ImagePresentation::sprite_start(EclSpriteRequest request, const Exploration
     frames_ = std::move(decoded);
     index_ = distance;
     sprite_ = true;
+    elapsed_ms_ = 0;
 }
 void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const formats::EgaPortraitLayout& layout) {
     if (!archives_.portraits) throw std::runtime_error("No portrait archives selected");
@@ -64,10 +66,26 @@ void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const for
     std::vector<formats::EgaFrame> decoded{std::move(frame)};
     validate(decoded);
     frames_ = std::move(decoded); index_ = 0; sprite_ = false;
+    elapsed_ms_ = 0;
 }
 void ImagePresentation::sprite_advance() {
     if (sprite_ && index_) --index_;
 }
-void ImagePresentation::clear() { frames_.clear(); index_ = 0; sprite_ = false; }
+std::uint32_t ImagePresentation::animation_wait_ms() const {
+    if (sprite_ || frames_.size() < 2 || !archives_.picture_period_ms) return 0;
+    return archives_.picture_period_ms - static_cast<std::uint32_t>(elapsed_ms_);
+}
+bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
+    if (!animation_wait_ms()) return false;
+    const auto period = archives_.picture_period_ms;
+    // Reduce before adding: even an arbitrarily large elapsed interval cannot overflow.
+    const auto cycle = std::uint64_t(period) * frames_.size();
+    const auto total = elapsed_ms_ + elapsed_ms % cycle;
+    const auto previous = index_;
+    index_ = (index_ + total / period) % frames_.size();
+    elapsed_ms_ = total % period;
+    return index_ != previous;
+}
+void ImagePresentation::clear() { frames_.clear(); index_ = 0; sprite_ = false; elapsed_ms_ = 0; }
 const formats::EgaFrame* ImagePresentation::frame() const { return frames_.empty() ? nullptr : &frames_[index_]; }
 } // namespace goldbox

@@ -13,6 +13,7 @@ int main(int argc, char** argv) {
     assert(argc == 3);
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
+    if (pool.picture_period_ms != 400 || curse.picture_period_ms != 0) return 1;
     assert(pool.id != curse.id);
     assert(pool.archive_format == "dax-v1");
     assert(pool.archive_format == curse.archive_format);
@@ -56,6 +57,16 @@ int main(int argc, char** argv) {
         if (!rejected) return 1;
     }
     auto portrait_prefix = prefix;
+    auto timing_prefix = prefix;
+    timing_prefix.replace(timing_prefix.find("colorBackdrop"),13,"picturePeriodMs");
+    for (const std::string value : {"-1","60001","1.5","true","\"400\""}) {
+        { std::ofstream o(path); o << timing_prefix << value << '}'; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        if (!rejected) return 1;
+    }
     portrait_prefix.replace(portrait_prefix.find("colorBackdrop"),13,"portrait");
     for (const std::string field : {
         R"({"headIdAddress":65536,"width":88,"height":88,"headOffset":[0,0],"bodyOffset":[0,40]})",
