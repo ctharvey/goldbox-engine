@@ -52,6 +52,14 @@ std::vector<int> scores(const bj::value& value, std::size_t count) {
     for (const auto& v : a) result.push_back(number(v,1,1000));
     return result;
 }
+void validate_portrait(const CreationRules& rules, const CharacterPortrait& portrait) {
+    require(rules.portrait.has_value(),"Portrait choices unavailable");
+    const auto contains = [](const auto& values, auto value) {
+        return std::find(values.begin(),values.end(),value) != values.end();
+    };
+    require(contains(rules.portrait->heads,portrait.head) && contains(rules.portrait->bodies,portrait.body),
+        "Unknown character portrait");
+}
 void validate_spellbook(const Spellbook& book) {
     require(book.first_level_slots >= 0 && book.first_level_slots <= 64 && book.known.size() <= 64,
         "Invalid character spellbook");
@@ -106,10 +114,25 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     const auto parsed = j::read_json(path);
     const auto& root = j::object(parsed,"creation rules");
     j::fields_only(root,{"schemaVersion","id","partyLimit","nameLimit","dice","abilities","genders",
-        "alignments","races","classes","percentile","initialRandomBounds"},"creation rules");
+        "alignments","races","classes","percentile","initialRandomBounds","portrait"},"creation rules");
     const auto field = [&](const char* key) -> const bj::value& { return j::field(root,key,"creation rules"); };
     require(number(field("schemaVersion"),1,1) == 1,"Unsupported creation schema");
     CreationRules r; r.id = id(field("id"));
+    if (const auto* value = root.if_contains("portrait")) {
+        const auto& portrait = j::object(*value,"creation portrait");
+        j::fields_only(portrait,{"heads","bodies"},"creation portrait");
+        const auto parts = [&](const char* key) {
+            const auto& values = j::array(j::field(portrait,key,"creation portrait"),"portrait parts");
+            require(!values.empty() && values.size() <= 256,"Invalid portrait part count");
+            std::vector<std::uint8_t> result; std::set<std::uint8_t> seen;
+            for (const auto& item : values) {
+                const auto part = static_cast<std::uint8_t>(number(item,0,255));
+                require(seen.insert(part).second,"Duplicate portrait part"); result.push_back(part);
+            }
+            return result;
+        };
+        r.portrait = CreationPortrait{parts("heads"),parts("bodies")};
+    }
     if (const auto* value = root.if_contains("initialRandomBounds")) {
         const auto& bounds = j::array(*value,"initial random bounds");
         require(bounds.size() <= 16,"Too many initial random draws");
@@ -413,6 +436,11 @@ Character roll_character_impl(const CreationRules& rules, Character draft, Rando
     auto candidate = random;
     const auto& race = find(rules.races,draft.race);
     const auto& choice = find(rules.classes,draft.character_class);
+    if (rules.portrait && !draft.portrait) {
+        require(!rules.portrait->heads.empty() && !rules.portrait->bodies.empty(),"Missing portrait choices");
+        draft.portrait = CharacterPortrait{rules.portrait->heads.front(),rules.portrait->bodies.front()};
+    }
+    if (draft.portrait) validate_portrait(rules,*draft.portrait);
     const auto selected = static_cast<std::size_t>(&choice-rules.classes.data());
     auto preview = draft; preview.abilities.clear();
     for (const auto n : race.maximum.at(draft.gender)) preview.abilities.push_back({n,0});
@@ -519,6 +547,7 @@ Character roll_character(const CreationRules& rules, Character draft, HighWordLc
 }
 void validate_character(const CreationRules& rules, const Character& c) {
     require(!c.age || *c.age > 0,"Invalid character age");
+    if (c.portrait) validate_portrait(rules,*c.portrait);
     if (c.hit_points) {
         const auto& hp = *c.hit_points;
         require(hp.base >= 1 && hp.base <= 65535 && hp.maximum >= 1 && hp.maximum <= 65535 &&
@@ -596,6 +625,7 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
             {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}};
         if (c.status) member["status"] = *c.status;
         if (c.age) member["age"] = *c.age;
+        if (c.portrait) member["portrait"] = bj::object{{"head",c.portrait->head},{"body",c.portrait->body}};
         if (c.hit_points) member["hitPoints"] = bj::object{{"base",c.hit_points->base},
             {"current",c.hit_points->current},{"maximum",c.hit_points->maximum}};
         if (!c.money.empty()) {
@@ -624,11 +654,17 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
         j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age",
-            "hitPoints","money","spellbook","spellbooks"},"character");
+            "hitPoints","money","spellbook","spellbooks","portrait"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
         if (const auto* value = o.if_contains("status")) c.status = id(*value);
         if (const auto* value = o.if_contains("age")) c.age = static_cast<std::uint16_t>(number(*value,1,65535));
+        if (const auto* value = o.if_contains("portrait")) {
+            const auto& portrait = j::object(*value,"saved portrait");
+            j::fields_only(portrait,{"head","body"},"saved portrait");
+            c.portrait = CharacterPortrait{static_cast<std::uint8_t>(number(j::field(portrait,"head","portrait"),0,255)),
+                static_cast<std::uint8_t>(number(j::field(portrait,"body","portrait"),0,255))};
+        }
         if (const auto* value = o.if_contains("hitPoints")) {
             const auto& hp = j::object(*value,"saved hit points");
             j::fields_only(hp,{"base","current","maximum"},"saved hit points");

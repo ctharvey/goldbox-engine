@@ -101,7 +101,7 @@ verify legal scores of 19 and their party save roundtrip. Modifiers consume no
 additional random draws. The original also draws before the raw
 ability loop, applies age processing before the racial clamps and class floors
 afterward; complete
-live interactive creation parity remains unverified. AC, portraits, equipment,
+live interactive creation parity remains unverified. AC, combat icons, equipment,
 spell casting/memorization, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
 
@@ -182,6 +182,30 @@ keeps those IDs, known spells and individual first-level capacities; the older
 single `spellbook` remains supported, with conflicting definitions rejected.
 The renderer lists each book's counts separately. This represents distinct
 divine and arcane capacities without title-specific engine branches.
+
+### Portrait selection
+
+Optional `portrait` declares ordered `heads` and `bodies` record IDs (0..255,
+unique, nonempty). The first pair supplies the creation default without any
+random draws. IDs refer to the portrait archives supplied to the rendering
+adapter. They are normalized resource choices, not native character selector
+bytes. Pool's fourteen heads and twelve bodies use the noncontiguous mappings
+verified in the original drawing routine. Its native default selector 1/1 maps
+to head record 0 and body record 1 in `HEAD3.DAX` / `BODY3.DAX`.
+
+After naming, H cycles head, B cycles body and K keeps the portrait. Up/Down and
+Enter also operate the choices. Escape cancels the draft; F10 restarts the
+session. The picker validates every offered resource first, previews imported
+artwork through the existing composer, and restores event image/animation
+state when it closes. No fallback artwork or missing choice is substituted.
+The final confirmation and roster View show the selected portrait. Saves store
+the selected head/body record IDs and reject unavailable or malformed choices;
+legacy missing portraits remain unknown. Choosing artwork consumes no RNG.
+
+Native cycle/keep controls match 26 isolated original cases. All 336 combinations
+in the authorized `HEAD3.DAX` and `BODY3.DAX` archives decode and compose with the
+existing adapter; the creator offers its verified subset of 168 combinations.
+This does not claim original-screen pixel parity or combat-icon customization.
 
 ## Saves and lifecycle
 

@@ -303,6 +303,26 @@ public:
         }
         choices.clear(); return std::nullopt;
     }
+    // Preview artwork without replacing the event image or its animation state.
+    struct PortraitPreview {
+        WindowHost& host;
+        ImagePresentation saved;
+        decltype(image_texture) texture;
+        explicit PortraitPreview(WindowHost& value) : host(value),saved(std::move(*value.images)),
+            texture(std::move(value.image_texture)) {}
+        ~PortraitPreview() {
+            host.images.reset(); host.images.emplace(std::move(saved));
+            host.image_texture = std::move(texture); host.image_clock = SDL_GetTicks();
+        }
+    };
+    void show_character(const Character& c) {
+        std::optional<PortraitPreview> preview;
+        if (c.portrait && images && portrait_config) {
+            preview.emplace(*this);
+            images->portrait(c.portrait->head,c.portrait->body,portrait_config->layout); update_image();
+        }
+        (void)pick({"BACK"},character_summary(c));
+    }
     void create_character() {
         const auto& rules = *session.character_rules;
         if (session.party.size() >= rules.party_limit) throw std::runtime_error("Party is full");
@@ -364,6 +384,41 @@ public:
         if (c.age) validate_character(rules,c); // Prepared rolls already include the percentile at its native point.
         else c = session.state.random ? finish_character(rules,std::move(c),*session.state.random) :
             finish_character(rules,std::move(c),creation_random);
+        std::optional<PortraitPreview> preview;
+        if (rules.portrait) {
+            if (!images || !portrait_config) throw std::runtime_error("Character portrait artwork is not loaded");
+            preview.emplace(*this);
+            const auto& parts = *rules.portrait;
+            // Validate every offered resource before presenting a partially usable picker.
+            for (const auto head_id : parts.heads) images->portrait(head_id,parts.bodies.front(),portrait_config->layout);
+            for (const auto body_id : parts.bodies) images->portrait(parts.heads.front(),body_id,portrait_config->layout);
+            auto head = std::find(parts.heads.begin(),parts.heads.end(),c.portrait ? c.portrait->head : parts.heads.front());
+            auto body = std::find(parts.bodies.begin(),parts.bodies.end(),c.portrait ? c.portrait->body : parts.bodies.front());
+            if (head == parts.heads.end() || body == parts.bodies.end()) throw std::runtime_error("Unknown character portrait");
+            std::size_t h = head-parts.heads.begin(), b = body-parts.bodies.begin();
+            choices = {"H: NEXT HEAD","B: NEXT BODY","K: KEEP PORTRAIT"}; selected = 2;
+            bool keep = false;
+            while (running && !keep) {
+                images->portrait(parts.heads[h],parts.bodies[b],portrait_config->layout); update_image();
+                text("CHOOSE PORTRAIT\nHEAD " + std::to_string(h+1) + " / BODY " + std::to_string(b+1),true);
+                draw(); SDL_Event event{};
+                if (!wait(event)) continue;
+                if (event.type == SDL_EVENT_QUIT) { running = false; break; }
+                if (event.type != SDL_EVENT_KEY_DOWN) continue;
+                const auto key = event.key.key;
+                if (key == SDLK_F10) {
+                    restart_requested = true; throw std::runtime_error("Restart requested during portrait selection");
+                }
+                if (key == SDLK_ESCAPE) { choices.clear(); return; }
+                if (key == SDLK_UP) selected = (selected+choices.size()-1)%choices.size();
+                if (key == SDLK_DOWN) selected = (selected+1)%choices.size();
+                if (key == SDLK_H || (key == SDLK_RETURN && selected == 0)) h = (h+1)%parts.heads.size();
+                if (key == SDLK_B || (key == SDLK_RETURN && selected == 1)) b = (b+1)%parts.bodies.size();
+                keep = key == SDLK_K || (key == SDLK_RETURN && selected == 2);
+            }
+            choices.clear(); if (!running) return;
+            c.portrait = CharacterPortrait{parts.heads[h],parts.bodies[b]};
+        }
         const auto confirm = pick({"ADD TO PARTY","CANCEL"},character_summary(c));
         if (confirm && *confirm == 0) add_character(session.party,rules,std::move(c));
     }
@@ -382,7 +437,7 @@ public:
                 for (const auto& c : session.party) names.push_back(c.name + " / " + c.character_class);
                 const auto member = pick(names,"SELECT CHARACTER"); if (!member) continue;
                 const auto summary = character_summary(session.party[*member]);
-                if (*action == 1) (void)pick({"BACK"},summary);
+                if (*action == 1) show_character(session.party[*member]);
                 else {
                     const auto remove = pick({"REMOVE FROM PARTY","CANCEL"},summary);
                     if (remove && *remove == 0) {

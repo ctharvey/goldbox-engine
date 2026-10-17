@@ -3,6 +3,10 @@
   "id": "adnd-first-edition-creation-v1",
   "partyLimit": 6,
   "nameLimit": 15,
+  "portrait": {
+    "heads": [0, 8, 9, 13, 16, 18, 22, 34, 45, 51, 53, 57, 67, 68],
+    "bodies": [1, 2, 3, 4, 7, 8, 18, 24, 26, 33, 35, 37]
+  },
   "initialRandomBounds": [256],
   "dice": {
     "count": 4,

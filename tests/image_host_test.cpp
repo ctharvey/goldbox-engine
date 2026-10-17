@@ -19,7 +19,7 @@
 using namespace goldbox;
 using namespace goldbox::formats;
 namespace {
-DaxArchive archive(std::uint8_t id, const std::vector<std::uint8_t>& raw) {
+DaxArchive archive(std::uint8_t id, const std::vector<std::uint8_t>& raw, std::optional<std::uint8_t> second = {}) {
     std::vector<std::uint8_t> packed;
     for (std::size_t i = 0; i < raw.size(); i += 128) {
         const auto n = std::min<std::size_t>(128,raw.size()-i);
@@ -29,6 +29,13 @@ DaxArchive archive(std::uint8_t id, const std::vector<std::uint8_t>& raw) {
     std::vector<std::uint8_t> result{9,0,id,0,0,0,0,std::uint8_t(raw.size()),std::uint8_t(raw.size()>>8),
         std::uint8_t(packed.size()),std::uint8_t(packed.size()>>8)};
     result.insert(result.end(),packed.begin(),packed.end());
+    if (second) {
+        result[0] = 18;
+        const std::vector<std::uint8_t> entry{*second,std::uint8_t(packed.size()),std::uint8_t(packed.size()>>8),0,0,
+            std::uint8_t(raw.size()),std::uint8_t(raw.size()>>8),std::uint8_t(packed.size()),std::uint8_t(packed.size()>>8)};
+        result.insert(result.begin()+11,entry.begin(),entry.end());
+        result.insert(result.end(),packed.begin(),packed.end());
+    }
     return DaxArchive::parse(result);
 }
 std::vector<std::uint8_t> sequence() {
@@ -78,6 +85,23 @@ int main(int argc, char** argv) {
         return 0;
     }
 #endif
+    if (argc == 5 && std::string_view(argv[1]) == "portraits") {
+        // Read-only local-resource validation; report counts, never original pixels or text.
+        const auto profile = read_game_profile(argv[2]);
+        assert(profile.portrait);
+        ImageArchives portrait_assets{DaxArchive::from_file(argv[3]),DaxArchive::from_file(argv[4])};
+        portrait_assets.portraits = PortraitArchives{portrait_assets.pictures,portrait_assets.sprites};
+        assert(portrait_assets.pictures.records().size() <= 32 && portrait_assets.sprites.records().size() <= 32);
+        ImagePresentation portrait_display(portrait_assets);
+        unsigned combinations = 0;
+        for (const auto& head : portrait_assets.pictures.records()) for (const auto& body : portrait_assets.sprites.records()) {
+            portrait_display.portrait(head.id,body.id,profile.portrait->layout);
+            assert(portrait_display.frame()); ++combinations;
+        }
+        std::cout << "portrait heads=" << portrait_assets.pictures.records().size()
+            << " bodies=" << portrait_assets.sprites.records().size() << " combinations=" << combinations << " validated\n";
+        return 0;
+    }
     if (argc == 10 && std::string_view(argv[1]) == "initialize") {
         // Read-only original-resource probe. Never print original text/pixels.
         const auto profile = read_game_profile(argv[2]);
@@ -252,7 +276,8 @@ int main(int argc, char** argv) {
     assert(!std::filesystem::exists(startup_save));
     session = {}; session.dialect = dialect; session.opcodes = ops;
     session.ecl_record = program({9,0,42,1,0,0x4a,0});
-    const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true) {
+    const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true,
+        const ImageArchives* portrait_images = nullptr, const GameProfile::Portrait* portrait_config = nullptr) {
         SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
         for (const auto code : keys) {
             SDL_Event event{};
@@ -261,8 +286,8 @@ int main(int argc, char** argv) {
             } else { event.type = SDL_EVENT_KEY_DOWN; event.key.key = code; }
             assert(SDL_PushEvent(&event));
         }
-        assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,nullptr,nullptr,{},
-            nullptr,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{}) == 0);
+        assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,portrait_images,nullptr,{},
+            portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{}) == 0);
         SDL_Quit();
     };
     const auto initial_startup = serialize_exploration(session,"startup-synthetic");
@@ -376,6 +401,39 @@ int main(int argc, char** argv) {
     auto compound_rng = *session.initial_random;
     for (int draw = 0; draw < 7; ++draw) (void)compound_rng.draw(1);
     assert(session.state.random->state() == compound_rng.state()); // No age draw or confirmation-time rerolls.
+    session = std::move(single_session);
+    single_session = session;
+    auto portrait_creation = creation; portrait_creation.portrait = CreationPortrait{{7,8},{9,10}};
+    ImageArchives creation_assets{assets.pictures,assets.sprites};
+    creation_assets.portraits = PortraitArchives{archive(7,part(3),8),archive(9,part(4),10)};
+    const GameProfile::Portrait creation_layout{0,layout};
+    session.party.clear(); session.state.random = session.initial_random; session.character_rules = portrait_creation;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_UNKNOWN,SDLK_RETURN,SDLK_H,SDLK_H,SDLK_B,SDLK_B,SDLK_H,SDLK_B,SDLK_K,SDLK_RETURN,
+        SDLK_DOWN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE},
+        true,&creation_assets,&creation_layout);
+    assert(session.party.size() == 1 && session.party[0].portrait->head == 8 && session.party[0].portrait->body == 10);
+    assert(session.state.random->state() == 0xe28f6d7a); // Choosing/cycling artwork consumes no RNG.
+    const auto painted_save = serialize_exploration(session,"startup-synthetic"); session.party.clear();
+    restore_exploration(session,painted_save,"startup-synthetic");
+    assert(session.party[0].portrait->head == 8 && session.party[0].portrait->body == 10);
+    session.party.clear(); session.state.random = session.initial_random;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_UNKNOWN,SDLK_RETURN,SDLK_H,SDLK_ESCAPE,SDLK_ESCAPE,SDLK_ESCAPE},true,&creation_assets,&creation_layout);
+    assert(session.party.empty() && session.state.random->state() == 0xe28f6d7a);
+    session.state.random = session.initial_random;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_UNKNOWN,SDLK_RETURN,SDLK_H,SDLK_F10,SDLK_ESCAPE},true,&creation_assets,&creation_layout);
+    assert(session.party.empty() && session.state.random->state() == session.initial_random->state());
+    // Missing artwork fails before publishing a character, with input-driven cancellation still usable.
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_UNKNOWN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
+    assert(session.party.empty());
+    auto incomplete_assets = creation_assets; incomplete_assets.portraits->heads = archive(7,part(3));
+    session.state.random = session.initial_random;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_UNKNOWN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE},true,&incomplete_assets,&creation_layout);
+    assert(session.party.empty() && session.state.random->state() == 0xe28f6d7a); // Missing offered head fails preflight.
     session = std::move(single_session);
     auto second_member = session.party.front(); second_member.name = "BOB";
     session.party.push_back(second_member); session.loaded_character = 1;

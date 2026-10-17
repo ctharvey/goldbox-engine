@@ -995,3 +995,45 @@ class selection passes. A synthetic save left by that abort was preserved in
 the private validation cache before the next run. Hygiene, attribution and
 whitespace checks pass. Live original UI parity and remaining creation fields
 remain unverified.
+
+### Player portrait choices — 2026-10-17
+
+The known creation call target 78:33E7 (file offset 1CD66) is the portrait
+chooser, followed by a separate combat-icon chooser. Disassemble from the known
+call target: the older linear overlay dump crosses embedded text and does not
+preserve every subsequent instruction boundary. Creation sets native head/body
+selectors to 1/1. H cycles heads 1..14, B cycles bodies 1..12 and K keeps them.
+Private `emulate_original_portrait_controls.py` verifies all 26 cycle/keep cases
+with bounded native blocks and no RNG calls.
+
+The original drawing call 3D0:0034 maps selectors through DS:286F and DS:287D;
+creation selects resource bank 3 at file offset 19AE7. The normalized head IDs
+are 0,8,9,13,16,18,22,34,45,51,53,57,67,68 and body IDs are
+1,2,3,4,7,8,18,24,26,33,35,37. This is explicit rules data. It must not be
+replaced with contiguous DAX IDs or the CHEAD/CBODY combat-icon families.
+
+Authorized resource fingerprints:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| HEAD3.DAX | 12403 | `1413773d5c2841bf62902a0d5bef7fc7439e9644fc518e03ae1b268d34ea1ed4` |
+| BODY3.DAX | 21505 | `7ea261c09a93293157e6865e1ac0ba82a8cbf149882dfd95e35704efd5a8b804` |
+
+The read-only `goldbox_image_host_tests portraits` probe composes all 21 heads
+and 16 bodies in these archives: 336 combinations pass using the existing
+profile layout and EGA composer. The creator offers the verified 14 by 12
+subset. Only counts, IDs and fingerprints enter public reports; original art,
+probe disassembly and extracted native bytes stay in the private cache.
+
+The independent creator uses configured part lists, preserves normalized
+selection IDs in saves, previews original artwork, and restores prior event
+image/animation state after creation or viewing. Synthetic SDL checks cover
+noncontiguous IDs, cycling/wrapping, confirmation, roster viewing, save/load,
+cancel, F10 and missing artwork. Choosing a portrait consumes no RNG. Combat
+icons, live original input/idle behavior and original-screen pixel parity remain
+unfinished.
+
+Verification: the serialized two-job build and all 26 public CTest suites pass
+(21.81 seconds); optional private integration skips without configured inputs.
+The final incomplete-resource preflight regression also passes in the affected
+SDL suite (0.67 seconds). Hygiene, attribution and whitespace checks pass.

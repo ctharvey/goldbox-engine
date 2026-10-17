@@ -56,6 +56,7 @@ struct CreationClass {
     std::map<std::string,CreationSpells> starting_spellbooks{};
 };
 enum class CreationBounds { reject, clamp };
+struct CreationPortrait { std::vector<std::uint8_t> heads, bodies; };
 struct CreationRules {
     std::string id;
     std::size_t party_limit{}, name_limit{};
@@ -69,10 +70,12 @@ struct CreationRules {
     CreationBounds bounds{CreationBounds::reject};
     std::optional<int> percentile_roll_maximum;
     std::vector<std::uint16_t> initial_random_bounds{};
+    std::optional<CreationPortrait> portrait{};
 };
 struct AbilityValue { int value{}, percentile{}; };
 struct HitPoints { int base{}, current{}, maximum{}; };
 struct Spellbook { std::vector<std::string> known; int first_level_slots{}; };
+struct CharacterPortrait { std::uint8_t head{}, body{}; };
 struct Character {
     std::string name, race, gender, character_class, alignment;
     std::vector<AbilityValue> abilities;
@@ -83,6 +86,7 @@ struct Character {
     std::map<std::string,std::uint16_t> money{}; // Missing currency means unknown, rather than an inferred balance.
     std::optional<Spellbook> spellbook{};
     std::map<std::string,Spellbook> spellbooks{};
+    std::optional<CharacterPortrait> portrait{};
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);

@@ -195,8 +195,8 @@ a standalone map initialization reproduces the original New Game sequence.
 Profiles can opt into `characterCreationRules` with an explicit relative JSON
 path. Pool selects the separate `rules/adnd-first-edition-creation.json` profile.
 With startup enabled, choose Create / manage party, then Create character.
-Choose race and gender, keep or reroll scores, select a qualifying single class
-and alignment, enter a name, and confirm Add to party. Escape cancels the current
+Choose race and gender, a supported class or combination and alignment, review
+or reroll scores, enter a name, choose a configured portrait, and confirm Add to party. Escape cancels the current
 selection/draft; F10 resets the entire launch session. View and Remove character
 operate on the current roster, with confirmation before removal.
 
@@ -221,6 +221,16 @@ caps remain unverified; see [creation rules](../docs/character-creation.md).
 Class choices account for optional creation floors. Complete rolls include those
 floors in the score review; legacy creators apply them at completion. The final
 confirmation preserves prepared percentiles. Loading a party preserves its abilities.
+
+Starting gold, HP and spellbook capacities are rules-defined and preserved in
+saves. Multi-class choices use their verified fixed ages and component rolls;
+divine and arcane spell capacities remain separate. Portrait selection uses H
+(next head), B (next body), K (keep), or Up/Down and Enter. It consumes no random
+numbers. For Pool's complete player choices, supply the original `HEAD3.DAX` and
+`BODY3.DAX` using the existing `--portraits` option together with `--images`.
+Other HEAD/BODY banks may omit offered parts and fail explicitly. Character
+View displays saved portraits when their resources are loaded. No original art
+is stored inside the engine save or repository. Combat-icon selection is unfinished.
 
 Pool allows up to six members and names up to 15 printable ASCII characters.
 Names must be distinct ignoring case. At least one member is required before

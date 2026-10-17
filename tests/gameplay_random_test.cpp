@@ -649,6 +649,7 @@ int main(int argc, char** argv) {
         HighWordLcg32 rng(source.seed,profile.random->multiplier(),1);
         const auto rolled = roll_character(complete_rules,draft,rng);
         assert(rolled.age == source.age && rolled.hit_points);
+        assert(rolled.portrait && rolled.portrait->head == 0 && rolled.portrait->body == 1);
         for (std::size_t i = 0; i < 6; ++i) assert(rolled.abilities[i].value == source.scores[i]);
         assert(rolled.abilities[0].percentile == source.percentile);
         assert(rolled.money.at("gold") == expected.gold && rolled.hit_points->base == expected.base);
@@ -1004,6 +1005,13 @@ int main(int argc, char** argv) {
     rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
     assert(vitals_rng.state() == 123);
     invalid_vitals.classes[1].starting_spells->first_level_slots = 2147483647;
+    rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
+    assert(vitals_rng.state() == 123);
+    invalid_vitals = complete_rules; invalid_vitals.portrait->heads.clear();
+    original_roll.portrait.reset();
+    rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
+    assert(vitals_rng.state() == 123);
+    invalid_vitals = complete_rules; original_roll.portrait = CharacterPortrait{255,255};
     rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
     assert(vitals_rng.state() == 123);
     struct AgeObservation { const char* race; const char* character_class; int age; std::uint32_t after; };

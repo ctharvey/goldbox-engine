@@ -64,6 +64,15 @@ int main(int argc, char** argv) {
     for (int i = 1; i < 6; ++i) { auto c = hero; c.name = "Hero"+std::to_string(i); add_character(party,rules,c); }
     const auto json = serialize_party(party,rules);
     assert(!read_party(json,rules)[0].age); // Legacy ages remain unknown.
+    assert(!read_party(json,rules)[0].portrait);
+    auto painted = hero; painted.portrait = CharacterPortrait{0,1};
+    const auto portrait_json = serialize_party({painted},rules);
+    assert(read_party(portrait_json,rules)[0].portrait->head == 0 && read_party(portrait_json,rules)[0].portrait->body == 1);
+    for (const auto& value : {"-1","256","true","2"})
+        rejects([&] { (void)read_party(changed(portrait_json,"\"head\":0",std::string("\"head\":")+value),rules); });
+    rejects([&] { (void)read_party(changed(portrait_json,"\"body\":1","\"body\":0"),rules); });
+    auto no_portrait_rules = rules; no_portrait_rules.portrait.reset();
+    rejects([&] { (void)read_party(portrait_json,no_portrait_rules); });
     assert(!read_party(json,rules)[0].hit_points && read_party(json,rules)[0].money.empty());
     assert(!read_party(json,rules)[0].spellbook);
     auto caster = hero; caster.spellbook = Spellbook{{"mod.custom-spell","divine.bless"},3};
@@ -200,7 +209,11 @@ int main(int argc, char** argv) {
         changed(original,"\"components\": [\n        \"cleric\",\n        \"fighter\"",
             "\"components\": [\n        \"fighter\",\n        \"fighter\""),
         changed(original,"\"startingSpellbooks\": {",
-            "\"startingSpells\": {\"known\": [], \"firstLevelSlots\": 0}, \"startingSpellbooks\": {")}) {
+            "\"startingSpells\": {\"known\": [], \"firstLevelSlots\": 0}, \"startingSpellbooks\": {"),
+        changed(original,"\"heads\": [0, 8","\"heads\": [0, 0"),
+        changed(original,"\"heads\": [0, 8","\"heads\": [0, 256"),
+        changed(original,"\"heads\": [","\"heads\": [false,"),
+        changed(original,"\"bodies\": [1, 2","\"bodies\": [1, 1")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }

@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Add rules-configured character portraits with H/B cycling and K to keep,
+  imported artwork preview, saved selections and roster viewing. Verify native
+  selector behavior and original HEAD3/BODY3 compositions; regress cancellation,
+  restart, persistence, invalid choices and unchanged RNG.
+
 - Add configurable multi-class creation: component dice, averaged starting gold
   and HP, fixed starting ages and separate spellbooks. Match the original race
   availability table and regress complete original multi-class numeric results.
