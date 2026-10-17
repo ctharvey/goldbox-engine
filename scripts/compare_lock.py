@@ -31,10 +31,19 @@ class SessionLock:
                 raise ControlledError(
                     f"session lock {self.path} is not a regular file; refusing to open")
         try:
-            self.fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
+            self.fd = os.open(self.path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
+                              0o600)
         except OSError as error:
             self.fd = None
             raise ControlledError(f"cannot open the session lock {self.path}: {error}") from error
+        try:
+            if not stat.S_ISREG(os.fstat(self.fd).st_mode):
+                raise ControlledError(f"session lock {self.path} is not a regular file")
+            self._lock()
+        except (OSError, ControlledError):
+            os.close(self.fd)
+            self.fd = None
+            raise
         try:
             size = os.fstat(self.fd).st_size
             if size == 0:
@@ -49,21 +58,23 @@ class SessionLock:
                     f"session lock {self.path} holds unexpected content; refusing")
             os.lseek(self.fd, 0, os.SEEK_SET)
         except (OSError, ControlledError) as error:
-            os.close(self.fd)
-            self.fd = None
+            self.release()
             raise ControlledError(f"cannot prepare the session lock {self.path}: {error}") from error
+        return self
+
+    def _lock(self):
+        # Locked before the marker is read or written: on Windows the byte-range
+        # lock is mandatory, so a contender must fail here, with the right message.
         try:
+            os.lseek(self.fd, 0, os.SEEK_SET)
             if os.name == "nt":
                 msvcrt.locking(self.fd, msvcrt.LK_NBLCK, 1)
             else:
                 fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as error:
-            os.close(self.fd)
-            self.fd = None
             raise ControlledError(
                 f"another comparison already holds the session lock {self.path}: {error}"
             ) from error
-        return self
 
     def release(self):
         if self.fd is None:

@@ -767,6 +767,81 @@ def test_reader_errors_are_failures(fixture):
           f"reader swallowed the read error: {events.failure!r}")
 
 
+def test_lock_and_launch_edges(fixture):
+    # F12: contention reports contention. F8: an interrupt after spawn kills the
+    # child. F25: job counts come from accounting, not a 256-entry list.
+    # F19/F20: WSL proxy failure paths close the real pipe, writer joined first.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    holder = compare_game.SessionLock(fixture.private).acquire()
+    try:
+        try:
+            compare_game.SessionLock(fixture.private).acquire()
+            check(False, "second lock acquired")
+        except compare_game.ControlledError as error:
+            check("already holds" in str(error), f"wrong contention message: {error}")
+    finally:
+        holder.release()
+    compare_game.SessionLock(fixture.private).acquire().release()
+
+    owned = compare_game.OwnedProcess.launch(
+        [sys.executable, "-c", "import time; time.sleep(60)"], fixture.private)
+    try:
+        if os.name == "nt":
+            check(compare_game._job_process_count(owned.job) == 1, "job count != 1")
+    finally:
+        owned.kill_tree()
+    if os.name == "nt":
+        created = []
+        real_popen = subprocess.Popen
+
+        class Recording(real_popen):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                created.append(self)
+
+        import compare_process
+        original = compare_process._thread_ids_of
+
+        def interrupted(pid):
+            raise KeyboardInterrupt
+
+        subprocess.Popen = Recording
+        compare_process._thread_ids_of = interrupted
+        try:
+            try:
+                compare_game.OwnedProcess.launch(
+                    [sys.executable, "-c", "import time; time.sleep(60)"], fixture.private)
+                check(False, "interrupted launch returned")
+            except KeyboardInterrupt:
+                pass
+        finally:
+            subprocess.Popen = real_popen
+            compare_process._thread_ids_of = original
+        check(len(created) == 1 and created[0].wait(timeout=10) is not None,
+              "interrupted launch left the suspended child alive")
+
+    native = compare_game.OwnedProcess.launch(
+        [sys.executable, "-c", "import sys; sys.stdin.buffer.readline()"], fixture.private)
+    try:
+        compare_game.WslEngine(native, {"argv": ["x" * 200000], "cwd": "/"}, 5)
+        check(False, "oversized start frame accepted")
+    except compare_game.ControlledError:
+        pass
+    native.kill_tree()
+    check(native.process.stdin.closed, "real stdin pipe leaked after __init__ failure")
+
+    native = compare_game.OwnedProcess.launch(
+        [sys.executable, "-c", "import sys; sys.stdin.buffer.readline()"], fixture.private)
+    engine = compare_game.WslEngine(native, {"argv": ["x"], "cwd": "/"}, 5)
+    try:
+        engine.kill_tree()
+    except compare_game.ControlledError:
+        pass  # No Linux acknowledgment exists for this synthetic child.
+    check(not engine.writer.is_alive() and engine.pipe.closed,
+          "writer still alive or pipe open after kill_tree")
+
+
 def test_termination_signals(fixture):
     # F5: a termination signal must run the cleanup path, not skip it. Windows
     # delivers CTRL_BREAK_EVENT; POSIX delivers SIGTERM and SIGHUP.
@@ -892,6 +967,7 @@ def main():
         test_launcher_and_containment_bypasses(fixture)
         test_cleanup_failure_handling(fixture)
         test_input_hardening(fixture)
+        test_lock_and_launch_edges(fixture)
         test_reader_errors_are_failures(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)

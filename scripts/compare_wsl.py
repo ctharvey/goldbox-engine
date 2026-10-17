@@ -21,7 +21,6 @@ class WslEngine:
         self.native = native
         self.process = native.process
         self.pipe = self.process.stdin
-        self.process.stdin = self
         self.nonce = uuid.uuid4().hex
         self.frames = queue.Queue(maxsize=64)
         self.failure = None
@@ -35,6 +34,9 @@ class WslEngine:
         self._enqueue({"op": "start", "nonce": self.nonce, "command": config["argv"],
                        "cwd": config["cwd"], "timeout": duration})
         self.writer.start()
+        # Swap last: if anything above raised, native.kill_tree() still closes the
+        # real stdin pipe instead of this proxy's no-op close().
+        self.process.stdin = self
 
     @classmethod
     def launch(cls, config, duration):
@@ -140,11 +142,14 @@ class WslEngine:
             try:
                 self.native.kill_tree()
             finally:
-                self.pipe.close()
+                # The writer owns the fd: stop and join it before closing, so it
+                # can never write to a reused descriptor number.
                 try:
                     self.frames.put_nowait(None)
                 except queue.Full:
                     pass
                 self.writer.join(timeout=1)
+                if not self.writer.is_alive():
+                    self.pipe.close()
         if errors:
             raise ControlledError("; ".join(errors))
