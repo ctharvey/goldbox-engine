@@ -681,6 +681,73 @@ def test_launcher_and_containment_bypasses(fixture):
     check(marker.read_bytes() == b"synthetic fixture only\n", "fixture modified")
 
 
+def test_input_hardening(fixture):
+    # F9: NUL, duplicate keys, non-regular/oversized config, facing range.
+    # F15: engine text cannot inject terminal escapes. F16: a rejected event
+    # prints nothing first.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    from compare_config import CONFIG_BYTE_LIMIT
+    import contextlib
+    import io
+    base = json.loads(fixture.config("hang", name="base.json").read_text(encoding="utf-8"))
+    cases = {
+        "nul-engine-argv": lambda c: c["engine"].update(command=["a\0b"]),
+        "nul-reference-argv": lambda c: c["reference"].update(command=["a\0b"]),
+        "nul-private-root": lambda c: c.update(privateRoot=c["privateRoot"] + "\0x"),
+    }
+    for label, mutate in cases.items():
+        config = json.loads(json.dumps(base))
+        mutate(config)
+        path = fixture.root / f"{label}.json"
+        path.write_text(json.dumps(config), encoding="utf-8")
+        try:
+            compare_game.parse_config(path)
+            check(False, f"{label}: accepted")
+        except compare_game.ControlledError:
+            pass
+    duplicate = fixture.root / "duplicate.json"
+    text = fixture.config("hang", name="dup-src.json").read_text(encoding="utf-8")
+    duplicate.write_text(text[:-1] + ', "timeoutSeconds": 5}', encoding="utf-8")
+    for path, label in ((duplicate, "duplicate keys"), (fixture.root, "directory"),
+                        (fixture.root / "missing.json", "missing file")):
+        try:
+            compare_game.parse_config(path)
+            check(False, f"{label}: accepted")
+        except compare_game.ControlledError:
+            pass
+    big = fixture.root / "big.json"
+    big.write_text(" " * (CONFIG_BYTE_LIMIT + 1), encoding="utf-8")
+    try:
+        compare_game.parse_config(big)
+        check(False, "oversized configuration accepted")
+    except compare_game.ControlledError:
+        pass
+    ready = {"type": "ready", "protocol": 1, "baseline": "unverified-empty",
+             "source_identity": "x", "row": 0, "column": 0, "facing": 4}
+    try:
+        compare_game._render_ready(ready)
+        check(False, "facing 4 accepted")
+    except compare_game.ControlledError:
+        pass
+    sink = io.StringIO()
+    with contextlib.redirect_stdout(sink):
+        compare_game._render_text({"text": "a\x1b[31mred\x07" + "z" * 9000, "clear": False})
+    printed = sink.getvalue()
+    check("\x1b" not in printed and "\x07" not in printed, "control characters printed")
+    check(len(printed) < 5000 and "[truncated]" in printed, "long field not bounded")
+    sink = io.StringIO()
+    with contextlib.redirect_stdout(sink):
+        try:
+            compare_game._render_complete(
+                {"id": 1, "status": "ok", "state": {}, "row": 0, "column": 0, "facing": 0,
+                 "dispatches": [], "diagnostic": 7, "steps": 0, "bytecode_offset": 0})
+            check(False, "bad diagnostic accepted")
+        except compare_game.ControlledError:
+            pass
+    check(sink.getvalue() == "", f"rejected event was partly printed: {sink.getvalue()!r}")
+
+
 def test_termination_signals(fixture):
     # F5: a termination signal must run the cleanup path, not skip it. Windows
     # delivers CTRL_BREAK_EVENT; POSIX delivers SIGTERM and SIGHUP.
@@ -805,6 +872,7 @@ def main():
         test_no_writes_no_match_claim(fixture)
         test_launcher_and_containment_bypasses(fixture)
         test_cleanup_failure_handling(fixture)
+        test_input_hardening(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
         if len(sys.argv) == 3:

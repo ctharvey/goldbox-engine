@@ -12,6 +12,24 @@ from compare_wsl import WslEngine
 from reference_input import WindowsMessages, key_sequence
 
 
+RENDER_FIELD_LIMIT = 4096
+
+
+def _clean(text):
+    """Engine text is untrusted: drop control characters (terminal escapes) and
+    bound each printed field."""
+    kept = "".join(ch if ch in "\n\t" or (ch.isprintable() and ch != "\x7f") else "?"
+                   for ch in text[:RENDER_FIELD_LIMIT])
+    return kept + (" [truncated]" if len(text) > RENDER_FIELD_LIMIT else "")
+
+
+def _count(document, name, what, maximum=None):
+    value = document.get(name)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0             or (maximum is not None and value > maximum):
+        _reject(value, f"{what} {name}")
+    return value
+
+
 def _render_ready(document, dual=False):
     if document.get("type") != "ready":
         raise ControlledError(
@@ -26,12 +44,10 @@ def _render_ready(document, dual=False):
         _reject(identity, "engine ready source_identity")
     parts = []
     for field in ("row", "column", "facing"):
-        value = document.get(field)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            _reject(value, f"engine ready {field}")
+        value = _count(document, field, "engine ready", 3 if field == "facing" else None)
         parts.append(f"{field} {value}")
     print("[engine ready]")
-    print(f"  protocol 1; source_identity={identity[:64]}")
+    print(f"  protocol 1; source_identity={_clean(identity[:64])}")
     print("  " + ", ".join(parts) + "; baseline unverified-empty")
     print("[note] this comparison is unpaired and inconclusive; no parity result is produced.")
     if not dual:
@@ -46,28 +62,36 @@ def _render_text(document):
     if not isinstance(document.get("clear"), bool):
         _reject(document.get("clear"), "engine text clear flag")
     if text:
-        print(text)
+        print(_clean(text))
 
 
-def _offer_menu(document):
+def _validate_menu(document):
     choices = document.get("choices")
-    if not isinstance(choices, list) or not choices \
-            or any(not isinstance(item, str) for item in choices):
+    if not isinstance(choices, list) or not choices             or any(not isinstance(item, str) for item in choices):
         _reject(choices, "engine menu choices")
     prompt = document.get("prompt")
     if not isinstance(prompt, str):
         _reject(prompt, "engine menu prompt")
     if not isinstance(document.get("vertical"), bool):
         _reject(document.get("vertical"), "engine menu vertical flag")
+    return choices, prompt
+
+
+def _print_menu(choices, prompt):
     if prompt:
-        print(prompt)
+        print(_clean(prompt))
     print("menus accept a zero-based choice number shown alongside each entry.")
     for index, choice in enumerate(choices):
-        print(f"  [{index}] {choice}")
+        print(f"  [{index}] {_clean(choice)}")
+
+
+def _offer_menu(document):
+    choices, prompt = _validate_menu(document)
+    _print_menu(choices, prompt)
     return choices
 
 
-def _render_complete(document):
+def _validate_complete(document):
     status = document.get("status")
     if not isinstance(status, str) or status not in ("ok", "blocked", "unsupported"):
         _reject(status, "engine complete status")
@@ -75,11 +99,7 @@ def _render_complete(document):
     if not isinstance(state, dict):
         _reject(state, "engine complete state")
     for name in ("row", "column", "facing"):
-        value = document.get(name)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            _reject(value, f"engine complete {name}")
-    position = " ".join(f"{name}={document.get(name)!r}" for name in ("row", "column", "facing"))
-    print(f"[complete id={document.get('id')!r}] status={status}; {position}")
+        _count(document, name, "engine complete", 3 if name == "facing" else None)
     dispatches = document.get("dispatches")
     if not isinstance(dispatches, list):
         _reject(dispatches, "engine complete dispatches")
@@ -87,23 +107,27 @@ def _render_complete(document):
         if not isinstance(dispatch, dict):
             _reject(dispatch, "engine dispatch entry")
         for name in ("table_offset", "selector", "target_offset"):
-            value = dispatch.get(name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-                _reject(value, f"engine dispatch {name}")
+            _count(dispatch, name, "engine dispatch")
         if not isinstance(dispatch.get("subroutine"), bool):
             _reject(dispatch.get("subroutine"), "engine dispatch subroutine flag")
-        print("  dispatch: " + ", ".join(
-            f"{name}={dispatch.get(name)!r}" for name in
-            ("table_offset", "selector", "target_offset", "subroutine")))
     diagnostic = document.get("diagnostic")
     if not isinstance(diagnostic, str):
         _reject(diagnostic, "engine complete diagnostic")
     for name in ("steps", "bytecode_offset"):
-        value = document.get(name)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            _reject(value, f"engine complete {name}")
+        _count(document, name, "engine complete")
+    return status, state, dispatches, diagnostic
+
+
+def _render_complete(document):
+    status, state, dispatches, diagnostic = _validate_complete(document)
+    position = " ".join(f"{name}={document.get(name)!r}" for name in ("row", "column", "facing"))
+    print(f"[complete id={document.get('id')!r}] status={status}; {position}")
+    for dispatch in dispatches:
+        print("  dispatch: " + ", ".join(
+            f"{name}={dispatch.get(name)!r}" for name in
+            ("table_offset", "selector", "target_offset", "subroutine")))
     if status == "unsupported":
-        print(f"  unsupported diagnostic: {diagnostic}")
+        print(f"  unsupported diagnostic: {_clean(diagnostic)}")
     if status == "blocked":
         print("  move was blocked; no event executed")
     print(f"  steps={document.get('steps')!r} "
@@ -435,7 +459,7 @@ class Session:
             if self.pending_menu is not None:
                 raise ControlledError(
                     "engine sent a second menu before the pending menu was answered")
-            choices = _offer_menu(document)
+            choices, prompt = _validate_menu(document)
             menu_id = document.get("menu_id")
             if isinstance(menu_id, bool) or not isinstance(menu_id, int) or menu_id < 1:
                 _reject(menu_id, "engine menu_id")
@@ -443,6 +467,7 @@ class Session:
                 raise ControlledError(
                     f"engine menu_id {menu_id} is not strictly greater than the "
                     f"previous menu id {self.last_menu_id}")
+            _print_menu(choices, prompt)
             self.last_menu_id = menu_id
             self.pending_menu = (self.pending_id, menu_id, choices)
             self.last_summary = f"menu event (action {event_id}, menu {menu_id})"

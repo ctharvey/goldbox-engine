@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path, PurePosixPath
+import stat
 from compare_common import (ControlledError, DEFAULT_CHECKPOINT, DEFAULT_TIMEOUT,
                             MAX_TIMEOUT, MIN_TIMEOUT, SCHEMA_VERSION)
 from reference_input import ReferenceInputError, validate_config
@@ -30,7 +31,8 @@ def _exact_schema_version(value):
 def _argv_field(fields, key, context):
     argv = fields.get(key)
     if not isinstance(argv, list) or not argv \
-            or any(not isinstance(entry, str) or not entry for entry in argv):
+            or any(not isinstance(entry, str) or not entry or "\0" in entry
+                   for entry in argv):
         _reject(argv, f"{context}.{key} (requires a nonempty array of strings)")
     return list(argv)
 
@@ -43,7 +45,8 @@ def _table_field(container, key, parent):
 
 
 def _absolute_dir(value, context):
-    if isinstance(value, bool) or not isinstance(value, str) or not value:
+    if isinstance(value, bool) or not isinstance(value, str) or not value \
+            or "\0" in value:
         _reject(value, f"{context} (requires a nonempty string path)")
     path = Path(value)
     if not path.is_absolute():
@@ -81,6 +84,33 @@ def _outside_repository(path):
     return not _contains(repository, path) and not _contains(path, repository)
 
 
+CONFIG_BYTE_LIMIT = 1024 * 1024
+
+
+def _no_duplicate_keys(pairs):
+    keys = [key for key, _ in pairs]
+    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicates:
+        raise ControlledError(f"session configuration repeats keys: {duplicates}")
+    return dict(pairs)
+
+
+def _read_config_text(path):
+    try:
+        info = os.stat(path)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > CONFIG_BYTE_LIMIT:
+            raise ControlledError(
+                f"session configuration must be a regular file of at most "
+                f"{CONFIG_BYTE_LIMIT} bytes")
+        with open(path, "rb") as handle:
+            data = handle.read(CONFIG_BYTE_LIMIT + 1)
+        if len(data) > CONFIG_BYTE_LIMIT:
+            raise ControlledError("session configuration is too large")
+        return data.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise ControlledError(f"cannot read the session configuration: {error}") from error
+
+
 def parse_config(path):
     """Validate the version-1 session configuration without side effects.
 
@@ -88,7 +118,7 @@ def parse_config(path):
     empty argv entries and invalid paths before anything is spawned.
     """
     try:
-        config = json.loads(path.read_text(encoding="utf-8"))
+        config = json.loads(_read_config_text(path), object_pairs_hook=_no_duplicate_keys)
     except ValueError as error:
         raise ControlledError(f"session configuration is not valid JSON: {error}") from error
     if not isinstance(config, dict):
