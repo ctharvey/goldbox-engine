@@ -145,7 +145,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     if (const auto* value = root.if_contains("partyMemory")) {
         if (!profile.character_rules) throw std::runtime_error("Party memory requires character creation rules");
         const auto& o = j::object(*value,"party memory");
-        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities"},"party memory");
+        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities","selectedAddress"},"party memory");
         const auto address = [&](const char* key) {
             const auto n = j::integer(j::field(o,key,"party memory"),key);
             if (n < 0 || n > 65535) throw std::runtime_error("Invalid party memory address");
@@ -153,6 +153,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         };
         PartyMemoryLayout layout{j::string(j::field(o,"dialect","party memory"),"party dialect"),
             address("recordBase"),address("recordSize"),address("countAddress"),{}};
+        if (o.if_contains("selectedAddress")) layout.selected_address = address("selectedAddress");
         const auto& fields = j::array(j::field(o,"abilities","party memory"),"party ability bindings");
         if (fields.size() > 64) throw std::runtime_error("Too many party ability bindings");
         for (const auto& field : fields) {

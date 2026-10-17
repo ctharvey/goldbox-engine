@@ -19,6 +19,8 @@ void validate_party_memory_layout(const PartyMemoryLayout& layout, const Creatio
     if (layout.dialect != "ssi-selected-character-v1") throw std::runtime_error("Unsupported party memory dialect");
     if (!layout.record_size || std::size_t(layout.record_base)+layout.record_size > 65536 ||
         character_address(layout,layout.count_address)) throw std::runtime_error("Invalid party memory range");
+    if (layout.selected_address && party_memory_intersects(layout,*layout.selected_address,1))
+        throw std::runtime_error("Selected character address overlaps party memory");
     if (layout.abilities.empty() || layout.abilities.size() > 64) throw std::runtime_error("Invalid party ability bindings");
     std::set<std::uint16_t> offsets;
     for (const auto& binding : layout.abilities) {

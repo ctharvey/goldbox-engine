@@ -144,6 +144,33 @@ def main():
         assert lines[1]["state"]["memory"][0x4a00] == 0x81
         assert finished.returncode == 0
 
+        # WHO uses the existing menu protocol with normalized party state.
+        (root / "ECL_WHO.DAX").write_bytes(dax(bytes(
+            [1, 1, 20, 0x99] * 5 + [0x39, 0x80, 1, 4, 0x11, 0x81, 0, 0x6b, 0])))
+        who = Harness(executable, profile, root, ecl="ECL_WHO.DAX", save="who.json")
+        identity_checks(who.event())
+        who.send({"id": 1, "action": "save"})
+        checkpoint = who.event()["state"]
+        who.send({"id": 2, "action": "quit"}); who.event()
+        assert who.finish()[0] == 0
+        checkpoint["party"]["characters"] = [
+            {"name": name, "race": "human", "gender": "female", "class": "cleric",
+             "alignment": "lawful-good", "abilities": [{"value": 15, "percentile": 0}] * 6}
+            for name in ("Ada", "Borin")]
+        (root / "who.json").write_text(json.dumps(checkpoint))
+        who = Harness(executable, profile, root, ecl="ECL_WHO.DAX", save="who.json")
+        who.event(); who.send({"id": 1, "action": "load"}); who.event()
+        who.send({"id": 2, "action": "search"})
+        prompt = who.event()
+        assert prompt["type"] == "menu" and prompt["prompt"] == "A"
+        assert prompt["choices"] == ["Ada", "Borin"] and prompt["vertical"] is True
+        who.send({"id": 2, "menu_id": prompt["menu_id"], "choice": 1})
+        assert who.event()["text"] == "Borin"
+        selected = who.event()["state"]
+        assert selected["loadedCharacter"] == 1 and selected["memory"][0x6db1] == 1
+        who.send({"id": 3, "action": "quit"}); who.event()
+        assert who.finish()[0] == 0
+
         # EOF without quit reports a protocol error and nonzero exit.
         finished, lines = run_lines(base, actions("search"))
         assert lines[-1]["type"] == "error" and finished.returncode != 0

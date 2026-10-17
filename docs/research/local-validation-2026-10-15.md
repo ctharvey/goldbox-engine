@@ -328,9 +328,11 @@ WHO (0x39) at offset 805. Other candidates include name output in ECL3 record 14
 and ECL8 record 13, with additional script/state dependencies. No candidate has
 yet been reproduced as the same event in both engines.
 
-Next implementation: research and implement the configurable WHO party-selection
-host semantics, including its relation to loaded-character and selected-PC state.
-Then establish the actual reference route and matching world/quest baseline for
+The follow-up implementation adds configurable WHO party selection through the
+existing menu host, updating loaded-character and selected-PC state together.
+LOAD_CHAR continues to update only the loaded character. Synthetic SDL, JSONL
+and state tests cover these mechanics; original interaction parity is unverified.
+Next establish the actual reference route and matching world/quest baseline for
 one event; implement only fields/effects that route requires. The supplied native
 save is not an engine save: copying its coordinates and visible party scores does
 not reproduce its world state. Do not report MATCH or event parity until both
@@ -338,5 +340,8 @@ sides execute the same checkpoint from equivalent state.
 
 Original saves, character bytes, names, extracted scripts and screenshots remain
 outside the repository. The private investigation is not a public importer or
-a replacement for the tested C++ decoders. No build was needed for this research;
-the last implementation milestone remains 113d5f0 with 23 passing CTest suites.
+a replacement for the tested C++ decoders. The research itself needed no build.
+The subsequent WHO implementation passed all 23 CTest suites in 17.45 seconds,
+including SDL selection, JSONL automation, invalid choices and saved state.
+Hygiene and attribution checks also passed. This is synthetic behavior coverage,
+not original WHO event parity.

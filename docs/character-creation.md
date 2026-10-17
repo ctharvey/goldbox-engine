@@ -69,6 +69,8 @@ checks the custom flow with original resources, not DOS creation parity.
 An optional game-profile `partyMemory` selects `ssi-selected-character-v1` and
 defines `recordBase`, `recordSize`, `countAddress` and `abilities` bindings
 (`offset`, normalized `ability` ID, `percentile`). It requires creation rules.
+An optional `selectedAddress` enables WHO's selected-PC RAM update; Pool uses
+0x6DB1. It must be outside the character window/count, event context and program.
 The shared adapter contains no title-specific addresses or ability ordering.
 Unknown dialects, overlapping count/record ranges, duplicate offsets and invalid
 ability references fail validation. Event-context and program overlaps fail
@@ -82,6 +84,16 @@ unlike SSI Engine's silent ignore. Numeric reads resolve configured fields;
 string references anywhere in the window resolve the loaded character's name.
 Byte/word reads and indexed COPY_MEM use the same adapter. Count remains
 readable for an empty party; character reads require a loaded member.
+
+WHO (0x39) takes a text prompt and presents names in roster order through the
+existing host menu. A valid zero-based choice updates both the loaded character
+and the configured selected-PC RAM byte. Empty parties, absent selection-address
+configuration, invalid prompts and out-of-range host choices fail explicitly;
+selection is published only after a valid response. This uses the same menu
+interface in SDL, the terminal and JSONL automation. Roster removal adjusts both
+indices. The selected-PC byte retains ordinary RAM semantics: a direct script
+write to it does not implicitly perform LOAD_CHAR. Original WHO interaction,
+focus/default selection and matched-event parity remain unverified.
 
 Unsupported fields and all script writes to this window/count report errors,
 including word writes crossing a boundary. They never fall back to stale RAM

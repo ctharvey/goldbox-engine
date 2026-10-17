@@ -330,9 +330,16 @@ int main(int argc, char** argv) {
     assert(session.party.size() == 1 && session.party[0].name == "ALICE");
     auto second_member = session.party.front(); second_member.name = "BOB";
     session.party.push_back(second_member); session.loaded_character = 1;
+    session.party_memory = PartyMemoryLayout{"ssi-selected-character-v1",0x5000,256,0x4fff,
+        {{0x44,"might",false}},0x4ffe};
+    session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::disabled,EclPartyDialect::load_character);
+    session.ecl_record = program({0x39,0x80,1,4,0x11,0x81,0,0x50,0});
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.loaded_character == 1 && session.state.memory[0x4ffe] == 1);
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,
         SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
     assert(session.party.size() == 1 && session.party.front().name == "BOB" && session.loaded_character == 0);
+    assert(session.state.memory[0x4ffe] == 0);
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,
         SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
     assert(session.party.empty()); // Remove member, return to startup, quit.

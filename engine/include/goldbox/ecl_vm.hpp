@@ -35,6 +35,7 @@ public:
     virtual void wall_banks(std::array<std::uint8_t,3> banks);
     virtual void load_area(std::array<std::uint8_t,3> values);
     virtual void load_character(std::uint8_t index);
+    virtual void select_character(std::string_view prompt);
     // Optional virtual memory overlays. Unhandled accesses retain ordinary RAM/string semantics.
     virtual std::optional<std::uint8_t> memory_byte(std::uint16_t address);
     virtual bool write_memory(std::uint16_t address, std::uint32_t value, std::size_t width);

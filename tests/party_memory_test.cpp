@@ -12,7 +12,13 @@ using namespace goldbox::formats;
 namespace {
 struct Host : EclHost {
     std::string output;
+    std::vector<std::string> choices;
+    std::string prompt;
+    std::size_t selected{}, menus{};
     void text(std::string_view value, bool) override { output += value; }
+    std::size_t menu(std::span<const std::string> values, std::string_view description, bool vertical) override {
+        assert(vertical); choices.assign(values.begin(),values.end()); prompt = description; ++menus; return selected;
+    }
 };
 void rejects(const std::function<void()>& action) {
     bool failed = false;
@@ -51,6 +57,23 @@ int main(int argc, char** argv) {
     assert(session.state.memory[0x4a00] == 2 && session.state.memory[0x4a01] == 17);
     assert(session.state.memory[0x4a02] == 17 && session.state.memory[0x4a03] == 14);
     assert(session.state.memory[0x4a04] == 14 && session.state.memory[0x6db1] == 0);
+    assert(layout.selected_address == 0x6db1);
+    host.selected = 1; host.output.clear();
+    assert(run({0x39,0x80,1,4,0x11,0x81,0,0x6b,0}).exited);
+    assert(host.choices == std::vector<std::string>({"Ada","Borin"}) && host.prompt == "A");
+    assert(host.output == "Borin" && session.loaded_character == 1 && session.state.memory[0x6db1] == 1);
+    host.output.clear();
+    assert(run({0x0a,0,0,0x11,0x81,0,0x6b,0}).exited && host.output == "Ada");
+    assert(session.loaded_character == 0 && session.state.memory[0x6db1] == 1);
+    host.selected = 2;
+    assert(!run({0x39,0x80,1,4,0}).exited);
+    assert(session.loaded_character == 0 && session.state.memory[0x6db1] == 1);
+    const auto menus = host.menus;
+    assert(!run({0x39,0,1,0}).exited && host.menus == menus); // Numeric prompt is invalid.
+    session.party_memory->selected_address.reset();
+    assert(!run({0x39,0x80,1,4,0}).exited && host.menus == menus);
+    session.party_memory = layout;
+    assert(run({0x0a,0,1,0}).exited);
     host.output.clear(); assert(run({0x11,0x81,0x10,0x6b,0}).exited && host.output == "Borin");
     assert(!run({0x0a,0,2,0}).exited && session.loaded_character == 1);
     assert(!run({0x0a,2,0,1,0}).exited && session.loaded_character == 1);
@@ -70,6 +93,7 @@ int main(int argc, char** argv) {
     const auto save = serialize_exploration(session,"synthetic-party");
     auto restored = session; restored.loaded_character = 0;
     restore_exploration(restored,save,"synthetic-party"); assert(restored.loaded_character == 1);
+    assert(restored.state.memory[0x6db1] == 1);
     auto invalid = save; auto at = invalid.find("\"loadedCharacter\":1"); assert(at != std::string::npos);
     invalid.replace(at,19,"\"loadedCharacter\":2");
     rejects([&] { restore_exploration(restored,invalid,"synthetic-party"); });
@@ -79,12 +103,23 @@ int main(int argc, char** argv) {
     restore_exploration(restored,serialize_exploration(legacy,"synthetic-party"),"synthetic-party");
     assert(restored.loaded_character == 0);
     session.party.clear(); session.loaded_character = 0;
+    const auto empty_menus = host.menus;
+    assert(!run({0x39,0x80,1,4,0}).exited && host.menus == empty_menus);
     assert(run({9,1,0x3e,0x6e,1,0,0x4a,0}).exited && session.state.memory[0x4a00] == 0);
     assert(!run({0x0a,0,0,0}).exited && !run({0x11,0x81,0,0x6b,0}).exited);
     auto other = layout; other.record_base = 0x5000; other.record_size = 256; other.count_address = 0x4fff;
+    other.selected_address = 0x4ffe;
     other.abilities = {{0x44,"intelligence",false}};
     validate_party_memory_layout(other,rules);
     assert(party_memory_byte(other,rules,Party{borin},0,0x5044) == 14);
+    auto alternate = session; alternate.party = {ada,borin}; alternate.party_memory = other;
+    alternate.ecl_record = program({0x39,0x80,1,4,0}); host.selected = 1;
+    assert(alternate.trigger(EclEventKind::move,host).exited && alternate.loaded_character == 1);
+    assert(alternate.state.memory[0x4ffe] == 1);
+    auto collision = layout; collision.selected_address = layout.count_address;
+    rejects([&] { validate_party_memory_layout(collision,rules); });
+    collision.selected_address = layout.record_base;
+    rejects([&] { validate_party_memory_layout(collision,rules); });
     for (int i = 0; i < 6; ++i) {
         auto bad = layout;
         if (i == 0) bad.dialect = "unknown";
@@ -108,4 +143,12 @@ int main(int argc, char** argv) {
     conflicting = session.opcodes;
     for (auto& op : conflicting) if (op.opcode == 0x0a) op.operand_count = 2;
     assert(!execute(conflicting).exited);
+    const auto who = program({0x39,0x80,1,4,0});
+    assert(!execute_ecl(who,EclEventKind::move,session.dialect,minimal_vm_opcodes(),state,host).exited);
+    assert(!execute_ecl(who,EclEventKind::move,session.dialect,session.opcodes,state,host).exited);
+    conflicting = session.opcodes; conflicting.push_back({0x39,"CONFLICT",1});
+    assert(!execute_ecl(who,EclEventKind::move,session.dialect,conflicting,state,host).exited);
+    conflicting = session.opcodes;
+    for (auto& op : conflicting) if (op.opcode == 0x39) op.operand_count = 2;
+    assert(!execute_ecl(who,EclEventKind::move,session.dialect,conflicting,state,host).exited);
 }

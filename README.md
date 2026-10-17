@@ -30,6 +30,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - Monochrome tile strips and independent/XOR-first picture/sprite decoding, with explicit palette policies; checked against local Pool picture, sprite and combat-image archives. An opt-in ECL host displays profile-timed pictures and non-replacement sprites from explicitly selected archives; original timing and scene parity remain unverified.
 - Startup party creation with data-selected races/classes/alignments, bounded ability rolling, roster review/removal and engine-save persistence; see [supported creation rules and limits](docs/character-creation.md).
 - Profile-selected read-only ECL party access: loaded-character selection, names, ability scores and party count; unsupported fields/writes fail explicitly. Original character-access parity remains unverified.
+- WHO party-selection prompts use existing window/terminal/automation menus and update the profile-configured selected-PC byte as well as the loaded character. Original interaction parity remains unverified.
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run

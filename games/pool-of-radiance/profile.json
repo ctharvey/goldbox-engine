@@ -23,6 +23,7 @@
     "recordBase": 27392,
     "recordSize": 511,
     "countAddress": 28222,
+    "selectedAddress": 28081,
     "abilities": [
       {
         "offset": 16,

@@ -2,6 +2,7 @@
 #include "goldbox/exploration.hpp"
 #include "json_support.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace goldbox {
@@ -31,6 +32,10 @@ public:
             if (!session.character_rules) throw std::runtime_error("Party memory requires creation rules");
             const auto& layout = *session.party_memory;
             validate_party_memory_layout(layout,*session.character_rules);
+            if (layout.selected_address && (*layout.selected_address == session.dialect.square_info_address ||
+                (session.dialect.position_addresses && std::find(session.dialect.position_addresses->begin(),
+                    session.dialect.position_addresses->end(),*layout.selected_address) != session.dialect.position_addresses->end())))
+                throw std::runtime_error("Selected character address overlaps event context");
             if (party_memory_intersects(layout,session.dialect.square_info_address,1))
                 throw std::runtime_error("Party memory overlaps event context");
             if (session.dialect.position_addresses) for (const auto address : *session.dialect.position_addresses)
@@ -39,7 +44,8 @@ public:
             const auto begin = std::size_t(session.dialect.code_base);
             const auto end = begin+session.ecl_record.size(); // Conservative program footprint including headers.
             if ((layout.record_base < end && std::size_t(layout.record_base)+layout.record_size > begin) ||
-                (layout.count_address >= begin && layout.count_address < end))
+                (layout.count_address >= begin && layout.count_address < end) ||
+                (layout.selected_address && *layout.selected_address >= begin && *layout.selected_address < end))
                 throw std::runtime_error("Party memory overlaps ECL program");
         }
     }
@@ -47,6 +53,19 @@ public:
         if (!session.party_memory) { delegate.load_character(index); return; }
         if (index >= session.party.size()) throw std::runtime_error("Character index outside current party");
         session.loaded_character = index;
+    }
+    void select_character(std::string_view prompt) override {
+        if (!session.party_memory) { delegate.select_character(prompt); return; }
+        const auto address = session.party_memory->selected_address;
+        if (!address) throw std::runtime_error("WHO requires a selected character address");
+        if (session.party.empty() || session.party.size() > 255)
+            throw std::runtime_error("WHO requires a nonempty byte-indexed party");
+        std::vector<std::string> choices;
+        for (const auto& character : session.party) choices.push_back(character.name);
+        const auto selected = delegate.menu(choices,prompt,true);
+        if (selected >= session.party.size()) throw std::runtime_error("WHO host returned invalid character index");
+        session.state.memory[*address] = static_cast<std::uint8_t>(selected);
+        session.loaded_character = static_cast<std::uint8_t>(selected);
     }
     std::optional<std::uint8_t> memory_byte(std::uint16_t address) override {
         if (session.party_memory) {

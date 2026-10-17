@@ -345,6 +345,11 @@ public:
                         session.party.erase(session.party.begin()+*member);
                         if (session.loaded_character == *member) session.loaded_character = 0;
                         else if (session.loaded_character > *member) --session.loaded_character;
+                        if (session.party_memory && session.party_memory->selected_address) {
+                            auto& selected = session.state.memory[*session.party_memory->selected_address];
+                            if (selected == *member) selected = 0;
+                            else if (selected > *member && selected <= session.party.size()) --selected;
+                        }
                     }
                 }
             } catch (const std::exception& error) {

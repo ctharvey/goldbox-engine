@@ -197,3 +197,9 @@ name lookup and ability offsets. Address facts are explicit game-profile data;
 normalized party access, validation and saves are independent C++. No Java
 source was copied or translated. This remains a research-only reference, with
 original character-access parity unverified.
+
+WHO selection additionally consults the pinned EngineInputAction and
+engine/input/MenuHandler for the single SELECT action and resumption behavior,
+plus VirtualMemory's distinction between loading and selecting a character.
+The C++ implementation reuses this project's menu host and updates configured
+state after validation; no Java handler or UI implementation was copied/ported.

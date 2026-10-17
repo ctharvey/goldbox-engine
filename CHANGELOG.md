@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Add WHO party selection through existing SDL, terminal and automation menus.
+  Update loaded-character and profile-configured selected-PC state only after
+  a valid choice; preserve LOAD_CHAR's separate semantics and adjust selection
+  on roster removal. Original WHO interaction/event parity remains unverified.
+
 - Establish a private original-save/character-sheet baseline and inventory
   candidate character-dependent events. Document WHO selection and matching
   world state as remaining checkpoint requirements; no event parity claimed.

@@ -112,7 +112,7 @@ See [original-resource evidence and remaining gates](../research/local-validatio
 
 ## Optional party host
 
-The VM can opt into one-operand LOAD_CHAR (0x0A), with unique opcode metadata
+The VM can opt into one-operand LOAD_CHAR (0x0A) and WHO (0x39), with unique opcode metadata
 validated before execution. Numeric and string operands pass through optional
 host memory callbacks; unhandled addresses retain RAM/string semantics. The
 exploration host attaches the profile-selected read-only party adapter described

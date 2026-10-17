@@ -62,6 +62,7 @@ void EclHost::clear_images() { throw EclDecodeError("Image host unavailable"); }
 void EclHost::wall_banks(std::array<std::uint8_t,3>) { throw EclDecodeError("Wall graphics host unavailable"); }
 void EclHost::load_area(std::array<std::uint8_t,3>) { throw EclDecodeError("Map host unavailable"); }
 void EclHost::load_character(std::uint8_t) { throw EclDecodeError("Party host unavailable"); }
+void EclHost::select_character(std::string_view) { throw EclDecodeError("Party selection host unavailable"); }
 std::optional<std::uint8_t> EclHost::memory_byte(std::uint16_t) { return std::nullopt; }
 bool EclHost::write_memory(std::uint16_t, std::uint32_t, std::size_t) { return false; }
 std::optional<std::string> EclHost::string_at(std::uint16_t) { return std::nullopt; }
@@ -84,6 +85,7 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
     if (area == EclAreaDialect::map3) result.push_back({0x21,"LOAD_AREA_MAP",3});
     if (party == EclPartyDialect::disabled)
         std::erase_if(result,[](const auto& op) { return op.opcode == 0x0a; });
+    else result.push_back({0x39,"WHO",1});
     return result;
 }
 
@@ -98,6 +100,10 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
         if (party_spec != opcodes.end()) require(party_spec->operand_count == 1 && party_spec->variable_count_operand == -1 &&
             std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0a; }) == 1,
             "Conflicting VM party opcode definition");
+        const auto who_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x39; });
+        if (who_spec != opcodes.end()) require(who_spec->operand_count == 1 && who_spec->variable_count_operand == -1 &&
+            std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x39; }) == 1,
+            "Conflicting VM WHO opcode definition");
         const auto area_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x21; });
         if (area_spec != opcodes.end()) require(area_spec->operand_count == 3 && area_spec->variable_count_operand == -1 &&
             std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x21; }) == 1,
@@ -234,6 +240,9 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                 host.load_character(static_cast<std::uint8_t>(index));
                 break;
             }
+            case 0x39:
+                host.select_character(string(args[0],state,host));
+                break;
             case 0x24: host.combat(state); break;
             case 0x0e: {
                 if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 14");
