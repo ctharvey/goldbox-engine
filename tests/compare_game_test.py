@@ -940,6 +940,16 @@ def test_cleanup_failure_handling(fixture):
         original(self)
         raise OSError("synthetic kill failure")
 
+    held = []
+    real_lock = compare_game.SessionLock
+
+    class RecordingLock(real_lock):
+        def acquire(self):
+            result = super().acquire()
+            held.append(self)
+            return result
+
+    compare_game.SessionLock = RecordingLock
     try:
         for label, patched in (("interrupt", interrupted_once), ("failure", failing)):
             del seen[:]
@@ -962,9 +972,20 @@ def test_cleanup_failure_handling(fixture):
                   f"{label}: not every tree was cleaned: {len(seen)} calls")
             check(all(owned.process.poll() is not None for owned in seen),
                   f"{label}: an owned process survived")
-            compare_game.SessionLock(config["privateRoot"]).acquire().release()
+            if label == "failure":
+                # F13: ownership is ambiguous after a failed kill, so the lock stays held.
+                try:
+                    compare_game.SessionLock(config["privateRoot"]).acquire().release()
+                except compare_game.ControlledError:
+                    pass
+                else:
+                    check(False, "lock was released despite a cleanup failure")
+                held[-1].release()
+            else:
+                compare_game.SessionLock(config["privateRoot"]).acquire().release()
     finally:
         compare_game.OwnedProcess.kill_tree = original
+        compare_game.SessionLock = real_lock
 
 
 def main():

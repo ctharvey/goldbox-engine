@@ -8,8 +8,9 @@
   `ActiveProcesses` and a single-resume check, WSL adapter cleanup/reap bounded
   below the controller wait, engine no longer inherits `SIGHUP=SIG_IGN`, hostile
   control frames end with a diagnostic, and abandoned reference-input dispatches
-  are cancelled before the next key. Deferred: F13, F30, F33, reference mapping/
-  disarm failures staying fatal, and two interrupt windows around launch.
+  are cancelled before the next key. The session lock now stays held when a kill fails
+  (ownership ambiguous). Deferred: F30, F33, reference mapping/disarm failures staying
+  fatal, and two interrupt windows around launch.
 
 - Controller cleanup hardening: SIGTERM/SIGHUP (POSIX) and CTRL_BREAK (Windows) now run
   the same cleanup path as Ctrl-C; POSIX `poll()` no longer reaps the owned group

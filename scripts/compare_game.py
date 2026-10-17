@@ -132,7 +132,8 @@ def run_session(config):
                 _wait_bounded(waiter)
             except KeyboardInterrupt as error:
                 interrupted = interrupted or error
-        lock.release()
+        if not cleanup_errors:
+            lock.release()  # A failed kill leaves ownership ambiguous: keep the lock until exit.
         if cleanup_errors:
             detail = "cleanup failed: " + "; ".join(cleanup_errors)
             if primary is None:
