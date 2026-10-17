@@ -1,44 +1,75 @@
-# Architecture — M1
+# Architecture
+
+## Current layering (M1 content + M2/M3 pilot)
 
 ```text
-[User-owned SSI game files] ---> [Future SSI adapters] ---\
-                                                     [Normalized Content Model]
-[Synthetic fixture journals.json] -> [JSON Importer] --/             |
-                                                                    v
-[examples/mods/*/mod.json] -> [Validation/Dependency Resolver] -> [Journal Resolver]
-                                      |                             |
-                                      v                             v
-                              [Warnings/errors]              [Classic/Enhanced]
-                                                                    |
-                                                 [CLI now; SDL3/RmlUi later]
-                                                                    |
-                                                        [Future game state]
+formats/    pure decoders: DAX, ECL (lexer, dispatch), GEO, EGA graphics.
+            No Boost, no engine dependency.
+   ^
+engine/     goldbox_core: content + mods + journal (M1), game profiles,
+            ECL VM, exploration session, image presentation. Links formats.
+   ^
+runtime/    optional SDL3 view/window (GOLDBOX_BUILD_RENDERER, default OFF).
+   ^
+apps/       goldbox_cli (content/mod/scan CLI), goldbox_explore (terminal pilot,
+            JSONL parity harness, optional --window).
 
-TypeScript -> compiled JavaScript -> future embedded QuickJS host (not implemented)
+scripts/    Python tooling, not linked into the engine: installation scanner,
+            hygiene/attribution checks, WSL build wrapper, and the side-by-side
+            comparison controller (compare_game.py and its compare_* modules).
+tests/      C++ unit tests, Python CLI/controller tests (ctest-registered).
 ```
 
-## Core contracts
+Includes point down the stack only. Engine simulation stays independent of
+rendering and of the TypeScript runtime.
 
-- `ContentImporter` is an abstraction for independently implemented importers, including future SSI versions.
-- `SyntheticJsonImporter` only accepts `sourceFormat: synthetic-v1` and does not claim original-game compatibility.
-- `ImportedContent` describes the campaign/source identity and normalized journal entries.
-- `discover_mods` reads and validates manifests; `resolve_mods` checks dependencies, missing journal targets, and field collisions.
-- `build_journal` merges entries in resolved order, keeping originals intact.
-- `make_session_metadata` produces descriptive startup metadata. A full save/load implementation remains future work.
+## Content pipeline (M1)
+
+```text
+[Synthetic fixture journals.json] -> [SyntheticJsonImporter] --\
+                                                         [Normalized Content Model]
+[examples/mods/*/mod.json] -> [Validation/Dependency Resolver] -> [Journal Resolver]
+                                                                  |
+                                                       [Classic / Enhanced mode]
+```
+
+- `ContentImporter` is the abstraction for independently implemented importers.
+- `SyntheticJsonImporter` only accepts `sourceFormat: synthetic-v1` and rejects
+  original-game identifiers.
+- `discover_mods` reads and validates manifests; `resolve_mods` checks dependencies,
+  missing journal targets and field collisions; `build_journal` merges in resolved order.
+- `make_session_metadata` produces descriptive startup metadata, not a savegame.
+
+## Original-resource pipeline (M2/M3 pilot)
+
+```text
+user-supplied installation -> read-only inventory (SHA-256) -> game profile
+  -> DAX/GEO/ECL/graphics decoders (formats/) -> ECL VM + exploration (engine/)
+  -> terminal host | JSONL harness | SDL3 window (apps/, runtime/)
+```
+
+Details: [universal importer](universal-importer.md), the format notes in
+`docs/formats/`, and the [validation scope](research/local-validation-2026-10-15.md).
 
 ## Invariants
 
-- Binary readers will never mutate the original user-supplied installation.
+- Binary readers never mutate the user-supplied installation.
 - Deterministic mod load order; dependency constraints precede priority.
-- A missing target is an error rather than creating implicit content.
+- A missing target is an error rather than implicit content.
 - Classic mode shows unmodified imported entries.
-- Game simulation stays independent of rendering or TypeScript runtime.
 - Repository tests never include copyrighted SSI game content.
 
-## Later phases
+## Target layout
 
-- First Pool of Radiance binary importer and ECL event interpreter.
-- AD&D rules engine / exploration / combat.
-- SDL3 presentation and optional RmlUi.
-- QuickJS-NG TypeScript mod bindings (compiled JS), with sandboxing.
-- Versioned saves and compatibility fingerprints.
+Not yet created; today's code sits where noted.
+
+| Planned | Today |
+| --- | --- |
+| `importers/` per-game importers producing `ImportedContent` | `formats/` decoders; only `SyntheticJsonImporter` implements `ContentImporter` |
+| `gameplay/` exploration, events, combat, rules | exploration and ECL VM in `engine/`; combat and rules not started |
+| Content/simulation split of `goldbox_core` | one library holds both (decide before M4) |
+| Embedded QuickJS-NG TypeScript host | design only: [security](security.md); `packages/mod-sdk` types |
+| Versioned saves with compatibility fingerprints | prototype position/event state only |
+
+Create `importers/` and `gameplay/` when real code needs them, not as placeholders.
+The `assets/` README is a standing licensing rule, not a stub.

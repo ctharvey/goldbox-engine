@@ -383,21 +383,24 @@ npm run check
 ## Repository shape
 
 ```text
-apps/                Console integration and CLI
+apps/                goldbox_cli and goldbox_explore (terminal pilot, JSONL harness, --window)
 engine/include/      Public engine/content/mod interfaces
-engine/src/          Core, Boost.JSON adapter, game profiles, import/mod implementations
-formats/             Shared DAX archive, ECL lexer, GEO map decoders (still unverified)
+engine/src/          Core: content/mods, game profiles, ECL VM, exploration, image presentation
+formats/             DAX, ECL, GEO and EGA graphics decoders (pilot-validated on one Pool install)
 games/               Declarative per-game compatibility profiles (unverified)
 examples/content/    Entirely fictional original sample campaign
 examples/mods/       External sample data mod
-packages/mod-sdk/     Proposed TypeScript mod manifest API
-importers/           Future original-game binary importers
-runtime/             Future SDL3, UI and JS scripting runtime
-gameplay/            Future events/ECL, rules and tactical combat
-docs/                Decisions, architecture, OpenXcom comparison, licenses
-tests/               Unit and integration tests
-scripts/             Hygiene checks
+packages/mod-sdk/    Proposed TypeScript mod manifest API
+runtime/             Optional SDL3 exploration window (JS scripting not implemented)
+docs/                Architecture, roadmap, format notes, decisions, research
+tests/               C++ unit tests and Python CLI/controller tests
+scripts/             Installation scanner, hygiene/attribution checks, WSL build
+                     wrapper, side-by-side comparison controller
+assets/              Licensing rule only; no assets are shipped
 ```
+
+Planned directories such as `importers/` and `gameplay/` are described under
+[target layout](docs/architecture.md#target-layout) and will be created when code needs them.
 
 ## Design and legal safeguards
 

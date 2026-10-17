@@ -28,8 +28,9 @@ implementation, method bodies, or translated code is included here.**
 ## Application to our project
 
 - `engine/`: game-independent session, event model, content resolution, and state.
-- `importers/`: isolated per-game binary parsers.
-- `gameplay/`: exploration, events/ECL interpreter, combat and AD&D rules.
+- `formats/`: isolated per-format binary decoders (DAX, ECL, GEO, graphics).
+- Gameplay (exploration, ECL interpreter) currently lives in `engine/`; combat and
+  AD&D rules are not started. See [architecture](architecture.md#target-layout).
 - `runtime/`: rendering, input, UI, and embedded scripts.
 - `packages/mod-sdk/`: strongly typed public authoring interface.
 - `examples/`: synthetic fixtures without copyrighted SSI assets.
