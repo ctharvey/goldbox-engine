@@ -488,3 +488,61 @@ no source was copied, translated or adopted. GNU objdump and a private Unicorn
 installation were analysis tools, not added engine dependencies. The private
 scripts, extracted load image and metadata/emulation reports stay under
 `.cache/goldbox-validation/`. No engine code changed and no C++ build was needed.
+
+### Original ECL RANDOM caller verification (2026-10-17)
+
+The same fingerprinted build's opcode-08 dispatch was followed to its actual
+handler: GAME.OVR file offset 3CBC tests opcode 08 and calls the handler at F7A
+(overlay unit 001F, code offset 0234). Its operand services are exported by
+overlay unit 002B. This identifies the instruction through executable control
+flow, rather than assuming that every runtime Random call has ECL semantics.
+
+The handler's verified numeric behavior is:
+
+```text
+upperByte = resolvedUpperOperand & 255
+runtimeBound = min(upperByte + 1, 255)
+state = (state * 0x08088405 + 1) modulo 2^32
+destination = (state >> 16) modulo runtimeBound
+```
+
+| Resolved upper operand | Runtime bound | Possible result |
+|---:|---:|---|
+| 0 | 1 | 0; still consumes one draw |
+| 1 | 2 | 0..1 |
+| 20 | 21 | 0..20 |
+| 254 | 255 | 0..254 |
+| 255 | 255 | 0..254 |
+| 256 | 1 | 0; word operand narrows to its low byte |
+| 257 | 2 | 0..1 |
+| 65535 | 255 | 0..254 |
+
+Thus ordinary byte bounds below 255 are inclusive, but 255 cannot be produced
+by this instruction. A replacement that always draws from 0 through the full
+resolved upper operand would disagree with this original build. Constant-zero
+results must still advance the generator to preserve subsequent draw order.
+
+Private Unicorn probes executed the original handler, operand decoder, operand
+reader, destination writer, numeric conversion routines and runtime RNG. Overlay
+entry thunks were resolved to private emulator load addresses; instruction bodies
+were unchanged. Only synthetic ECL operands and memory were supplied. No DOSBox
+process, original overlay loader or whole-game event loop was executed.
+
+Verification passed **2,048 handler executions**: all 256 byte bounds, four
+initial states (0, 1, FFFFFFFF, 12345678), and two consecutive draws per case.
+Each execution checked the destination word, resulting 32-bit seed, exactly one
+runtime draw and the six-byte advance over the synthetic instruction. Another
+**32 executions** used word-memory upper operands 0, 255, 256, 257, 511, 65280,
+65534 and 65535 across the same four states; these checked narrowing, the
+unchanged source word, destination, seed, draw count and seven-byte advance.
+Each execution had a 5,000-instruction/one-second limit, with separate whole-probe
+deadlines. Reports and reproduction probes remain private under
+`.cache/goldbox-validation/`; no original routine bytes are committed.
+
+This resolves numeric RANDOM bounds and draw consumption for the tested operand
+forms in this installed build. It does not establish every operand type, another
+title/version's behavior, engine RANDOM support, or complete event parity.
+Live native save/reload and idle-loop RNG observations remain unperformed; the
+save-state conclusion above is still based on static analysis. Future engine
+support should select these semantics through a compatibility profile rather
+than imposing this build's byte narrowing on every game.

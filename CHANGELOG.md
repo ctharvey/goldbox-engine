@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Verify the original DOS ECL RANDOM handler with 2,080 isolated executions.
+  Document inclusive bounds below 255, the 255 edge case, word-to-byte narrowing
+  and one draw even for a zero result. Engine RANDOM remains unsupported; live
+  save/reload parity remains unverified.
+
 - Identify the installed DOS executable's time-seeded 32-bit random generator.
   Isolated execution of its original routines passes 1,120 draw checks and three
   clock-seeding checks. Record startup and save-format evidence separately from

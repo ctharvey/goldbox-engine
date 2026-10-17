@@ -56,6 +56,15 @@ transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations
 with a process timeout. No complete combat implementation is supplied.
 
+RANDOM remains unsupported by the VM. Independent analysis and bounded execution
+of the fingerprinted original DOS Pool of Radiance handler establish a
+build-specific rule: narrow the resolved upper operand to one byte, draw using
+runtime bound `min(upperByte + 1, 255)`, and consume one PRNG draw even when the
+result must be zero. Upper bounds 0..254 are inclusive; 255 yields 0..254.
+This is compatibility research, not a shared rule for all ECL dialects. See the
+[original RNG and handler evidence](../research/local-validation-2026-10-15.md#original-ecl-random-caller-verification-2026-10-17)
+for the generator formula, tested operand forms and remaining parity limits.
+
 `ExplorationSession` supplies map coordinates, facing and raw square info via
 profile-selected addresses. Version-1 local saves preserve position/facing,
 numeric memory and string state. Invalid loads are rejected before publishing
