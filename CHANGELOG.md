@@ -2,6 +2,11 @@
 
 ## 2026-10-16
 
+- Add opt-in profile-selected title screens and an exploration startup menu.
+  Initialize the paired map before movement, load engine saves without rerunning
+  initialization, and return to the menu with rolled-back state on failures.
+  Party creation and full original campaign startup remain unfinished.
+
 - Animate decoded pictures through an explicit profile interval during idle and
   menu waits. Preserve static sprites/portraits, bound timer waits, and keep
   original timing unverified (Pool uses a provisional 400 ms research policy).

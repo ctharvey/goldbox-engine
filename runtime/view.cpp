@@ -6,6 +6,25 @@
 #include <stdexcept>
 
 namespace goldbox {
+std::vector<formats::IndexedImage> load_startup_screens(const formats::DaxArchive& archive,
+    std::span<const std::uint8_t> records) {
+    if (records.empty() || records.size() > 64) throw std::runtime_error("Startup requires 1..64 title records");
+    std::vector<formats::IndexedImage> screens;
+    for (const auto id : records) {
+        const auto decoded = formats::decode_ega_images(archive.extract(id));
+        if (decoded.images.size() != 1) throw std::runtime_error("Startup title requires one EGA image per record");
+        const auto& image = decoded.images.front();
+        // SSI title rendering centers the image; EGA header offsets are not
+        // title placement (Pool's full-width records carry a nonzero X field).
+        const auto x = (320-image.width)/2, y_offset = (200-image.height)/2;
+        formats::IndexedImage canvas{320,200,std::vector<std::uint8_t>(320*200,0)};
+        for (std::size_t y = 0; y < image.height; ++y)
+            std::copy_n(image.pixels.begin()+y*image.width,image.width,
+                canvas.pixels.begin()+(y_offset+y)*320+x);
+        screens.push_back(std::move(canvas));
+    }
+    return screens;
+}
 std::uint8_t font_glyph(unsigned char ascii) {
     if (ascii >= 'a' && ascii <= 'z') ascii -= 'a'-'A';
     if (ascii < 32 || ascii > 95) ascii = '?';

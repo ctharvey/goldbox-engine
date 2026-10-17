@@ -20,6 +20,10 @@ WallHit cast_wall(const formats::GeoMap& map, int row, int column, double dx, do
 // Lowercase UI text folds to uppercase; unsupported bytes use '?'.
 std::uint8_t font_glyph(unsigned char ascii);
 formats::IndexedImage compose_font_atlas(std::span<const formats::IndexedImage> tiles);
+// Explicit EGA17 records in adapter order, centered on 320x200 independently of header offsets.
+// The final screen is the startup menu backdrop. No game/filename heuristics.
+std::vector<formats::IndexedImage> load_startup_screens(const formats::DaxArchive& archive,
+    std::span<const std::uint8_t> records);
 // Native 88x88 perspective view using preprojected wall pieces. Palette index
 // 13 is transparent in wall artwork. Without color configuration, the backdrop
 // remains a placeholder. Color rendering reads state but never changes it.
@@ -29,5 +33,6 @@ int run_exploration_window(ExplorationSession& session, std::string_view source_
     const std::filesystem::path& save, const formats::WallGraphics* graphics = nullptr,
     const ImageArchives* images = nullptr, const GameProfile::ColorBackdrop* backdrop = nullptr,
     std::span<const formats::IndexedImage> font = {}, const GameProfile::Portrait* portrait = nullptr,
-    const WallArchives* wall_archives = nullptr);
+    const WallArchives* wall_archives = nullptr,
+    std::span<const formats::IndexedImage> startup_screens = {});
 } // namespace goldbox

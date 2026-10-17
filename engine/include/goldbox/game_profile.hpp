@@ -40,6 +40,7 @@ struct GameProfile {
     std::optional<Portrait> portrait;
     std::string area_dialect{"disabled"};
     std::uint32_t picture_period_ms{};
+    std::vector<std::uint8_t> startup_title_records; // Ordered screens; last is the menu backdrop.
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

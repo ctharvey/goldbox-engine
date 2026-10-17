@@ -124,6 +124,64 @@ public:
         session = std::move(candidate);
         clear_images();
     }
+    void load_save(const std::filesystem::path& save, std::string_view identity) {
+        if (std::filesystem::is_symlink(save) || !std::filesystem::is_regular_file(save) ||
+            std::filesystem::file_size(save) > 4*1024*1024) throw std::runtime_error("Invalid save file");
+        std::ifstream input(save,std::ios::binary);
+        if (!input) throw std::runtime_error("Cannot read save");
+        const std::string json{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
+        restore(json,identity);
+    }
+    // Returns 0=quit, 1=initialize exploration, 2=load engine save.
+    int startup(std::span<const formats::IndexedImage> screens, const std::string& error) {
+        std::size_t screen = error.empty() ? 0 : screens.size()-1;
+        std::size_t selection = 0;
+        std::size_t uploaded = screens.size();
+        std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> title(nullptr,SDL_DestroyTexture);
+        constexpr const char* options[]{"START EXPLORATION", "LOAD ENGINE SAVE", "QUIT"};
+        while (running) {
+            if (uploaded != screen) {
+                title.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,320,200));
+                if (!title) throw std::runtime_error(SDL_GetError());
+                checked(SDL_SetTextureScaleMode(title.get(),SDL_SCALEMODE_NEAREST));
+                const auto palette = formats::ega_palette();
+                std::vector<formats::Rgba> rgba;
+                for (const auto pixel : screens[screen].pixels) rgba.push_back(palette[pixel]);
+                checked(SDL_UpdateTexture(title.get(),nullptr,rgba.data(),320*4));
+                uploaded = screen;
+            }
+            color(0,0,0); checked(SDL_RenderClear(renderer));
+            const SDL_FRect target{0,0,960,600};
+            checked(SDL_RenderTexture(renderer,title.get(),nullptr,&target));
+            const bool menu = screen+1 == screens.size();
+            if (menu) {
+                color(0,0,0); rectangle(240,448,480,152);
+                color(207,176,112); label(264,464,"GOLDBOX ENGINE - EXPLORATION PREVIEW");
+                for (std::size_t i = 0; i < 3; ++i) {
+                    color(i == selection ? 255 : 160,i == selection ? 220 : 160,160);
+                    label(264,492+float(i)*28,std::string(i == selection ? "> " : "  ")+options[i]);
+                }
+            }
+            color(220,220,220);
+            label(24,608,menu ? "UP / DOWN, ENTER TO SELECT - ESC TO QUIT" : "ENTER / SPACE TO CONTINUE - ESC TO QUIT");
+            if (!error.empty()) { color(255,160,140); label(24,624,error.substr(0,114)); }
+            checked(SDL_RenderPresent(renderer));
+            SDL_Event event;
+            checked(SDL_WaitEvent(&event));
+            if (event.type == SDL_EVENT_QUIT ||
+                (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) return 0;
+            if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
+            const auto key = event.key.key;
+            if (!menu) {
+                if (key == SDLK_RETURN || key == SDLK_SPACE) ++screen;
+            } else {
+                if (key == SDLK_UP) selection = (selection+2)%3;
+                if (key == SDLK_DOWN) selection = (selection+1)%3;
+                if (key == SDLK_RETURN) return selection == 2 ? 0 : static_cast<int>(selection+1);
+            }
+        }
+        return 0;
+    }
     void picture(std::uint8_t id) override {
         if (!images) throw std::runtime_error("No image archives selected");
         if (portrait_config && session.state.memory[portrait_config->head_id_address] != 255)
@@ -292,8 +350,15 @@ public:
 int run_exploration_window(ExplorationSession& session, std::string_view identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images,
     const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
-    const GameProfile::Portrait* portrait, const WallArchives* wall_archives) {
+    const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
+    std::span<const formats::IndexedImage> startup_screens) {
     if (graphics) require_wall_bindings(session,*graphics);
+    if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
+    for (const auto& screen : startup_screens) {
+        if (screen.width != 320 || screen.height != 200 || screen.pixels.size() != 320*200 ||
+            std::any_of(screen.pixels.begin(),screen.pixels.end(),[](auto pixel) { return pixel > 15; }))
+            throw std::runtime_error("Invalid startup screen");
+    }
     SDL_SetMainReady();
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
@@ -305,8 +370,35 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    WindowHost host(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
-    host.text("Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented.",false);
+    const auto create_host = [&] {
+        return std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
+    };
+    auto window_host = create_host();
+    if (!startup_screens.empty()) {
+        const auto initial_session = session;
+        std::string error;
+        while (true) {
+            const auto action = window_host->startup(startup_screens,error);
+            if (!action) return 0;
+            try {
+                if (action == 1) {
+                    const auto result = session.trigger(formats::EclEventKind::initialize,*window_host);
+                    if (!window_host->running) return 0;
+                    if (!result.exited) throw std::runtime_error("Initialization stopped: " + result.diagnostic);
+                } else window_host->load_save(save,identity);
+                break;
+            } catch (const std::exception& failure) {
+                error = failure.what();
+                window_host.reset();
+                session = initial_session;
+                window_host = create_host();
+            }
+        }
+    }
+    auto& host = *window_host;
+    host.text(startup_screens.empty() ?
+        "Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented." :
+        "Exploration ready. Arrows move, Space searches, F5 saves, F9 loads; I reruns initialization.",false);
     const auto trigger = [&](formats::EclEventKind kind) {
         const auto result = session.trigger(kind,host);
         if (!result.exited) host.text("Event stopped: " + result.diagnostic,false);
@@ -342,12 +434,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                 if (!output) throw std::runtime_error("Failed writing save");
                 host.text("State saved.",false);
             } else if (key == SDLK_F9) {
-                if (std::filesystem::is_symlink(save) || !std::filesystem::is_regular_file(save) ||
-                    std::filesystem::file_size(save) > 4*1024*1024) throw std::runtime_error("Invalid save file");
-                std::ifstream input(save,std::ios::binary);
-                if (!input) throw std::runtime_error("Cannot read save");
-                const std::string json{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
-                host.restore(json,identity);
+                host.load_save(save,identity);
                 host.text("State restored.",false);
             }
         } catch (const std::exception& error) {

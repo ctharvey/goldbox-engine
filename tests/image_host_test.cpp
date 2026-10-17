@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <iostream>
 #include <functional>
+#include <fstream>
 
 using namespace goldbox;
 using namespace goldbox::formats;
@@ -70,6 +71,13 @@ struct Host : EclHost {
 };
 }
 int main(int argc, char** argv) {
+#ifdef GOLDBOX_RENDERER
+    if (argc == 3 && std::string_view(argv[1]) == "titles") {
+        const auto screens = load_startup_screens(DaxArchive::from_file(argv[2]),std::array<std::uint8_t,2>{1,2});
+        std::cout << "startup screens=" << screens.size() << " canvas=320x200 validated\n";
+        return 0;
+    }
+#endif
     if (argc == 10 && std::string_view(argv[1]) == "initialize") {
         // Read-only original-resource probe. Never print original text/pixels.
         const auto profile = read_game_profile(argv[2]);
@@ -223,6 +231,56 @@ int main(int argc, char** argv) {
     rejects([&] { no_portraits.portrait(7,9,layout); });
     display.clear(); assert(!display.frame());
 #ifdef GOLDBOX_RENDERER
+    auto title = part(3); title[4] = title[6] = 1;
+    const auto titles = archive(7,title);
+    const auto screens = load_startup_screens(titles,std::array<std::uint8_t,2>{7,7});
+    assert(screens.size() == 2 && screens[0].pixels[0] == 0 && screens[0].pixels[96*320+156] == 3);
+    rejects([&] { (void)load_startup_screens(titles,std::array<std::uint8_t,1>{8}); });
+    rejects([&] { (void)load_startup_screens(titles,{}); });
+    auto outside = title; outside[4] = 40;
+    assert(load_startup_screens(archive(7,outside),std::array<std::uint8_t,1>{7})[0].pixels == screens[0].pixels);
+    auto full_title = part(5); full_title[0] = 200; full_title[2] = 40;
+    full_title[4] = 1; full_title.resize(17+320*200/2,0x55);
+    const auto full = load_startup_screens(archive(7,full_title),std::array<std::uint8_t,1>{7});
+    assert(full[0].pixels.front() == 5 && full[0].pixels.back() == 5);
+    auto multi = part(3); multi[8] = 2; multi.resize(17+64,0x33);
+    rejects([&] { (void)load_startup_screens(archive(7,multi),std::array<std::uint8_t,1>{7}); });
+    const auto startup_save = std::filesystem::temp_directory_path()/"goldbox-startup-test-save.json";
+    assert(!std::filesystem::exists(startup_save));
+    session = {}; session.dialect = dialect; session.opcodes = ops;
+    session.ecl_record = program({9,0,42,1,0,0x4a,0});
+    const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys) {
+        SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
+        for (const auto code : keys) {
+            SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = code;
+            assert(SDL_PushEvent(&event));
+        }
+        assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,nullptr,nullptr,{},
+            nullptr,nullptr,screens) == 0);
+        SDL_Quit();
+    };
+    startup_window({SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 0); // Title escape does not initialize.
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN});
+    assert(session.state.memory[0x4a00] == 0); // Quit from the menu does not initialize.
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 0); // Missing save stays in menu.
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_F5,SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 42 && std::filesystem::exists(startup_save));
+    session.state.memory[0x4a00] = 99;
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 42); // Load uses saved state.
+    session.ecl_record = program({9,0,73,1,0,0x4a,0xff});
+    session.state.memory[0x4a00] = 11;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 11); // Failed initialization rolls back before returning to menu.
+    { std::ofstream invalid(startup_save); invalid << "{}"; }
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.state.memory[0x4a00] == 11); // Failed restore does not enter exploration.
+    std::filesystem::remove(startup_save);
+    auto invalid_screens = screens; invalid_screens[0].pixels[0] = 16;
+    rejects([&] { (void)run_exploration_window(session,"startup-synthetic",{},nullptr,nullptr,nullptr,{},
+        nullptr,nullptr,invalid_screens); });
     session = {};
     session.dialect = dialect; session.opcodes = ops;
     session.ecl_record = program({0x0e,0,7,0x0c,0,7,0,0,0,255,0x0d,0x31,

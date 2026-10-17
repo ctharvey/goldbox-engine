@@ -1,5 +1,18 @@
 # Third-party licensing and provenance
 
+## Startup title/menu shell (2026-10-16)
+
+SSI Engine Pool properties, `ui/classic/ClassicMode.java`,
+`ui/classic/TitleRenderer.java` and `engine/Engine.java` at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`
+were consulted for title record ordering, centering independently of EGA header
+offsets, the final title as menu backdrop,
+and the distinction between mode/program menus and starting a game. These
+remain research-only references. Existing MIT-attributed EGA decoding and the
+SDL renderer provide meaningful reusable components; no Java menu, scheduler,
+party or startup implementation was copied/ported. The independent C++ shell
+uses explicit input advances and an exploration-only menu. It does not adopt
+upstream timed title switching or claim a complete original New Game flow.
+
 ## ECL picture/sprite host (2026-10-16)
 
 SSI Engine `VirtualMachine.java`, `Engine.java`, `ClassicMode.java`,

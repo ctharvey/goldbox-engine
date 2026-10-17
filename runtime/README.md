@@ -154,3 +154,33 @@ research only. See the attribution registry and SDL notice in `licenses/`.
 With the renderer enabled, CTest covers cardinal/oblique/boundary rays, opposing
 walls, invalid rays, and the real SDL event loop under its dummy/software driver:
 movement, an ECL menu/state write, save/load and exit. Public fixtures are synthetic.
+
+## Startup preview
+
+With `--window`, insert `--startup /private/TITLE.DAX` alongside the other
+resource options. The profile must explicitly list `startupTitleRecords` in
+presentation order (1..64 byte-sized IDs). Pool selects `[1,2]` from pinned
+SSI Engine configuration; the last screen is the menu backdrop. No archive,
+map, ECL or resource-group association is guessed. Existing launches without
+`--startup` still open exploration directly.
+
+Title records use the existing strict EGA17 decoder, one image per record,
+centered on a 320x200 black canvas. The title adapter ignores EGA header
+offsets for placement, matching the researched title renderer; the decoder
+still preserves them. Unsupported composite
+or multi-frame title records fail explicitly. Enter/Space advances screens;
+the last screen offers Start exploration, Load engine save, and Quit using
+Up/Down and Enter. Escape or closing the window quits. Titles wait for input;
+original timed title transitions and exact menu layout are not reproduced.
+
+Start exploration executes the explicitly paired map/ECL initialization before
+accepting movement. Successful initialization uses the existing image/wall/menu
+host callbacks. Failure discards its partial state and presentation changes,
+returns to the startup menu, and displays a diagnostic. Loading uses the same
+bounded save reader and resource-identity/graphics checks as F9; it does not
+rerun initialization. Saves are engine exploration saves, not DOS saves.
+
+This is a startup shell for the exploration pilot. Party creation, character
+import, original save import, campaign startup state and NEW_ECL transitions
+remain unfinished. The start action does not fabricate a party or claim that
+a standalone map initialization reproduces the original New Game sequence.

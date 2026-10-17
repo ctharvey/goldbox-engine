@@ -15,7 +15,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
-        "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs"}, "game profile");
+        "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -27,7 +27,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "eventDialect", "game profile"), "profile.eventDialect"),
         j::string(j::field(root, "rulesProfile", "game profile"), "profile.rulesProfile"),
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
-        {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled"
+        {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled", 0, {}
     };
     static const std::regex id_pattern(R"(^[a-z0-9][a-z0-9._-]{0,127}$)");
     if (!std::regex_match(profile.id, id_pattern) || profile.id.find("..") != std::string::npos ||
@@ -74,6 +74,15 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         profile.image_dialect = j::string(*images,"imageDialect");
         if (profile.image_dialect != "disabled" && profile.image_dialect != "ssi-images-3-v1")
             throw std::runtime_error("Unsupported image dialect");
+    }
+    if (const auto* value = root.if_contains("startupTitleRecords")) {
+        const auto& records = j::array(*value,"startupTitleRecords");
+        if (records.empty() || records.size() > 64) throw std::runtime_error("Startup requires 1..64 title records");
+        for (const auto& record : records) {
+            const auto id = j::integer(record,"startup title record");
+            if (id < 0 || id > 255) throw std::runtime_error("Invalid startup title record");
+            profile.startup_title_records.push_back(static_cast<std::uint8_t>(id));
+        }
     }
     if (const auto* value = root.if_contains("picturePeriodMs")) {
         const auto period = j::integer(*value,"picturePeriodMs");

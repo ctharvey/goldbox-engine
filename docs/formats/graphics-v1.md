@@ -245,3 +245,16 @@ images and picture sequences, so it must not be assigned one guessed decoder.
 SSI Engine's pinned `ClassicMode.java`, `Palette.java`, `UIResourceManager.java`
 and `UIScaler.java` were consulted for layering, opaque colors and placement.
 The C++ compositor was independently implemented; no Java was copied or ported.
+
+## Startup title adapter
+
+`load_startup_screens` reads explicitly ordered EGA17 DAX records supplied by
+`startupTitleRecords`; each must contain one image fitting a 320x200 canvas. The title adapter centers
+the image and pads uncovered pixels with opaque black, independently of EGA
+header offsets. Both local original titles are 320x200 with a nonzero X field;
+SSI Engine TitleRenderer likewise centers titles rather than using that field. Rendering
+uses the standard EGA palette and nearest-neighbor scaling independently of the
+88x88 event-image host. Title ordering and selection belong to the adapter;
+the shared renderer contains no title-specific filename or game-ID branches.
+Pool's records 1 and 2 were selected from pinned SSI Engine title configuration.
+This does not establish original title timing, menu geometry or campaign parity.
