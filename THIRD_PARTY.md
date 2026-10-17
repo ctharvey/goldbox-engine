@@ -11,6 +11,15 @@ images, rejects mismatched sizes/counts and removes System.Drawing, filename
 palette guessing and count adjustments. Independent wall assembly and explicit
 bank loading were added to that MIT file. No SSI pixel data is included.
 
+The same MIT integration now includes headerless mono tiles and multi-frame
+EGA images from `MonoBlock.cs`, `MonoBlockSpecification.cs`, `EgaSpriteBlock.cs`
+and `EgaSpriteBlockSpecification.cs` at that revision. It retains per-frame
+metadata, makes independent/XOR-first modes and palette policy explicit,
+preserves source bytes and adds strict bounds/exact-consumption checks.
+SSI Engine `EGADependentImages.java`, `ExtendedEGAImage.java` and
+`ExtendedEGADependentImages.java` were additional research-only cross-checks;
+no GPL-3.0-only Java implementation was ported. No upstream assets were copied.
+
 SSI Engine `EGAImage.java`, `Palette.java`, `WallDef.java`,
 `DungeonWallSetBuilder.java`, `DungeonRenderer.java` and `DungeonMap.java` at
 `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` were research references for format,

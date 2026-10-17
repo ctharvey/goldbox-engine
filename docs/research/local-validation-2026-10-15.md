@@ -116,3 +116,49 @@ automatically verified map/ECL/artwork relationship. ECL-selected bank changes,
 original backdrops and an original-game scene at matching position/facing remain
 unverified. No proprietary images, map bytes or extracted content are included
 in this report or the public tests.
+
+## Monochrome, picture and sprite validation (2026-10-16)
+
+Explicit-format read-only checks accepted all selected records: 177 mono tiles
+from `8X8D1.DAX` record 201; 325 frames from 92 PIC records; 258 frames from
+88 SPRIT records; 218 images from 218 CPIC records. The earlier EGA-only check
+correctly rejected record 201; the new explicit mono adapter now handles it.
+No fallback-by-length was introduced. These counts include repeated resources
+stored in multiple archives and do not imply unique artworks or scene parity.
+
+PIC was selected as XOR-first, SPRIT as independent frames, and CPIC as the
+existing 17-byte EGA format. All 25 selected archive/format checks returned zero.
+Palette remapping is tested synthetically; these checks establish decoding and
+metadata validity, not original display/color/timing equivalence. Glyph identity,
+ECL picture/sprite selection, distance/animation semantics and UI rendering of
+these additional image families remain unverified or unimplemented.
+
+| Archive | Format | Records | Frames/tiles | Bytes | SHA-256 |
+| --- | --- | ---: | ---: | ---: | --- |
+| 8X8D1.DAX (201) | mono8 | 1 | 177 | 9711 | `cce9313f23a600200fec60b5d46cd08aa9535a6143eee5d5d768a1d4e0415021` |
+| PIC1.DAX | xor-first | 7 | 26 | 36273 | `ff636705387218dcca9b8f559e12223d2f1ab1ca45c56fcc5e11b6fd67f0891d` |
+| PIC2.DAX | xor-first | 13 | 48 | 71533 | `aa0f7e67e65b362e19056a6d869b9238e2d2815404c508c7e93f72f0abef0f21` |
+| PIC3.DAX | xor-first | 3 | 10 | 15316 | `44fc6edc72bad4a62ac4b5c45ca90ff99d59370044342c0bb2e3e8b4809d028d` |
+| PIC4.DAX | xor-first | 17 | 68 | 91885 | `346d2f48680a7693137c2a2366903fbe59ce1de94f7b02b2654a81b7e2d6cdc8` |
+| PIC5.DAX | xor-first | 10 | 34 | 46750 | `522f71a6de97a59e69e11985c91b5cae279961c30648b26286036a14f1710227` |
+| PIC6.DAX | xor-first | 14 | 45 | 66888 | `2c93668dc322c4823b20d7be7ae51653f0c03f31fd1f94dc8c109541f71d0234` |
+| PIC7.DAX | xor-first | 14 | 52 | 67804 | `4171a7d575b562ccb9bbe28fa1e4d0fa3250625744a418931d0721a07a3b12cd` |
+| PIC8.DAX | xor-first | 14 | 42 | 67227 | `760cf9042110bbf41e60bb4b0cf76635398751ceaf1ce693dc5e39ef92d8200a` |
+| SPRIT1.DAX | independent | 5 | 15 | 5613 | `a7a822a1fb883aa619881e0cfca0b8534b29ee07786b5eab722c3e7163bde3a7` |
+| SPRIT2.DAX | independent | 15 | 45 | 16768 | `413c1dd3a1a787122396aab3b9451b4c4058ad1a0612309945cd6064fce8585e` |
+| SPRIT3.DAX | independent | 7 | 21 | 6124 | `890f70ff6fb131f03abca845f5468b601fda3c1b5daf9dc163b72dad6bf1f9d0` |
+| SPRIT4.DAX | independent | 12 | 36 | 11176 | `3a32d1a894ab35c5a6541d9cd686ee61ef6a18bb7a1a5581132e181c3c10aef1` |
+| SPRIT5.DAX | independent | 11 | 33 | 13174 | `edcba16aab8187feb733f2edd50e4b7edec9b18af6a7a48973af231d1e47dd59` |
+| SPRIT6.DAX | independent | 14 | 38 | 13727 | `53b777d72abba897d20452fe68ab4242bbc0fcb58101991fc7000860bef61079` |
+| SPRIT7.DAX | independent | 12 | 36 | 12985 | `11090b90c51a655ade1aaa0b76e2ab30ce961d1e2d4f17483a91b11d51f30f5d` |
+| SPRIT8.DAX | independent | 12 | 34 | 14853 | `046fb1431b1401e7267ad79038c74160cb9d91c77dbc10cb6a7acfd3cccd2c47` |
+| CPIC1.DAX | ega | 22 | 22 | 6182 | `61a13e8daf91b511d316ecdc4e230e776c7d2de49894ccef3c30e2e250c09ff3` |
+| CPIC2.DAX | ega | 38 | 38 | 11505 | `d9c24617095cb341a843fdb4921fe54d3d4ee0f909de2b3179301afb7ae567ba` |
+| CPIC3.DAX | ega | 14 | 14 | 3150 | `0e063d1b659832639c859f4248e538a2ea69917acfcad394aaecec43228336df` |
+| CPIC4.DAX | ega | 44 | 44 | 12154 | `181fe21499fce0504d84bcc3bb01d7911db74584400cdaa857a9fe7a20fdfac9` |
+| CPIC5.DAX | ega | 20 | 20 | 7779 | `ace0d371b4e5a7fcb894a3c6b6078751ac52445b9e435897432e0a6ce576f705` |
+| CPIC6.DAX | ega | 30 | 30 | 8101 | `f8285ccd2642a3c8c90b74810952796f240ee189412a5e24d7ed167c0ac424c6` |
+| CPIC7.DAX | ega | 22 | 22 | 6178 | `6918aa709d53ef608574d734c879216f09c362ac1c8805f680232aad4744544a` |
+| CPIC8.DAX | ega | 28 | 28 | 10325 | `dda82c9521fad757cf8dd35756393d76937a471224895ac99da92218c2a92f30` |
+
+No pixels, glyph bitmaps or proprietary extracted content are included.

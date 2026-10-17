@@ -12,7 +12,8 @@ The CGA mapping is retained as metadata, not interpreted as an EGA palette.
 
 Dimensions must be nonzero and at most 320x200; count must be nonzero and the
 payload length must match exactly. The decoder does not guess VGA, monochrome,
-combat palette swaps or count-plus-one variants. Those need separate adapters.
+palette swaps or count-plus-one variants. Explicit mono/sequence/palette adapters
+are described below; VGA and count-plus-one variants remain unsupported.
 
 `WALLDEF` contains one or more 156-byte definitions. Each byte selects an 8x8
 tile. Views are row-major tile grids in this order:
@@ -76,3 +77,56 @@ timeout 30 ./build/tests/goldbox_graphics_tests \
 It prints counts and per-record diagnostics, not pixels, strings or extracted
 content. Non-EGA records are counted as unsupported; wall failures return an
 error. Keep installation tests and rendered original artwork outside the repo.
+
+## Monochrome tiles and picture/sprite sequences
+
+`decode_mono8_tiles` explicitly decodes headerless 8x8 tiles: eight bytes per
+tile, one byte per row, most-significant bit on the left, black index 0 and
+white index 15. Empty, partial and over-256-tile strips are rejected. It is
+never used as an automatic fallback for a failed EGA decode. In the inspected
+installation, `8X8D1.DAX` record 201 contains 177 such tiles. Glyph identity and
+character encoding are not established, and the UI font has not been replaced.
+
+`decode_ega_sequence` takes an explicit independent or XOR-first mode. A leading
+byte gives 1..8 frames, each with this 21-byte header followed by packed nibbles:
+
+| Relative byte | Value |
+| --- | --- |
+| 0..3 | Little-endian raw delay; timing unit unverified |
+| 4..5 | Height in pixels |
+| 6..7 | Width in eight-pixel units |
+| 8..9 / 10..11 | X/Y offsets in eight-pixel units |
+| 12 | Preserved raw byte; meaning not assumed |
+| 13..20 | Preserved CGA mapping |
+
+Dimensions are bounded to 320x200 and offsets must fit 16-bit pixel coordinates.
+Independent frames may differ in size. XOR-first frames must share dimensions;
+every later packed frame is XORed with the **original first frame**, not the
+preceding decoded frame. Decoding does not mutate source bytes and rejects
+truncated headers/pixels or trailing data rather than returning partial output.
+SPRIT frames are not automatically treated as animation; distance selection and
+ECL picture/sprite callbacks remain unimplemented.
+
+Palette policy is explicit and separate from indexed decoding. Standard EGA is
+opaque. Sprite policy makes index 0 transparent and maps index 13 to opaque
+black. Combat policy makes index 0 transparent and maps index 8 to opaque black.
+The standard policy is the default, preserving wall-renderer behavior.
+
+These additions adapt MIT Gold Box Explorer `MonoBlock.cs`, `EgaSpriteBlock.cs`
+and their specifications at the same pinned revision, preserving the existing
+license and attribution. SSI Engine `EGADependentImages.java` independently
+confirms first-frame XOR and per-frame metadata as a research reference only;
+no Java implementation was ported. Filename-based mode/palette selection and
+source-buffer mutation were removed; bounds and exact-consumption tests added.
+
+Opt-in read-only local validation examples (public CTest remains synthetic):
+
+```sh
+timeout 30 ./build/tests/goldbox_image_sequence_tests mono8 /private/8X8D1.DAX 201
+timeout 30 ./build/tests/goldbox_image_sequence_tests xor-first /private/PIC1.DAX
+timeout 30 ./build/tests/goldbox_image_sequence_tests independent /private/SPRIT1.DAX
+timeout 30 ./build/tests/goldbox_image_sequence_tests ega /private/CPIC1.DAX
+```
+
+The validator prints record/frame counts and diagnostics only. This does not
+export images, interpret ECL selection or establish original-game scene parity.

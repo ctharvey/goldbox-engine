@@ -2,6 +2,13 @@
 
 ## 2026-10-16
 
+- Add bounded monochrome 8x8 strips and per-frame EGA picture/sprite decoding
+  with explicit independent/XOR-first modes and standard/sprite/combat palettes.
+  Preserve raw timing and offsets without mutating input; reject malformed or
+  mismatched frames. Validate local picture, sprite, combat-image and mono
+  resources with public-safe counts/hashes and synthetic regression tests.
+  ECL image selection, UI font mapping and scene parity remain unfinished.
+
 - Decode bounded SSI EGA images and 156-byte wall definitions, shared tiles,
   split/continuation banks and transparency. Add explicit original-artwork
   selection to the SDL view with a native 88x88 perspective compositor.

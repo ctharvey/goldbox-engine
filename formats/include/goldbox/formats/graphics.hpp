@@ -17,7 +17,22 @@ struct EgaImages {
 // count adjustments or VGA/combat palette selection. Dimensions <=320x200.
 EgaImages decode_ega_images(std::span<const std::uint8_t> record);
 using Rgba = std::array<std::uint8_t,4>;
-std::array<Rgba,16> ega_palette();
+enum class EgaPaletteKind { standard, sprite, combat };
+std::array<Rgba,16> ega_palette(EgaPaletteKind kind = EgaPaletteKind::standard);
+
+// Explicit formats: no filename/length-based fallback between unrelated codecs.
+std::vector<IndexedImage> decode_mono8_tiles(std::span<const std::uint8_t> record);
+enum class EgaFrameEncoding { independent, xor_first };
+struct EgaFrame {
+    std::uint32_t delay{}; // Raw engine timing value; no milliseconds claim.
+    std::uint16_t x_offset{}, y_offset{};
+    std::uint8_t header_byte{};
+    std::array<std::uint8_t,8> cga_mapping{};
+    IndexedImage image;
+};
+// 1-byte count, then a 21-byte header and packed pixels per frame. PIC-style
+// dependent frames XOR against the original first frame, not the previous one.
+std::vector<EgaFrame> decode_ega_sequence(std::span<const std::uint8_t> record, EgaFrameEncoding encoding);
 
 // Original views: far front/left/right, medium front/left/right,
 // close front/left/right, far filler. Each definition is exactly 156 indices.

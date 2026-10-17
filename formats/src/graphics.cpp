@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Attribution-ID: gold-box-explorer-ega
 // Copyright (c) 2018 Bil Simser
-// EGA packed-pixel decoding adapted from Gold Box Explorer's EgaBlock.cs.
+// EGA/mono decoding adapted from Gold Box Explorer's EgaBlock.cs,
+// EgaSpriteBlock.cs and MonoBlock.cs (see attribution registry).
 // Bounds, indexed output, wall assembly and explicit bank loading added here.
 // MIT notice: licenses/gold-box-explorer-MIT.txt
 #include "goldbox/formats/graphics.hpp"
@@ -48,7 +49,66 @@ EgaImages decode_ega_images(std::span<const std::uint8_t> record) {
     return result;
 }
 
-std::array<Rgba,16> ega_palette() {
+std::vector<IndexedImage> decode_mono8_tiles(std::span<const std::uint8_t> record) {
+    if (record.empty() || record.size()%8 || record.size() > 256*8)
+        throw std::runtime_error("Invalid monochrome 8x8 tile strip");
+    std::vector<IndexedImage> result;
+    for (std::size_t at = 0; at < record.size(); at += 8) {
+        IndexedImage tile{8,8,{}};
+        tile.pixels.reserve(64);
+        for (const auto row : record.subspan(at,8)) for (unsigned bit = 0; bit < 8; ++bit)
+            tile.pixels.push_back(row & (0x80 >> bit) ? 15 : 0);
+        result.push_back(std::move(tile));
+    }
+    return result;
+}
+
+std::vector<EgaFrame> decode_ega_sequence(std::span<const std::uint8_t> record, EgaFrameEncoding encoding) {
+    if (encoding != EgaFrameEncoding::independent && encoding != EgaFrameEncoding::xor_first)
+        throw std::runtime_error("Invalid EGA frame encoding");
+    if (record.empty() || !record[0] || record[0] > 8)
+        throw std::runtime_error("Unsupported EGA sequence frame count");
+    std::vector<EgaFrame> result;
+    std::vector<std::uint8_t> base;
+    std::size_t cursor = 1;
+    for (unsigned n = 0; n < record[0]; ++n) {
+        if (record.size()-cursor < 21) throw std::runtime_error("Truncated EGA sequence header");
+        const auto header = record.subspan(cursor,21);
+        const auto height = word(header,4), columns = word(header,6);
+        if (!height || height > 200 || !columns || columns > 40 || word(header,8) > 8191 || word(header,10) > 8191)
+            throw std::runtime_error("Unsupported EGA sequence dimensions/offsets");
+        const std::size_t width = columns*8, packed_size = width*height/2;
+        cursor += 21;
+        if (record.size()-cursor < packed_size) throw std::runtime_error("Truncated EGA sequence pixels");
+        if (n && encoding == EgaFrameEncoding::xor_first &&
+            (result[0].image.width != width || result[0].image.height != height))
+            throw std::runtime_error("Dependent EGA frames must match the first frame dimensions");
+        EgaFrame frame;
+        frame.delay = std::uint32_t(header[0]) | (std::uint32_t(header[1]) << 8) |
+            (std::uint32_t(header[2]) << 16) | (std::uint32_t(header[3]) << 24);
+        frame.x_offset = word(header,8)*8;
+        frame.y_offset = word(header,10)*8;
+        frame.header_byte = header[12];
+        std::copy_n(header.begin()+13,8,frame.cga_mapping.begin());
+        frame.image = {static_cast<std::uint16_t>(width),height,{}};
+        frame.image.pixels.reserve(width*height);
+        const auto packed = record.subspan(cursor,packed_size);
+        if (!n && encoding == EgaFrameEncoding::xor_first) base.assign(packed.begin(),packed.end());
+        for (std::size_t i = 0; i < packed.size(); ++i) {
+            const auto b = n && encoding == EgaFrameEncoding::xor_first ? packed[i]^base[i] : packed[i];
+            frame.image.pixels.push_back(b >> 4);
+            frame.image.pixels.push_back(b & 15);
+        }
+        result.push_back(std::move(frame));
+        cursor += packed_size;
+    }
+    if (cursor != record.size()) throw std::runtime_error("Trailing EGA sequence data");
+    return result;
+}
+
+std::array<Rgba,16> ega_palette(EgaPaletteKind kind) {
+    if (kind != EgaPaletteKind::standard && kind != EgaPaletteKind::sprite && kind != EgaPaletteKind::combat)
+        throw std::runtime_error("Invalid EGA palette kind");
     std::array<Rgba,16> result{};
     for (unsigned i = 0; i < 16; ++i) {
         const unsigned bright = i & 8 ? 85 : 0;
@@ -57,6 +117,10 @@ std::array<Rgba,16> ega_palette() {
             static_cast<std::uint8_t>((i & 1 ? 170 : 0)+bright),255};
     }
     result[6][1] = 85; // EGA brown, rather than dark yellow.
+    if (kind != EgaPaletteKind::standard) {
+        result[kind == EgaPaletteKind::sprite ? 13 : 8] = result[0];
+        result[0][3] = 0;
+    }
     return result;
 }
 

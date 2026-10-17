@@ -89,14 +89,17 @@
         "src/main/java/data/palette/Palette.java",
         "src/main/java/data/dungeon/WallDef.java",
         "src/main/java/ui/shared/dungeon/DungeonWallSetBuilder.java",
-        "src/main/java/ui/classic/DungeonRenderer.java"
+        "src/main/java/ui/classic/DungeonRenderer.java",
+        "src/main/java/data/image/EGADependentImages.java",
+        "src/main/java/data/image/ExtendedEGAImage.java",
+        "src/main/java/data/image/ExtendedEGADependentImages.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,
       "licenseUrl": "https://github.com/TiCoKH/ssi-engine/blob/master/LICENSE",
       "copyrightNotice": "Upstream authors, as documented by source history",
       "localFiles": [],
-      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics; cross-check graphics headers, shared/additional tile ordering, bank continuation, transparency and native perspective geometry",
+      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics; cross-check graphics headers, shared/additional tile ordering, bank continuation, transparency and native perspective geometry; cross-check PIC first-frame XOR semantics and per-frame metadata",
       "modifications": "No Java source copied or translated. Independent bounded C++ implementation informed by observable behavior; profile address facts transcribed from configuration. No upstream engine, dependency or rules implementation adopted.",
       "reviewed": "2026-10-16"
     },
@@ -195,7 +198,11 @@
       "upstreamRevision": "eac30abaa6ee66aea6f5d65ebe6d676b10015a8f",
       "upstreamFiles": [
         "src/Common/Plugins/Dax/EgaBlock.cs",
-        "src/Common/Plugins/Dax/EgaBlockSpecification.cs"
+        "src/Common/Plugins/Dax/EgaBlockSpecification.cs",
+        "src/Common/Plugins/Dax/EgaSpriteBlock.cs",
+        "src/Common/Plugins/Dax/EgaSpriteBlockSpecification.cs",
+        "src/Common/Plugins/Dax/MonoBlock.cs",
+        "src/Common/Plugins/Dax/MonoBlockSpecification.cs"
       ],
       "license": "MIT",
       "licenseFile": "licenses/gold-box-explorer-MIT.txt",
@@ -204,8 +211,8 @@
       "localFiles": [
         "formats/src/graphics.cpp"
       ],
-      "purpose": "SSI EGA image header and packed high/low-nibble pixel decoder",
-      "modifications": "Adapted C# decoding to bounded C++ indexed images. Exact payload/dimension/count checks; retain CGA mapping and offsets; no System.Drawing, filename-dependent palette guessing or count-plus-one heuristic. Wall assembly, bank loading and EGA bit-derived palette are independent additions in the same MIT file. No SSI images copied.",
+      "purpose": "SSI EGA single-image and multi-frame packed-pixel decoding plus monochrome 8x8 tile strips",
+      "modifications": "Adapted C# decoding to bounded C++ indexed images. Exact payload/dimension/count checks; retain CGA mapping and offsets; no System.Drawing, filename-dependent palette guessing or count-plus-one heuristic. Wall assembly, bank loading and EGA bit-derived palette are independent additions in the same MIT file. No SSI images copied. Added explicit independent/XOR-first sequence modes, immutable base-frame decoding, raw timing/offset/header metadata, exact consumption, dimension/count limits and explicit standard/sprite/combat palettes. Mono bits become indexed black/white tiles; no filename-based format selection or partial decode results.",
       "reviewed": "2026-10-16"
     }
   ]
