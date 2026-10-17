@@ -9,7 +9,7 @@ from compare_common import COMMANDS, ControlledError, ENGINE_QUIT_DRAIN_SECONDS,
 from compare_config import _reject
 from compare_stream import _wait_bounded
 from compare_wsl import WslEngine
-from reference_input import WindowsMessages, key_sequence
+from reference_input import ReferenceInputError, WindowsMessages, key_sequence
 
 
 RENDER_FIELD_LIMIT = 4096
@@ -189,6 +189,7 @@ class Session:
     def _finish_streamdown(self):
         remainder = max(self.deadline - time.monotonic(), 0.0)
         budget = min(max(remainder, 0.5), ENGINE_QUIT_DRAIN_SECONDS)
+        drain_deadline = time.monotonic() + budget  # one budget for exit and EOF together
         try:
             self.engine.process.wait(timeout=budget)
         except subprocess.TimeoutExpired as error:
@@ -198,10 +199,9 @@ class Session:
         if code != 0:
             raise ControlledError(
                 f"engine exited with code {code} after acknowledging quit")
-        deadline = time.monotonic() + budget
         while True:
             self._check_housekeeping()
-            leftover = deadline - time.monotonic()
+            leftover = drain_deadline - time.monotonic()
             if leftover <= 0:
                 raise ControlledError(
                     "engine stdout did not reach EOF within the post-ack drain budget")
@@ -301,7 +301,11 @@ class Session:
             if self.reference_input is None:
                 raise ControlledError("reference input is not configured")
             if verb == "arm":
-                self.reference_input.window()
+                try:
+                    self.reference_input.window()
+                except ReferenceInputError as error:
+                    print(f"[ignored] cannot arm yet: {error}")
+                    return
                 self.armed = True
                 print("[dual input] armed; action/menu keys go to both sides. Baseline remains unverified.")
             elif verb == "disarm":
@@ -310,7 +314,11 @@ class Session:
             else:
                 if self.armed:
                     raise ControlledError("disarm before sending reference-only staging keys")
-                keys = key_sequence(item.upper().split()[1:])
+                try:
+                    keys = key_sequence(item.upper().split()[1:])
+                except ReferenceInputError as error:
+                    print(f"[ignored] nothing was sent: {error}")
+                    return
                 self._send(None, keys)
                 print("[reference] staging keys delivered")
             return

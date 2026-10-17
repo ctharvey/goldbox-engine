@@ -22,6 +22,7 @@ class ConsoleInput(threading.Thread):
     def run(self):
         try:
             buffer = bytearray()
+            scanned = 0
             while self.failure is None:
                 try:
                     # Avoid holding Python's buffered stdin lock at interpreter shutdown.
@@ -31,10 +32,15 @@ class ConsoleInput(threading.Thread):
                 if not chunk:
                     break
                 buffer.extend(chunk)
-                while b"\n" in buffer and self.failure is None:
-                    line, _, rest = bytes(buffer).partition(b"\n")
-                    buffer = bytearray(rest)
+                while self.failure is None:
+                    newline = buffer.find(b"\n", scanned)
+                    if newline < 0:
+                        break
+                    line = bytes(buffer[:newline])
+                    del buffer[:newline + 1]
+                    scanned = 0
                     self._offer(line)
+                scanned = len(buffer)
                 if len(buffer) > OPERATOR_LINE_LIMIT:
                     self.failure = FloodError("operator input exceeds its bounded line limit")
             if self.failure is None:
@@ -80,7 +86,8 @@ class _BoundedDrain(threading.Thread):
             while True:
                 try:
                     chunk = self.stream.read1(CHUNK)
-                except OSError:
+                except OSError as error:
+                    self.failure = ControlledError(f"{self.what} read failed: {error}")
                     return
                 if not chunk:
                     return
@@ -124,11 +131,14 @@ class EngineStdoutReader(threading.Thread):
 
     def run(self):
         buffer = bytearray()
+        scanned = 0
         try:
             while True:
                 try:
                     chunk = self.stream.read1(CHUNK)
-                except OSError:
+                except OSError as error:
+                    self.queue.mark_failure(
+                        ControlledError(f"engine stdout read failed: {error}"))
                     break
                 if not chunk:
                     break
@@ -139,20 +149,25 @@ class EngineStdoutReader(threading.Thread):
                         f"({ENGINE_OUTPUT_LIMIT} bytes)"))
                     return
                 buffer.extend(chunk)
-                if b"\n" not in buffer and len(buffer) > ENGINE_LINE_LIMIT:
-                    self.queue.mark_failure(FloodError(
-                        f"engine line exceeds the {ENGINE_LINE_LIMIT} byte bound "
-                        "before any newline"))
-                    return
-                while b"\n" in buffer:
-                    line, _, rest = bytes(buffer).partition(b"\n")
-                    buffer = bytearray(rest)
+                while True:
+                    newline = buffer.find(b"\n", scanned)
+                    if newline < 0:
+                        break
+                    line = bytes(buffer[:newline])
+                    del buffer[:newline + 1]
+                    scanned = 0
                     if len(line) > ENGINE_LINE_LIMIT:
                         self.queue.mark_failure(FloodError(
                             f"engine line longer than the {ENGINE_LINE_LIMIT} byte bound"))
                         return
                     if not self._offer(line):
                         return
+                scanned = len(buffer)
+                if len(buffer) > ENGINE_LINE_LIMIT:
+                    self.queue.mark_failure(FloodError(
+                        f"engine line exceeds the {ENGINE_LINE_LIMIT} byte bound "
+                        "before any newline"))
+                    return
             if buffer:
                 self._offer(bytes(buffer))
             self.queue.put(("eof", None))

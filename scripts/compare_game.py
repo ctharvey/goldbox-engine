@@ -100,7 +100,7 @@ def run_session(config):
         if code != 0:
             raise ControlledError(f"session returned an unexpected status {code!r}")
         reference_exit = reference.process.poll()
-        if reference_exit is not None and reference_exit != 0:
+        if reference_exit is not None:  # same policy as Session._check_reference
             raise ControlledError(
                 f"reference exited with code {reference_exit}; session inconclusive "
                 "(no comparison result)")

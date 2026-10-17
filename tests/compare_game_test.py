@@ -748,6 +748,25 @@ def test_input_hardening(fixture):
     check(sink.getvalue() == "", f"rejected event was partly printed: {sink.getvalue()!r}")
 
 
+def test_reader_errors_are_failures(fixture):
+    # F18: a pipe read error must surface as a failure, not as a silent EOF.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+
+    class BrokenStream:
+        def read1(self, size):
+            raise OSError("synthetic pipe error")
+
+    drain = compare_game._BoundedDrain(BrokenStream(), "synthetic pipe", 1024)
+    drain.run()
+    check(drain.failure is not None and "synthetic pipe error" in str(drain.failure),
+          f"drain swallowed the read error: {drain.failure!r}")
+    events = compare_game._EventQueue()
+    compare_game.EngineStdoutReader(BrokenStream(), events).run()
+    check(events.failure is not None and "synthetic pipe error" in str(events.failure),
+          f"reader swallowed the read error: {events.failure!r}")
+
+
 def test_termination_signals(fixture):
     # F5: a termination signal must run the cleanup path, not skip it. Windows
     # delivers CTRL_BREAK_EVENT; POSIX delivers SIGTERM and SIGHUP.
@@ -873,6 +892,7 @@ def main():
         test_launcher_and_containment_bypasses(fixture)
         test_cleanup_failure_handling(fixture)
         test_input_hardening(fixture)
+        test_reader_errors_are_failures(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
         if len(sys.argv) == 3:
