@@ -665,3 +665,56 @@ suites passed (19.06 seconds); the optional private integration test skipped
 because its private inputs were not configured. Hygiene, attribution and
 whitespace checks passed. Synthetic cases also cover alternate ability layouts,
 invalid adjustment counts/types/ranges and unchanged draw consumption.
+
+### Racial bounds and exceptional-strength caps (2026-10-17)
+
+Bounded execution of the original post-roll code verifies clamping to the
+existing race/gender minimum and maximum tables, with no random draws.
+The private probe enters each ability's bound block directly and stops at the
+first read of the character class code. This deliberately excludes age and
+class-floor processing. Entry file offsets are 0x1AD47, 0x1AF29, 0x1B0B5,
+0x1B222, 0x1B385 and 0x1B46D for STR through CHA in the previously fingerprinted
+GAME.OVR. Synthetic input scores 0, 2, 3, 8, 18, 19 and 255 across six races,
+two genders and six abilities pass **504 cases**, all without RNG consumption.
+The creation rules' current racial limits match these observed tables.
+
+A second probe enters the original exceptional-strength block at 0x1AE59 and
+stops before 0x1AECD. Synthetic fighter flags and legal capped strength values
+exercise six races, two genders and six states: **72 cases**, 36 runtime draws.
+The routine draws Random(100)+1 when strength is 18 and the fighter flag is set,
+then caps the percentile to the race/gender maximum. It does not roll directly
+within a smaller cap. Seed 0x12345678 produces 60, capped to 50 for a male gnome
+or female human, with final state 0xCB5B9059. Seed 23 produces 100, capped to
+99/75/50/90 for male dwarf/elf/gnome/half-elf, respectively, and stays 100 for
+a male human. Its final state is 3099843700. Legal strength below 18 consumes
+no exceptional-strength draw. Native draw ordering within creation is unchanged
+by this finding and remains to be implemented.
+
+Private probes/reports are `emulate_original_ability_caps.py`,
+`original-ability-caps-report.json`, `emulate_original_percentile_caps.py` and
+`original-percentile-caps-report.json` under `.cache/goldbox-validation/`.
+They use 10,000-instruction/100 ms per-case limits, ten-second total deadlines
+and a 15-second outer process timeout. Original code and data remain private.
+Public fixtures contain numeric facts and synthetic rule configurations only.
+
+The independent engine implementation extends the existing rules reader with
+optional `dice.bounds` and `percentile.rollMaximum`; omitted values preserve
+the previous reject/direct-within-cap policies. The AD&D creation rules opt in
+to clamping and a 100-sided percentile roll. Existing party validation/save
+reading still reject invalid saved values rather than silently clamping them.
+No upstream source is copied or translated for these changes.
+
+Native age modifiers, class-specific score floors, native class selection order,
+the earlier Random(256) draw and percentile timing remain unfinished. The creator
+currently selects a class after rolling and consumes exceptional strength at
+completion; therefore matching these isolated primitives is not complete
+character-creation or live-game parity.
+
+Verification: the serialized two-job build and final full CTest run passed all
+26 public suites in 19.75 seconds; the optional private integration test skipped
+for unconfigured inputs. Hygiene, attribution and whitespace checks passed.
+The first run found a CRLF-sensitive new legacy-rules fixture, corrected by
+normalizing carriage returns, and one existing harness SIGTERM diagnostic
+failure. That signal failure did not reproduce in its isolated test, 20 further
+bounded SIGTERM/SIGHUP checks, or the final full run. Harness implementation
+is unchanged; this does not establish that the intermittent failure is fixed.

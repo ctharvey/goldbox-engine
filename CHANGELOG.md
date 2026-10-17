@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Select rules-driven racial/gender clamping instead of whole-set rerolls.
+  Roll exceptional strength on 1..100, then clamp to its configured cap.
+  Verify 504 original bound cases and 72 percentile cases; preserve legacy
+  policies when the optional settings are absent. Age and native class-floor
+  adjustments, class-choice ordering and percentile draw timing remain unfinished.
+
 - Apply optional rules-defined racial ability modifiers during party creation.
   Verify dwarf, elf and halfling adjustments plus unmodified controls against
   isolated original code; regress seeded scores, unchanged draw consumption,

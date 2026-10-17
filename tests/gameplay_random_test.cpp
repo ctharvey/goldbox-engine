@@ -9,6 +9,7 @@
 #include <cassert>
 #include <functional>
 #include <fstream>
+#include <algorithm>
 
 using namespace goldbox;
 namespace {
@@ -51,6 +52,7 @@ int main(int argc, char** argv) {
     assert(profile.random && profile.random->state() == 1);
     assert(profile.random_dialect == EclRandomDialect::byte_upper);
     const auto& rules = *profile.character_rules;
+    assert(rules.bounds == CreationBounds::clamp && rules.percentile_roll_maximum == 100);
     assert(rules.dice_count == 3 && rules.dice_sides == 6 && rules.drop_lowest == 0 && rules.keep_best_of == 6);
     std::ifstream source(argv[1]);
     const std::string profile_json{std::istreambuf_iterator<char>(source),std::istreambuf_iterator<char>()};
@@ -123,6 +125,32 @@ int main(int argc, char** argv) {
         const auto restored = read_party(serialize_party(party,rules),rules);
         same(rolled,restored[0].abilities); // Legal 19 survives validation and persistence.
     }
+    // Original racial-bound blocks: endpoint facts for all six races and both genders.
+    struct BoundsObservation {
+        const char* race; std::array<int,6> minimum, male_maximum, female_maximum;
+    };
+    const BoundsObservation bounds[]{
+        {"dwarf",{8,3,3,3,12,3},{18,18,18,17,19,16},{17,18,18,17,19,16}},
+        {"elf",{3,8,3,7,6,8},{18,18,18,19,18,18},{16,18,18,19,18,18}},
+        {"gnome",{6,7,3,3,8,3},{18,18,18,18,18,18},{15,18,18,18,18,18}},
+        {"half-elf",{3,4,3,6,6,3},{18,18,18,18,18,18},{17,18,18,18,18,18}},
+        {"halfling",{6,6,3,8,10,3},{17,18,17,18,19,18},{14,18,17,18,19,18}},
+        {"human",{3,3,3,3,3,3},{18,18,18,18,18,18},{18,18,18,18,18,18}}
+    };
+    for (const auto& observed : bounds) for (const auto gender : {"male","female"}) {
+        for (const auto adjustment : {-100,100}) {
+            auto capped = rules;
+            capped.dice_count = 1; capped.dice_sides = 2; capped.drop_lowest = 0; capped.keep_best_of = 1;
+            for (auto& race : capped.races) race.adjustments.assign(6,adjustment);
+            for (auto& choice : capped.classes) choice.minimum.assign(6,1); // Isolate racial bounds.
+            HighWordLcg32 rng(0x12345678,profile.random->multiplier(),1);
+            const auto rolled = roll_abilities(capped,observed.race,gender,rng);
+            const auto& expected = adjustment < 0 ? observed.minimum :
+                (std::string_view(gender) == "male" ? observed.male_maximum : observed.female_maximum);
+            for (std::size_t i = 0; i < 6; ++i) assert(rolled[i].value == expected[i]);
+            assert(rng.state() == 0xe28f6d7a); // Six draws, no cap-triggered rerolls.
+        }
+    }
     auto session = session_for(profile);
     const auto first_scores = roll_abilities(rules,"human","male",*session.state.random);
     Character created{"Seeded","human","male","fighter","lawful-good",first_scores};
@@ -146,6 +174,26 @@ int main(int argc, char** argv) {
     HighWordLcg32 percentile(0x12345678,profile.random->multiplier(),profile.random->increment());
     assert(finish_character(rules,fighter,percentile).abilities[0].percentile == 60);
     assert(percentile.state() == 0xcb5b9059);
+    struct PercentileObservation { std::uint32_t seed; int rolled; std::uint32_t after; };
+    const PercentileObservation percentiles[]{
+        {0,1,1},{1,57,134775814},{0xffffffff,80,4160191484u},
+        {0x12345678,60,3411775577u},{0x2e4d0932,83,2043606523},{23,100,3099843700u}
+    };
+    const int male_caps[]{99,75,50,90,0,100};
+    for (std::size_t r = 0; r < 6; ++r) for (const auto gender : {"male","female"}) {
+        const bool male = std::string_view(gender) == "male";
+        const auto strength = std::min(18,(male ? bounds[r].male_maximum : bounds[r].female_maximum)[0]);
+        const auto cap = male ? male_caps[r] : (r == 5 ? 50 : 0);
+        for (const auto& observed : percentiles) {
+            Character draft{"Cap",bounds[r].race,gender,"fighter","lawful-good",
+                {{strength,0},{10,0},{10,0},{10,0},{13,0},{10,0}}};
+            HighWordLcg32 rng(observed.seed,profile.random->multiplier(),1);
+            const auto finished = finish_character(rules,draft,rng);
+            assert(finished.abilities[0].percentile == (cap ? std::min(observed.rolled,cap) : 0));
+            assert(rng.state() == (cap ? observed.after : observed.seed));
+            same(finished.abilities,read_party(serialize_party({finished},rules),rules)[0].abilities);
+        }
+    }
 
     // Typed ECL reads, original inclusive byte bounds, zero draw and 255 edge.
     for (const auto upper : {0,20,254,255}) {

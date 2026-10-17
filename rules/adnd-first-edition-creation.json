@@ -6,7 +6,8 @@
   "dice": {
     "count": 4,
     "sides": 6,
-    "dropLowest": 1
+    "dropLowest": 1,
+    "bounds": "clamp"
   },
   "abilities": [
     {
@@ -84,7 +85,8 @@
   ],
   "percentile": {
     "ability": "strength",
-    "at": 18
+    "at": 18,
+    "rollMaximum": 100
   },
   "classes": [
     {

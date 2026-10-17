@@ -88,10 +88,15 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     CreationRules r; r.id = id(field("id"));
     r.party_limit = number(field("partyLimit"),1,8); r.name_limit = number(field("nameLimit"),1,32);
     const auto& dice = j::object(field("dice"),"creation dice");
-    j::fields_only(dice,{"count","sides","dropLowest"},"creation dice");
+    j::fields_only(dice,{"count","sides","dropLowest","bounds"},"creation dice");
     r.dice_count = number(j::field(dice,"count","dice"),1,10);
     r.dice_sides = number(j::field(dice,"sides","dice"),2,100);
     r.drop_lowest = number(j::field(dice,"dropLowest","dice"),0,r.dice_count-1);
+    if (const auto* value = dice.if_contains("bounds")) {
+        const auto policy = j::string(*value,"ability bounds");
+        require(policy == "reject" || policy == "clamp","Unknown ability bounds policy");
+        if (policy == "clamp") r.bounds = CreationBounds::clamp;
+    }
     const auto choices = [&](const char* key) {
         std::vector<CreationChoice> result;
         for (const auto& v : j::array(field(key),key)) {
@@ -103,10 +108,12 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     r.abilities = choices("abilities"); require(r.abilities.size() <= 16,"Too many abilities");
     r.genders = choices("genders"); r.alignments = choices("alignments");
     if (const auto* value = root.if_contains("percentile")) {
-        const auto& o = j::object(*value,"percentile"); j::fields_only(o,{"ability","at"},"percentile");
+        const auto& o = j::object(*value,"percentile");
+        j::fields_only(o,{"ability","at","rollMaximum"},"percentile");
         const auto& ability = find(r.abilities,id(j::field(o,"ability","percentile")));
         r.percentile_ability = static_cast<std::size_t>(&ability-r.abilities.data());
         r.percentile_at = number(j::field(o,"at","percentile"),1,1000);
+        if (const auto* maximum = o.if_contains("rollMaximum")) r.percentile_roll_maximum = number(*maximum,1,100);
     }
     for (const auto& v : j::array(field("classes"),"classes")) {
         const auto& o = j::object(v,"class");
@@ -165,8 +172,11 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
     require(rules.dice_count >= 1 && rules.dice_count <= 10 && rules.dice_sides >= 2 && rules.dice_sides <= 100 &&
         rules.drop_lowest >= 0 && rules.drop_lowest < rules.dice_count,"Invalid ability dice");
     require(rules.keep_best_of >= 1 && rules.keep_best_of <= 16,"Invalid ability trial count");
+    require(rules.bounds == CreationBounds::reject || rules.bounds == CreationBounds::clamp,
+        "Unknown ability bounds policy");
     Character c; c.race = race; c.gender = gender;
-    const auto& adjustments = find(rules.races,race).adjustments;
+    const auto& race_rule = find(rules.races,race);
+    const auto& adjustments = race_rule.adjustments;
     (void)find(rules.genders,gender);
     require(adjustments.empty() || adjustments.size() == rules.abilities.size(),"Racial adjustment count mismatch");
     for (const auto n : adjustments) require(n >= -100 && n <= 100,"Racial adjustment out of range");
@@ -183,7 +193,13 @@ std::vector<AbilityValue> roll_abilities_impl(const CreationRules& rules, std::s
                 best = std::max(best,score);
             }
             // A fixed per-ability modifier commutes with keeping the best trial.
-            c.abilities.push_back({best+(adjustments.empty() ? 0 : adjustments[i]),0});
+            auto value = best+(adjustments.empty() ? 0 : adjustments[i]);
+            if (rules.bounds == CreationBounds::clamp) {
+                const auto low = race_rule.minimum.at(i), high = race_rule.maximum.at(c.gender).at(i);
+                require(low <= high,"Conflicting ability limits");
+                value = std::clamp(value,low,high);
+            }
+            c.abilities.push_back({value,0});
         }
         if (!eligible_classes(rules,c).empty()) return c.abilities;
     }
@@ -216,7 +232,11 @@ Character finish_character_impl(const CreationRules& rules, Character draft, Ran
         *rules.percentile_ability < draft.abilities.size() &&
         draft.abilities[*rules.percentile_ability].value == rules.percentile_at) {
         const auto maximum = find(rules.races,draft.race).percentile_maximum.at(draft.gender);
-        if (maximum) draft.abilities[*rules.percentile_ability].percentile = die(random,maximum);
+        if (maximum) {
+            const auto sides = rules.percentile_roll_maximum.value_or(maximum);
+            require(sides >= 1 && sides <= 100,"Invalid percentile roll maximum");
+            draft.abilities[*rules.percentile_ability].percentile = std::min(die(random,sides),maximum);
+        }
     }
     validate_character(rules,draft); return draft;
 }

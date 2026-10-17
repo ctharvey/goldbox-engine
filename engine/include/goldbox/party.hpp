@@ -26,6 +26,7 @@ struct CreationClass {
     std::vector<std::string> alignments;
     bool percentile{};
 };
+enum class CreationBounds { reject, clamp };
 struct CreationRules {
     std::string id;
     std::size_t party_limit{}, name_limit{};
@@ -36,6 +37,8 @@ struct CreationRules {
     std::optional<std::size_t> percentile_ability;
     int percentile_at{};
     int keep_best_of{1};
+    CreationBounds bounds{CreationBounds::reject};
+    std::optional<int> percentile_roll_maximum;
 };
 struct AbilityValue { int value{}, percentile{}; };
 struct Character {

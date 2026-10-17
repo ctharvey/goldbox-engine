@@ -17,6 +17,10 @@ preserves the existing exploration/startup behavior. The creation JSON has
 `schemaVersion: 1`, `id`, `partyLimit`, `nameLimit`, `dice` (`count`, `sides`,
 `dropLowest`), labeled `abilities`, `genders`, `alignments`, `classes`, and `races`.
 An optional `percentile` selects an ability ID and triggering score (`at`).
+Its optional `rollMaximum` (1..100) sets the die bound before capping the result
+to the race/gender limit. Absent configuration rolls within the limit directly.
+Optional `dice.bounds` selects `reject` (legacy default) or `clamp`; unknown
+policies fail. Clamp applies racial bounds after modifiers without extra draws.
 Classes provide `minimum`, allowed alignment IDs and a percentile flag; races
 provide `minimum`, gender-keyed `maximum` and `percentileMaximum` maps and class
 IDs. Unknown fields, duplicate IDs, invalid references, inverted bounds and
@@ -40,9 +44,10 @@ The shared rules retain four six-sided dice with the lowest dropped. A game
 profile can override `characterCreationDice: {count, sides, dropLowest, keepBestOf}`;
 Pool selects the best of six 3d6 trials for each ability, matching the isolated
 original human raw-score loop. Five seeded sets and final RNG states are public
-numeric regression fixtures from 540 original runtime draws. Complete rolls
-outside race/gender limits or without any eligible class are still rejected,
-with at most 256 attempts; this rejection policy is provisional.
+numeric regression fixtures from 540 original runtime draws. The selected rules
+now clamp racial/gender bounds, matching the isolated original bound blocks.
+Rolls without any eligible class still retry at most 256 times; native class
+minimum adjustments and the prototype's class-choice order remain unimplemented.
 
 Pool's `random` profile selects `algorithm: lcg32-high16-mod-v1`, multiplier
 134775813, increment 1 and startup seed 1. Character rolls, rerolls, exceptional
@@ -50,9 +55,11 @@ strength and ECL RANDOM consume the same session stream. `--seed` accepts a
 decimal or hexadecimal uint32 override; F10 restores the launch seed. Profiles
 without this configuration keep the existing caller-supplied MT19937 path.
 Exceptional strength is a configured percentile ability: fighter strength 18
-receives a uniform percentile within the configured race/gender cap (100 is
-shown as 00). The human male Random(100)+1 primitive is verified, while native
-percentile timing and other race/gender policies remain provisional.
+rolls 1..100 and clamps to the configured race/gender cap (100 is shown as 00).
+This makes the maximum more frequent when the cap is below 100, matching 72
+isolated original cases. Native percentile timing remains unimplemented: the
+original can draw immediately after strength, before later abilities, while
+this creator draws at character completion after selecting a class.
 
 The rules now apply independently verified racial modifiers: dwarf CON +1 and
 CHA -1; elf DEX +1 and CON -1; halfling STR -1 and DEX +1. Gnome, half-elf and
@@ -60,7 +67,8 @@ human have no modifier in the tested original loop. Thirty seeded racial sets
 match the raw original scores and final states; additional dwarf/elf cases
 verify legal scores of 19 and their party save roundtrip. Modifiers consume no
 additional random draws. The original also draws before the raw
-ability loop and applies age/class/gender processing afterward; complete
+ability loop, applies age processing before the racial clamps and class floors
+afterward; complete
 character-creation draw alignment is unverified. Multi-classing, HP/AC, portraits, equipment,
 spells, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.

@@ -117,10 +117,24 @@ int main(int argc, char** argv) {
         changed(original,"\"id\": \"fighter\"","\"id\": \"missing\""),
         changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [1]"),
         changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [0, 0, 0, 0, true, -1]"),
-        changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [0, 0, 0, 0, 101, -1]")}) {
+        changed(original,"\"adjustments\": [0, 0, 0, 0, 1, -1]","\"adjustments\": [0, 0, 0, 0, 101, -1]"),
+        changed(original,"\"bounds\": \"clamp\"","\"bounds\": \"unknown\""),
+        changed(original,"\"bounds\": \"clamp\"","\"bounds\": true"),
+        changed(original,"\"rollMaximum\": 100","\"rollMaximum\": 0"),
+        changed(original,"\"rollMaximum\": 100","\"rollMaximum\": 101"),
+        changed(original,"\"rollMaximum\": 100","\"rollMaximum\": false")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }
+    auto legacy_source = original;
+    std::erase(legacy_source,'\r');
+    const auto legacy_rules_json = changed(changed(legacy_source,",\n    \"bounds\": \"clamp\"",""),
+        ",\n    \"rollMaximum\": 100","");
+    { std::ofstream output(invalid_file); output << legacy_rules_json; }
+    const auto legacy_rules = read_creation_rules(invalid_file);
+    assert(legacy_rules.bounds == CreationBounds::reject && !legacy_rules.percentile_roll_maximum);
+    HighWordLcg32 legacy_rng(0x12345678,134775813,1);
+    assert(finish_character(legacy_rules,fighter,legacy_rng).abilities[0].percentile == 10);
     std::filesystem::remove(invalid_file);
     std::cout << "Party creation, eligibility, bounded dice, save validation and alternate rules passed\n";
 }
