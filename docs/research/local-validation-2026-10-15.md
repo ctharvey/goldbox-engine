@@ -401,3 +401,90 @@ This establishes a completed original character-dependent branch with authored
 inputs and fresh-process persistence. It does not establish a naturally reached
 reference-game route, equivalent quest flags, original RNG/damage behavior, or
 side-by-side event parity. Those remain explicit acceptance gates.
+
+## Original DOS random-generator investigation (2026-10-17)
+
+**Confirmed for the fingerprinted installed build: it uses a seeded PRNG, and
+startup seeds it from the DOS time-of-day.** This is analysis of the original
+executable, not an inference from SSI Engine's Java Random implementation.
+
+| Original resource | Bytes | SHA-256 |
+|---|---:|---|
+| START.EXE | 65231 | d825df2b174675c9088ba1489488bdeebe66ad2a22943f17d3a198e60b6a07bd |
+| GAME.OVR | 206105 | 872964a32cef0fc32bbf83bab68b15e04ad36d59076f37b00a179dfee7928614 |
+
+START.EXE uses EXEPACK. Private analysis reconstructed its 68,592-byte load image
+using the installed decompression stub's backwards run semantics: 889 commands
+and a 337-byte unchanged prefix. The unpacked image and all disassembly remain
+outside the repository. No installed executable was changed or replaced.
+
+### Seed and generator
+
+The runtime holds a 32-bit state at DS:4428/442A. Its update is:
+
+```text
+state = (state * 0x08088405 + 1) modulo 2^32
+```
+
+The integer runtime Random(n) advances that state and returns
+`(state >> 16) modulo n` for nonzero 16-bit n. For n=0 it returns zero but still
+advances state. This describes the runtime function, not yet a complete audit of
+how every game/ECL caller transforms its bounds or consumes draws.
+
+The seed routine calls DOS INT 21h/AH=2Ch, stores CX as the low word and DX as the
+high word. Its seed therefore is:
+
+```text
+(second << 24) | (hundredth << 16) | (hour << 8) | minute
+```
+
+These are binary clock fields, not BCD or the game's adventure-time clock.
+The units returned by DOS do not imply a guaranteed hundredth-second clock
+resolution. The underlying API is documented in Microsoft's
+[MS-DOS reference](https://www.pcjs.org/documents/books/mspl13/msdos/dosref33/).
+
+The startup call chain was traced from load-image offset 00FD through overlay
+stub 003E:0025, whose descriptor resolves to GAME.OVR offset E600. That routine
+calls the seed function at overlay-file offset EBD5, targeting runtime
+0AF8:1247 (load-image offset C1C7). The seed-function far pointer occurs once
+in GAME.OVR and zero times in the resident image. This establishes a startup
+call site; it is not proof against all possible indirect reseeding paths.
+
+Private isolated emulation used Unicorn 2.1.4, with 16-bit x86 instruction budgets
+and mocked DOS clock responses. Executing the original integer RNG matched the
+formula for 1,120 draws: five initial states, seven bounds (including 0 and 65535),
+and 32 draws each. Three clock inputs produced the expected seed words. For
+initial state 0x12345678, the first ten Random(20) values were
+19,11,16,4,9,19,8,3,12,7. No game executable or proprietary routine bytes are
+included in these public findings, and this did not execute a full game session.
+
+### Native save and repeatability limits
+
+The native main-save loader issues ten block reads with sizes
+1,2048,2048,1024,7680,5,1,1,1,328: exactly 13,137 bytes, matching the supplied
+SAVGAMA.DAT. The large destinations are allocated game-state buffers; the
+remaining destinations are specific game fields and stack-local records. The
+resident runtime seed at DS:4428 is outside the identified saved fields, and
+the examined loader does not restore it. The static audit therefore indicates
+that the ordinary save omits RNG state. **A full live save/reload memory trace
+has not been performed**, so that conclusion remains a static-analysis finding.
+
+The same seed and draw-call sequence reproduce the same runtime results. A
+fresh program launch normally receives a clock-dependent seed; merely loading
+the same native save is not sufficient evidence of identical future rolls.
+Exact harness replay should capture/restore runtime RNG state or an emulator
+snapshot and align draw order. Seeding our replacement generator alone would
+not establish full-game parity.
+
+### Research provenance
+
+Primary evidence is the user-owned fingerprinted binaries. Supporting format
+research consulted the EXEPACK author's
+[format notes](https://www.bamsoftware.com/software/exepack/) and the documented
+Turbo Pascal overlay descriptor in
+[Dos Navigator's overlay source](https://github.com/romiras/turbo-pascal-archive/blob/master/Files/Dos%20Navigator/OVERLAYS.PAS).
+The latter has restrictive licensing and was used only to interpret metadata;
+no source was copied, translated or adopted. GNU objdump and a private Unicorn
+installation were analysis tools, not added engine dependencies. The private
+scripts, extracted load image and metadata/emulation reports stay under
+`.cache/goldbox-validation/`. No engine code changed and no C++ build was needed.

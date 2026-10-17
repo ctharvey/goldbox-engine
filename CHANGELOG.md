@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Identify the installed DOS executable's time-seeded 32-bit random generator.
+  Isolated execution of its original routines passes 1,120 draw checks and three
+  clock-seeding checks. Record startup and save-format evidence separately from
+  still-unverified live replay; no engine RNG implementation added.
+
 - Complete an original character-name event branch with declared authored party
   and flag state, then verify exact save/restore in a fresh engine process.
   The unset-flag route needs RANDOM; an alternate response needs DAMAGE.
