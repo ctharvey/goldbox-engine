@@ -258,6 +258,10 @@ public:
         const auto& rules = *session.character_rules;
         std::string result = c.name + " / " + c.race + " / " + c.character_class + " / " + c.alignment + "\n";
         if (c.age) result += "AGE " + std::to_string(*c.age) + "\n";
+        if (c.hit_points) result += "HP " + std::to_string(c.hit_points->current) + "/" +
+            std::to_string(c.hit_points->maximum) + "\n";
+        for (const auto& [currency,balance] : c.money)
+            result += currency + " " + std::to_string(balance) + "\n";
         for (std::size_t i = 0; i < c.abilities.size(); ++i) {
             result += rules.abilities[i].label + " " + std::to_string(c.abilities[i].value);
             if (c.abilities[i].percentile) result += "/" + (c.abilities[i].percentile == 100 ?

@@ -101,7 +101,7 @@ verify legal scores of 19 and their party save roundtrip. Modifiers consume no
 additional random draws. The original also draws before the raw
 ability loop, applies age processing before the racial clamps and class floors
 afterward; complete
-live interactive creation parity remains unverified. Multi-classing, HP/AC, portraits, equipment,
+live interactive creation parity remains unverified. Multi-classing, AC, portraits, equipment,
 spells, experience/advancement and original character import are unfinished.
 Upstream placeholder HP and racial modifiers are not used.
 
@@ -114,6 +114,26 @@ interfaces remain lower-level helpers; they do not reproduce the whole sequence
 when combined in arbitrary order. Do not call the legacy randomizing completion
 helper on a prepared roll. Actual DOS reroll/cancellation/idle timing remains
 unverified; engine reroll behavior is deterministic and tested separately.
+
+### Starting hit points and money
+
+Optional class `startingMoney` configures currency ID, count/sides and multiplier;
+`hitPoints` configures count/sides, a minimum roll, modifier ability, first supported
+ability score (`abilityMinimum`) and its ordered modifier array. Money rolls after
+the abilities and before HP. Pool uses cleric 3d6, fighter 5d4, magic-user 2d4 and
+thief 2d6, multiplied by ten gold. HP uses 1d8/1d10/1d4/1d6 with floors 5/6/2/4,
+then Constitution modifiers and a final minimum of one. Fighter CON 17/18 grants
+3/4; the other supported classes grant 2. These policies are data, without game
+IDs or original record offsets in the engine.
+
+The original full post-stat initialization matches 204 numeric cases, including
+gold, base/current/maximum HP and final RNG. Another 72 original cases cover CON
+3..20 for each class. The engine displays and saves HP (`base`, `current`,
+`maximum`) and per-currency balances. Current HP may be zero; it cannot exceed
+maximum. Loading preserves wounds and balances, never rerolling or recomputing
+them. Legacy missing fields remain unknown. Rerolls regenerate money and HP while
+retaining age. The original reroll branch confirms this ordering; interactive
+input, idle timing and the entire native character record remain unverified.
 
 ## Saves and lifecycle
 

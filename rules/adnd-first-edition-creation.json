@@ -94,6 +94,8 @@
       "id": "cleric",
       "label": "Cleric",
       "creationMinimum": [6, 6, 9, 0, 0, 0],
+      "hitPoints": {"count": 1, "sides": 8, "minimum": 5, "ability": "constitution", "abilityMinimum": 3, "modifiers": [-2, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2]},
+      "startingMoney": {"currency": "gold", "count": 3, "sides": 6, "multiplier": 10},
       "minimum": [
         3,
         3,
@@ -119,6 +121,8 @@
       "id": "fighter",
       "label": "Fighter",
       "creationMinimum": [9, 0, 6, 6, 7, 0],
+      "hitPoints": {"count": 1, "sides": 10, "minimum": 6, "ability": "constitution", "abilityMinimum": 3, "modifiers": [-2, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 4, 4]},
+      "startingMoney": {"currency": "gold", "count": 5, "sides": 4, "multiplier": 10},
       "minimum": [
         9,
         3,
@@ -144,6 +148,8 @@
       "id": "magic-user",
       "label": "Magic-user",
       "creationMinimum": [0, 9, 6, 6, 0, 0],
+      "hitPoints": {"count": 1, "sides": 4, "minimum": 2, "ability": "constitution", "abilityMinimum": 3, "modifiers": [-2, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2]},
+      "startingMoney": {"currency": "gold", "count": 2, "sides": 4, "multiplier": 10},
       "minimum": [
         3,
         9,
@@ -169,6 +175,8 @@
       "id": "thief",
       "label": "Thief",
       "creationMinimum": [6, 6, 0, 9, 0, 0],
+      "hitPoints": {"count": 1, "sides": 6, "minimum": 4, "ability": "constitution", "abilityMinimum": 3, "modifiers": [-2, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2]},
+      "startingMoney": {"currency": "gold", "count": 2, "sides": 6, "multiplier": 10},
       "minimum": [
         3,
         3,

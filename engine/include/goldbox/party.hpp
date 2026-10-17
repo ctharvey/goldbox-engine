@@ -29,12 +29,21 @@ struct CreationRace {
     std::map<std::string,StartingAgeDice> starting_ages{};
     std::vector<CreationAgeAdjustment> age_adjustments{};
 };
+struct CreationHitPoints {
+    int count{}, sides{}, minimum{};
+    std::size_t ability{};
+    int ability_minimum{};
+    std::vector<int> modifiers;
+};
+struct CreationMoney { std::string currency; int count{}, sides{}, multiplier{}; };
 struct CreationClass {
     std::string id, label;
     std::vector<int> minimum;
     std::vector<std::string> alignments;
     bool percentile{};
     std::vector<int> creation_minimum; // Optional creation-only floors; saved values remain unchanged.
+    std::optional<CreationHitPoints> hit_points{};
+    std::optional<CreationMoney> starting_money{};
 };
 enum class CreationBounds { reject, clamp };
 struct CreationRules {
@@ -52,12 +61,15 @@ struct CreationRules {
     std::vector<std::uint16_t> initial_random_bounds{};
 };
 struct AbilityValue { int value{}, percentile{}; };
+struct HitPoints { int base{}, current{}, maximum{}; };
 struct Character {
     std::string name, race, gender, character_class, alignment;
     std::vector<AbilityValue> abilities;
     // Symbolic condition; absent means unknown (including legacy engine saves).
     std::optional<std::string> status{};
     std::optional<std::uint16_t> age{}; // Unknown for legacy parties; no automatic inference on load.
+    std::optional<HitPoints> hit_points{};
+    std::map<std::string,std::uint16_t> money{}; // Missing currency means unknown, rather than an inferred balance.
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);

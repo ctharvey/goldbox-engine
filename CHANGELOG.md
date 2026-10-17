@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Generate, display and preserve configurable starting gold and hit points after
+  ability rolls. Verify 204 original post-stat initializations and 72 HP/CON
+  boundary cases. Preserve wounded HP and unknown legacy values; regress exact
+  RNG continuation, rerolls, save validation and scripted SDL creation.
+
 - Match the tested original character-generation sequence: initial random draw,
   age, racial/age modifiers, clamps, class floors and in-order exceptional strength.
   Add configurable ordered age adjustments and 353 original numeric snapshots

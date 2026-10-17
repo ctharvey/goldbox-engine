@@ -876,3 +876,45 @@ the affected generation suite passed again (0.24 seconds). Hygiene, attribution
 and whitespace checks passed. The SDL synthetic creator verifies four draws
 (setup, age, ability, percentile), final state 0xF25CF394, percentile 45 and
 save/load continuation, detecting any extra confirmation-time draw.
+
+### Starting HP and gold — 2026-10-17
+
+Using the same private installation and unpacked image fingerprints recorded
+above, execute the original post-stat initialization through its HP stores.
+The bounded probe loads overlay AC for cleric spell initialization as well as
+78 and B0; no installed file is changed. All 204 supported race/class/gender/seed
+cases agree with isolated money/HP runs: cleric initialization adds no random
+draws. Gold is stored at record +8E, corroborated by the existing research-only
+SSI Engine `data/character/CharacterValues.java` at commit
+`51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`. Its placeholder creator/HP rules
+offer no advantage for this verified behavior; no upstream code is adopted.
+
+Native sequence: class-specific money dice, times ten; class-specific hit dice,
+floored at two thirds of die sides; Constitution adjustment; minimum one HP.
+The complete original initializer stores identical initial current/maximum HP.
+The base roll is retained independently. A separate 72-case probe covers CON
+3..20 for all four supported classes, including negative modifiers, minimum-one
+HP and fighter-only CON 17/18 bonuses. The original rejection branch returns
+to ability rolling after age generation and rerolls money/HP too.
+
+Public tests retain numeric observations only. They cover all 204 full results,
+72 HP boundaries, exact final RNG, persisted wounds/zero balances, malformed
+saves/rules, failure atomicity after money rolls, complete seeded reroll replay,
+and scripted SDL creation/save/load. The six-draw synthetic SDL case now ends
+at 0xE28F6D7A (adding money and HP after the prior four draws).
+
+Private reproductions/reports under `.cache/goldbox-validation/`:
+`emulate_original_creation_vitals.py`, `original-creation-vitals-report.json`,
+`emulate_original_creation_initialization.py`,
+`original-creation-initialization-report.json`,
+`emulate_original_creation_hp_edges.py`, `original-creation-hp-edges-report.json`.
+Each original block is bounded to 25,000 instructions/100 ms, with a 45-second
+total deadline (10 seconds for HP boundaries). This verifies native numeric
+creation behavior, not interactive screen parity, idle timing, multiclass
+creation, complete spell semantics, equipment or native-save interoperability.
+
+Verification: the serialized two-job build and all 26 public CTest suites pass
+(20.54 seconds); optional private integration skips without configured inputs.
+Hygiene, attribution and whitespace checks pass. The first HP test run exposed
+missing modifier coverage for legal dwarf CON 19; the corrected table and new
+original boundary checks cover scores through 20.

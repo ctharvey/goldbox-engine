@@ -33,7 +33,10 @@ SSI Engine `engine/character/CharacterCreator.java`,
 stages, single-class availability, alignments and 4d6 drop-lowest rolls.
 These are research-only references; no Java implementation or character-byte
 layout was copied/translated. Existing JSON validation, save and SDL menu
-components were reused. Upstream fixed-HP and zero-racial-adjustment placeholders
+components were reused. Starting HP/gold are independently verified against
+bounded local original-code execution; `CharacterValues.java` at the revision
+above corroborates the original gold field. No upstream HP implementation is
+adopted. Upstream fixed-HP and zero-racial-adjustment placeholders
 were not adopted. The normalized character model, data profile, bounded dice,
 save validation and SDL creator are independent project code.
 

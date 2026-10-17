@@ -127,11 +127,37 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     }
     for (const auto& v : j::array(field("classes"),"classes")) {
         const auto& o = j::object(v,"class");
-        j::fields_only(o,{"id","label","minimum","alignments","percentile","creationMinimum"},"class");
+        j::fields_only(o,{"id","label","minimum","alignments","percentile","creationMinimum",
+            "hitPoints","startingMoney"},"class");
         CreationClass c{id(j::field(o,"id","class")),label(j::field(o,"label","class")),
             scores(j::field(o,"minimum","class"),r.abilities.size()),ids(j::field(o,"alignments","class")),false,{}};
         const auto& flag = j::field(o,"percentile","class"); require(flag.is_bool(),"Invalid percentile flag");
         c.percentile = flag.as_bool(); require(!c.percentile || r.percentile_ability.has_value(),"Missing percentile policy");
+        if (const auto* value = o.if_contains("hitPoints")) {
+            const auto& hp = j::object(*value,"hit points");
+            j::fields_only(hp,{"count","sides","minimum","ability","abilityMinimum","modifiers"},"hit points");
+            CreationHitPoints rule;
+            rule.count = number(j::field(hp,"count","hit points"),1,10);
+            rule.sides = number(j::field(hp,"sides","hit points"),2,100);
+            rule.minimum = number(j::field(hp,"minimum","hit points"),1,rule.count*rule.sides);
+            const auto& ability = find(r.abilities,id(j::field(hp,"ability","hit points")));
+            rule.ability = static_cast<std::size_t>(&ability-r.abilities.data());
+            rule.ability_minimum = number(j::field(hp,"abilityMinimum","hit points"),1,1000);
+            const auto& modifiers = j::array(j::field(hp,"modifiers","hit points"),"hit point modifiers");
+            require(!modifiers.empty() && modifiers.size() <= 1000,"Invalid hit point modifier count");
+            for (const auto& n : modifiers) rule.modifiers.push_back(number(n,-100,100));
+            c.hit_points = std::move(rule);
+        }
+        if (const auto* value = o.if_contains("startingMoney")) {
+            const auto& money = j::object(*value,"starting money");
+            j::fields_only(money,{"currency","count","sides","multiplier"},"starting money");
+            CreationMoney rule{id(j::field(money,"currency","starting money")),
+                number(j::field(money,"count","starting money"),1,10),
+                number(j::field(money,"sides","starting money"),2,100),
+                number(j::field(money,"multiplier","starting money"),1,65535)};
+            require(rule.count*rule.sides <= 65535/rule.multiplier,"Starting money overflows uint16");
+            c.starting_money = std::move(rule);
+        }
         if (const auto* value = o.if_contains("creationMinimum")) {
             const auto& values = j::array(*value,"class creation minimum");
             require(values.size() == r.abilities.size(),"Class creation minimum count mismatch");
@@ -340,6 +366,30 @@ Character roll_character_impl(const CreationRules& rules, Character draft, Rando
     require(race.age_adjustments.empty() || draft.age.has_value(),"Age state unavailable");
     require(!draft.age || *draft.age > 0,"Invalid character age");
     draft.abilities = roll_abilities_impl(rules,draft.race,draft.gender,candidate,&draft);
+    if (choice.starting_money) {
+        const auto& money = *choice.starting_money;
+        require(money.count >= 1 && money.count <= 10 && money.sides >= 2 && money.sides <= 100 &&
+            money.multiplier >= 1 && money.multiplier <= 65535 &&
+            money.count*money.sides <= 65535/money.multiplier,"Invalid starting money dice");
+        (void)id(bj::value(money.currency));
+        int balance = 0;
+        for (int i = 0; i < money.count; ++i) balance += die(candidate,money.sides);
+        draft.money[money.currency] = static_cast<std::uint16_t>(balance*money.multiplier);
+    }
+    if (choice.hit_points) {
+        const auto& hp = *choice.hit_points;
+        require(hp.count >= 1 && hp.count <= 10 && hp.sides >= 2 && hp.sides <= 100 &&
+            hp.minimum >= 1 && hp.minimum <= hp.count*hp.sides && hp.ability < draft.abilities.size(),
+            "Invalid hit point dice");
+        const int index = draft.abilities[hp.ability].value-hp.ability_minimum;
+        require(index >= 0 && static_cast<std::size_t>(index) < hp.modifiers.size(),"Missing hit point modifier");
+        require(hp.modifiers[index] >= -100 && hp.modifiers[index] <= 100,"Invalid hit point modifier");
+        int base = 0;
+        for (int i = 0; i < hp.count; ++i) base += die(candidate,hp.sides);
+        base = std::max(base,hp.minimum);
+        const auto maximum = std::max(1,base+hp.modifiers[index]);
+        draft.hit_points = HitPoints{base,maximum,maximum};
+    }
     draft.status = "okay";
     random = candidate;
     return draft;
@@ -352,6 +402,13 @@ Character roll_character(const CreationRules& rules, Character draft, HighWordLc
 }
 void validate_character(const CreationRules& rules, const Character& c) {
     require(!c.age || *c.age > 0,"Invalid character age");
+    if (c.hit_points) {
+        const auto& hp = *c.hit_points;
+        require(hp.base >= 1 && hp.base <= 65535 && hp.maximum >= 1 && hp.maximum <= 65535 &&
+            hp.current >= 0 && hp.current <= hp.maximum,"Invalid character hit points");
+    }
+    require(c.money.size() <= 64,"Too many character currencies");
+    for (const auto& [currency,balance] : c.money) { (void)id(bj::value(currency)); (void)balance; }
     if (c.status) (void)id(bj::value(*c.status));
     require(!c.name.empty() && c.name.size() <= rules.name_limit && c.name.front() != ' ' && c.name.back() != ' ' &&
         std::all_of(c.name.begin(),c.name.end(),[](unsigned char b) { return b >= 32 && b < 127; }),"Invalid character name");
@@ -418,6 +475,13 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
             {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}};
         if (c.status) member["status"] = *c.status;
         if (c.age) member["age"] = *c.age;
+        if (c.hit_points) member["hitPoints"] = bj::object{{"base",c.hit_points->base},
+            {"current",c.hit_points->current},{"maximum",c.hit_points->maximum}};
+        if (!c.money.empty()) {
+            bj::object money;
+            for (const auto& [currency,balance] : c.money) money[currency] = balance;
+            member["money"] = std::move(money);
+        }
         members.push_back(std::move(member));
     }
     return bj::serialize(bj::object{{"rulesId",rules.id},{"characters",std::move(members)}});
@@ -430,11 +494,24 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     require(members.size() <= rules.party_limit,"Saved party is full"); Party result;
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
-        j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age"},"character");
+        j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age",
+            "hitPoints","money"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
         if (const auto* value = o.if_contains("status")) c.status = id(*value);
         if (const auto* value = o.if_contains("age")) c.age = static_cast<std::uint16_t>(number(*value,1,65535));
+        if (const auto* value = o.if_contains("hitPoints")) {
+            const auto& hp = j::object(*value,"saved hit points");
+            j::fields_only(hp,{"base","current","maximum"},"saved hit points");
+            c.hit_points = HitPoints{number(j::field(hp,"base","hit points"),1,65535),
+                number(j::field(hp,"current","hit points"),0,65535),
+                number(j::field(hp,"maximum","hit points"),1,65535)};
+        }
+        if (const auto* value = o.if_contains("money")) {
+            const auto& money = j::object(*value,"saved money"); require(money.size() <= 64,"Too many currencies");
+            for (const auto& [currency,balance] : money)
+                c.money.emplace(id(bj::value(currency)),static_cast<std::uint16_t>(number(balance,0,65535)));
+        }
         const auto& abilities = j::array(j::field(o,"abilities","character"),"abilities");
         require(abilities.size() == rules.abilities.size(),"Saved ability count mismatch");
         for (const auto& value : abilities) {

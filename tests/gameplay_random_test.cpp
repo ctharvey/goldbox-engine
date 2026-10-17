@@ -51,7 +51,10 @@ int main(int argc, char** argv) {
     const auto profile = read_game_profile(argv[1]);
     assert(profile.random && profile.random->state() == 1);
     assert(profile.random_dialect == EclRandomDialect::byte_upper);
-    const auto& rules = *profile.character_rules;
+    auto rules = *profile.character_rules;
+    const auto complete_rules = rules;
+    // Keep the earlier ability-only observations at their independently captured stopping point.
+    for (auto& choice : rules.classes) { choice.hit_points.reset(); choice.starting_money.reset(); }
     // Numeric observations from the original combined creation routines. No original code/data bytes.
     struct CreationObservation {
         const char* race; const char* character_class; const char* gender; std::uint32_t seed;
@@ -428,6 +431,273 @@ int main(int argc, char** argv) {
         const auto loaded = read_party(serialize_party({rolled},rules),rules);
         same(rolled.abilities,loaded[0].abilities); assert(loaded[0].age == rolled.age);
     }
+    struct VitalsObservation { int gold, base, hp; std::uint32_t after; };
+    // Original post-ability initialization, in the same order as the first 204 observations above.
+    const VitalsObservation vitals_observations[]{
+        {150,9,11,832869128u},
+        {140,6,10,2890333993u},
+        {110,6,8,3070371559u},
+        {140,6,8,2261670016u},
+        {140,8,12,1326963322u},
+        {150,6,10,909920767u},
+        {150,9,11,832869128u},
+        {140,6,10,2890333993u},
+        {110,6,8,3070371559u},
+        {140,6,8,2261670016u},
+        {140,8,12,1326963322u},
+        {150,6,10,909920767u},
+        {70,4,6,3509128559u},
+        {40,4,6,607289132u},
+        {90,4,6,2116000690u},
+        {30,6,8,1311759367u},
+        {110,4,6,2312759641u},
+        {90,5,7,1191331178u},
+        {70,4,6,3509128559u},
+        {40,4,6,607289132u},
+        {90,4,6,2116000690u},
+        {30,6,8,1311759367u},
+        {110,4,6,2312759641u},
+        {90,5,7,1191331178u},
+        {150,9,9,832869128u},
+        {140,6,8,2890333993u},
+        {110,6,6,3070371559u},
+        {140,6,6,2261670016u},
+        {140,8,10,1326963322u},
+        {150,6,9,909920767u},
+        {150,9,9,832869128u},
+        {140,6,8,2890333993u},
+        {110,6,6,3070371559u},
+        {140,6,6,2261670016u},
+        {140,8,10,1326963322u},
+        {150,6,9,909920767u},
+        {50,4,4,401550301u},
+        {70,2,4,288477010u},
+        {60,2,2,514623592u},
+        {70,2,2,3218675893u},
+        {60,4,6,1323513271u},
+        {60,4,6,2095831904u},
+        {50,4,4,401550301u},
+        {70,2,4,288477010u},
+        {60,2,2,514623592u},
+        {70,2,2,3218675893u},
+        {60,4,6,1323513271u},
+        {60,4,6,2095831904u},
+        {50,4,4,401550301u},
+        {50,4,6,288477010u},
+        {60,5,5,514623592u},
+        {90,4,4,3218675893u},
+        {80,6,8,1323513271u},
+        {60,6,8,2095831904u},
+        {50,4,4,401550301u},
+        {50,4,6,288477010u},
+        {60,5,5,514623592u},
+        {90,4,4,3218675893u},
+        {80,6,8,1323513271u},
+        {60,6,8,2095831904u},
+        {150,9,10,832869128u},
+        {140,6,9,2890333993u},
+        {110,6,7,3070371559u},
+        {140,6,7,2261670016u},
+        {140,8,11,1326963322u},
+        {150,6,10,909920767u},
+        {150,9,10,832869128u},
+        {140,6,9,2890333993u},
+        {110,6,7,3070371559u},
+        {140,6,7,2261670016u},
+        {140,8,11,1326963322u},
+        {150,6,10,909920767u},
+        {50,4,5,401550301u},
+        {50,4,6,288477010u},
+        {60,5,6,514623592u},
+        {90,4,5,3218675893u},
+        {80,6,8,1323513271u},
+        {60,6,8,2095831904u},
+        {50,4,5,401550301u},
+        {50,4,6,288477010u},
+        {60,5,6,514623592u},
+        {90,4,5,3218675893u},
+        {80,6,8,1323513271u},
+        {60,6,8,2095831904u},
+        {130,5,6,3509128559u},
+        {90,5,7,607289132u},
+        {100,8,9,2116000690u},
+        {50,8,9,1311759367u},
+        {140,5,7,2312759641u},
+        {110,5,7,1191331178u},
+        {130,5,6,3509128559u},
+        {90,5,7,607289132u},
+        {100,8,9,2116000690u},
+        {50,8,9,1311759367u},
+        {140,5,7,2312759641u},
+        {110,5,7,1191331178u},
+        {140,6,9,288477010u},
+        {130,6,9,258954395u},
+        {140,6,7,317999625u},
+        {120,7,8,497209226u},
+        {130,7,8,400189588u},
+        {150,7,10,3904424161u},
+        {140,6,9,288477010u},
+        {130,6,9,258954395u},
+        {140,6,7,317999625u},
+        {120,7,8,497209226u},
+        {130,7,8,400189588u},
+        {150,7,10,3904424161u},
+        {50,2,3,3517051158u},
+        {50,2,4,3509128559u},
+        {50,3,4,3524973757u},
+        {30,2,3,9511118u},
+        {40,2,4,4274625400u},
+        {70,2,4,3334831381u},
+        {50,2,3,3517051158u},
+        {50,2,4,3509128559u},
+        {50,3,4,3524973757u},
+        {30,2,3,9511118u},
+        {40,2,4,4274625400u},
+        {70,2,4,3334831381u},
+        {70,4,6,3509128559u},
+        {40,4,6,607289132u},
+        {90,4,5,2116000690u},
+        {30,6,7,1311759367u},
+        {110,4,5,2312759641u},
+        {90,5,7,1191331178u},
+        {70,4,6,3509128559u},
+        {40,4,6,607289132u},
+        {90,4,5,2116000690u},
+        {30,6,7,1311759367u},
+        {110,4,5,2312759641u},
+        {90,5,7,1191331178u},
+        {140,6,9,288477010u},
+        {130,6,9,258954395u},
+        {140,6,7,317999625u},
+        {120,7,8,497209226u},
+        {130,7,8,400189588u},
+        {150,7,10,3904424161u},
+        {140,6,9,288477010u},
+        {130,6,9,258954395u},
+        {140,6,7,317999625u},
+        {120,7,8,497209226u},
+        {130,7,8,400189588u},
+        {150,7,10,3904424161u},
+        {110,4,5,3517051158u},
+        {70,4,6,3509128559u},
+        {70,4,5,3524973757u},
+        {30,4,5,9511118u},
+        {80,6,8,4274625400u},
+        {50,6,8,3334831381u},
+        {110,4,5,3517051158u},
+        {70,4,6,3509128559u},
+        {70,4,5,3524973757u},
+        {30,4,5,9511118u},
+        {80,6,8,4274625400u},
+        {50,6,8,3334831381u},
+        {160,5,7,3517051158u},
+        {130,5,6,3509128559u},
+        {110,5,7,3524973757u},
+        {90,5,7,9511118u},
+        {130,5,6,4274625400u},
+        {90,6,8,3334831381u},
+        {160,5,7,3517051158u},
+        {130,5,6,3509128559u},
+        {110,5,7,3524973757u},
+        {90,5,7,9511118u},
+        {130,5,6,4274625400u},
+        {90,6,8,3334831381u},
+        {120,7,10,607289132u},
+        {120,8,9,401550301u},
+        {160,6,10,813027963u},
+        {110,6,8,1285220388u},
+        {110,6,7,542864062u},
+        {140,9,11,170263315u},
+        {120,7,10,607289132u},
+        {120,8,9,401550301u},
+        {160,6,10,813027963u},
+        {110,6,8,1285220388u},
+        {110,6,7,542864062u},
+        {140,9,11,170263315u},
+        {50,2,3,3517051158u},
+        {50,2,4,3509128559u},
+        {50,3,4,3524973757u},
+        {30,2,3,9511118u},
+        {40,2,4,4274625400u},
+        {70,2,4,3334831381u},
+        {50,2,3,3517051158u},
+        {50,2,4,3509128559u},
+        {50,3,4,3524973757u},
+        {30,2,3,9511118u},
+        {40,2,4,4274625400u},
+        {70,2,4,3334831381u},
+        {110,5,7,1465832913u},
+        {110,4,5,3517051158u},
+        {50,6,8,3709581964u},
+        {80,4,6,2516634665u},
+        {80,5,6,774936139u},
+        {60,4,6,1399212292u},
+        {110,5,7,1465832913u},
+        {110,4,5,3517051158u},
+        {50,6,8,3709581964u},
+        {80,4,6,2516634665u},
+        {80,5,6,774936139u},
+        {60,4,6,1399212292u},
+    };
+    for (std::size_t n = 0; n < std::size(vitals_observations); ++n) {
+        const auto& source = creation_observations[n]; const auto& expected = vitals_observations[n];
+        Character draft{"Vitals",source.race,source.gender,source.character_class,
+            std::string_view(source.character_class) == "thief" ? "neutral-good" : "lawful-good",{}};
+        HighWordLcg32 rng(source.seed,profile.random->multiplier(),1);
+        const auto rolled = roll_character(complete_rules,draft,rng);
+        assert(rolled.age == source.age && rolled.hit_points);
+        for (std::size_t i = 0; i < 6; ++i) assert(rolled.abilities[i].value == source.scores[i]);
+        assert(rolled.abilities[0].percentile == source.percentile);
+        assert(rolled.money.at("gold") == expected.gold && rolled.hit_points->base == expected.base);
+        assert(rolled.hit_points->current == expected.hp && rolled.hit_points->maximum == expected.hp);
+        assert(rng.state() == expected.after);
+        const auto loaded = read_party(serialize_party({rolled},complete_rules),complete_rules)[0];
+        assert(loaded.money == rolled.money && loaded.hit_points->base == expected.base);
+        assert(loaded.hit_points->current == expected.hp && loaded.hit_points->maximum == expected.hp);
+    }
+    // Original isolated HP routine, CON 3..20. Synthetic ability clamps supply its inputs.
+    const int hp_edges[4][18]{
+        {3,4,4,4,5,5,5,5,5,5,5,5,6,7,7,7,7,7},
+        {7,8,8,8,9,9,9,9,9,9,9,9,10,11,12,13,13,13},
+        {1,1,1,1,2,2,2,2,2,2,2,2,3,4,4,4,4,4},
+        {2,3,3,3,4,4,4,4,4,4,4,4,5,6,6,6,6,6}};
+    for (std::size_t cls = 0; cls < 4; ++cls) for (int con = 3; con <= 20; ++con) {
+        auto edge_rules = complete_rules;
+        edge_rules.dice_count = 1; edge_rules.dice_sides = 2; edge_rules.drop_lowest = 0; edge_rules.keep_best_of = 1;
+        auto& race = edge_rules.races[5]; race.age_adjustments.clear();
+        race.minimum.assign(6,15); race.minimum[4] = con;
+        race.maximum["male"] = race.minimum;
+        auto& choice = edge_rules.classes[cls];
+        choice.minimum.assign(6,1); choice.creation_minimum.clear(); choice.starting_money.reset();
+        Character draft{"Edge","human","male",choice.id,choice.alignments.front(),{}}; draft.age = 1;
+        HighWordLcg32 rng(0x12345678,profile.random->multiplier(),1);
+        const auto rolled = roll_character(edge_rules,draft,rng);
+        assert(rolled.abilities[4].value == con && rolled.hit_points->current == hp_edges[cls][con-3]);
+        auto expected_rng = HighWordLcg32(0xe28f6d7a,profile.random->multiplier(),1);
+        (void)expected_rng.draw(choice.hit_points->sides);
+        assert(rng.state() == expected_rng.state());
+    }
+    auto complete_session = session_for(profile);
+    complete_session.state.random.emplace(0x12345678,profile.random->multiplier(),1);
+    auto original_roll = roll_character(complete_rules,Character{"Full","human","male","fighter","lawful-good",{}},
+        *complete_session.state.random);
+    add_character(complete_session.party,complete_rules,original_roll);
+    const auto full_save = serialize_exploration(complete_session,"vitals-replay");
+    auto full_restored = session_for(profile); restore_exploration(full_restored,full_save,"vitals-replay");
+    const auto reroll = roll_character(complete_rules,original_roll,*complete_session.state.random);
+    const auto replay_roll = roll_character(complete_rules,full_restored.party[0],*full_restored.state.random);
+    assert(reroll.age == original_roll.age && replay_roll.age == original_roll.age);
+    same(reroll.abilities,replay_roll.abilities);
+    assert(reroll.money == replay_roll.money && reroll.hit_points->base == replay_roll.hit_points->base);
+    assert(reroll.hit_points->current == replay_roll.hit_points->current);
+    assert(complete_session.state.random->state() == full_restored.state.random->state());
+    auto invalid_vitals = complete_rules; invalid_vitals.classes[1].hit_points->modifiers.clear();
+    HighWordLcg32 vitals_rng(123,profile.random->multiplier(),1);
+    rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
+    assert(vitals_rng.state() == 123); // Failures after money rolling also leave the caller RNG untouched.
+    invalid_vitals = complete_rules; invalid_vitals.classes[1].starting_money->multiplier = 65535;
+    rejects([&] { (void)roll_character(invalid_vitals,original_roll,vitals_rng); });
+    assert(vitals_rng.state() == 123);
     struct AgeObservation { const char* race; const char* character_class; int age; std::uint32_t after; };
     auto replay = session_for(profile);
     auto byte_rules = rules;

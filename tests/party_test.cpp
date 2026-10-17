@@ -62,6 +62,18 @@ int main(int argc, char** argv) {
     for (int i = 1; i < 6; ++i) { auto c = hero; c.name = "Hero"+std::to_string(i); add_character(party,rules,c); }
     const auto json = serialize_party(party,rules);
     assert(!read_party(json,rules)[0].age); // Legacy ages remain unknown.
+    assert(!read_party(json,rules)[0].hit_points && read_party(json,rules)[0].money.empty());
+    auto wounded = hero; wounded.hit_points = HitPoints{5,0,6}; wounded.money["gold"] = 0;
+    const auto vitals_json = serialize_party({wounded},rules);
+    auto restored = read_party(vitals_json,rules)[0];
+    assert(restored.hit_points->base == 5 && restored.hit_points->current == 0 &&
+        restored.hit_points->maximum == 6 && restored.money.at("gold") == 0);
+    for (const auto& value : {"-1","7","true","null"})
+        rejects([&] { (void)read_party(changed(vitals_json,"\"current\":0",std::string("\"current\":")+value),rules); });
+    for (const auto& value : {"-1","65536","1.5","true"})
+        rejects([&] { (void)read_party(changed(vitals_json,"\"gold\":0",std::string("\"gold\":")+value),rules); });
+    wounded.hit_points->current = 7;
+    rejects([&] { (void)serialize_party({wounded},rules); });
     auto with_age = party; with_age[0].age = 22;
     const auto age_json = serialize_party(with_age,rules);
     assert(read_party(age_json,rules)[0].age == 22);
@@ -143,7 +155,11 @@ int main(int argc, char** argv) {
         changed(original,"\"values\": [0, 0, -1, 0, 0, 0]","\"values\": [0]"),
         changed(original,"\"values\": [0, 0, -1, 0, 0, 0]","\"values\": [0, 0, -101, 0, 0, 0]"),
         changed(original,"\"positiveOnly\": [\"strength\"]","\"positiveOnly\": [\"unknown\"]"),
-        changed(original,"\"wrapByte\": true","\"wrapByte\": 1")}) {
+        changed(original,"\"wrapByte\": true","\"wrapByte\": 1"),
+        changed(original,"\"abilityMinimum\": 3","\"abilityMinimum\": true"),
+        changed(original,"\"minimum\": 5, \"ability\"","\"minimum\": 9, \"ability\""),
+        changed(original,"\"currency\": \"gold\"","\"currency\": \"Invalid ID\""),
+        changed(original,"\"multiplier\": 10","\"multiplier\": 65535")}) {
         { std::ofstream output(invalid_file); output << value; }
         rejects([&] { (void)read_creation_rules(invalid_file); });
     }
