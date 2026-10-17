@@ -146,3 +146,10 @@ The independent EGA portrait compositor consults SSI Engine's pinned
 for head/body placement, opaque palette behavior and offset precedence. It uses
 the existing EGA decoder and caller-supplied geometry; no Java compositor was
 copied or translated. These remain research references in the attribution registry.
+
+The three-operand map-loading adapter also consults that pinned SSI Engine's
+Pool configuration, EclOpCode, VirtualMachine and Engine for argument layout and
+supported dungeon selectors. The C++ read-only resolver, atomic map transition
+and map-aware save binding are independently implemented, without upstream
+private virtual-memory addresses or filename-search policy. No Java source was
+copied or translated.

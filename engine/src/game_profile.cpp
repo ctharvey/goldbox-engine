@@ -15,7 +15,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
-        "colorBackdrop", "portrait"}, "game profile");
+        "colorBackdrop", "portrait", "areaDialect"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -27,7 +27,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "eventDialect", "game profile"), "profile.eventDialect"),
         j::string(j::field(root, "rulesProfile", "game profile"), "profile.rulesProfile"),
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
-        {}, std::nullopt, "disabled", std::nullopt, std::nullopt
+        {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled"
     };
     static const std::regex id_pattern(R"(^[a-z0-9][a-z0-9._-]{0,127}$)");
     if (!std::regex_match(profile.id, id_pattern) || profile.id.find("..") != std::string::npos ||
@@ -115,6 +115,11 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         config.layout.head_offset = offset("headOffset");
         config.layout.body_offset = offset("bodyOffset");
         profile.portrait = config;
+    }
+    if (const auto* value = root.if_contains("areaDialect")) {
+        profile.area_dialect = j::string(*value,"areaDialect");
+        if (profile.area_dialect != "disabled" && profile.area_dialect != "ssi-area-map3-v1")
+            throw std::runtime_error("Unsupported area dialect");
     }
     return profile;
 }

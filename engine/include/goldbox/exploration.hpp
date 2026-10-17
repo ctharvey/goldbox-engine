@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "goldbox/ecl_vm.hpp"
+#include <functional>
 
 namespace goldbox {
 
 enum class Direction : std::uint8_t { north, east, south, west };
+struct MapResources {
+    // Read-only resolver returning normalized GEO16 content. Archive/group
+    // selection belongs to the caller's adapter, never to the VM.
+    std::function<formats::GeoMap(std::uint8_t)> resolve;
+    std::string source_identity;
+};
 
-// Explicit imported map/ECL pairing. No record-ID guessing or title logic.
+// Explicit initial map/ECL pairing and optional normalized-map resolver.
+// Map loading does not replace the ECL program or guess archive groups.
 struct ExplorationSession {
     formats::GeoMap map;
     std::vector<std::uint8_t> ecl_record;
@@ -17,9 +25,13 @@ struct ExplorationSession {
     std::uint8_t column{};
     Direction facing{Direction::north};
     std::optional<std::array<std::uint8_t,3>> wall_banks{};
+    std::optional<MapResources> maps{};
+    std::optional<std::array<std::uint8_t,3>> area{};
+    std::optional<std::uint8_t> initial_map_record{};
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);
+    void load_area(std::array<std::uint8_t,3> values);
     EclExecution trigger(formats::EclEventKind kind, EclHost& host, EclLimits limits = {});
 };
 

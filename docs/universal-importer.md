@@ -56,6 +56,11 @@ window supports only portraits fitting its 88x88 image view; larger profile
 layouts require a capable host. The adapter is enabled by explicit portrait
 archives, not by title matching. Unknown fields and invalid geometry are rejected.
 
+Optional `areaDialect` selects `ssi-area-map3-v1` or `disabled` (default). Pool
+uses the three-operand LOAD_AREA_MAP adapter; profiles with a two-operand or
+different map dialect must provide a separate adapter rather than inheriting
+this layout. Map-resource lookup is a supplied resolver, not a filename scan.
+
 ## Compatibility acceptance per game/version
 
 1. Fingerprint user-supplied install files without ever uploading or committing them.

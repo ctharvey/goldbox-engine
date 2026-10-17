@@ -70,6 +70,47 @@ struct Host : EclHost {
 };
 }
 int main(int argc, char** argv) {
+    if (argc == 10 && std::string_view(argv[1]) == "initialize") {
+        // Read-only original-resource probe. Never print original text/pixels.
+        const auto profile = read_game_profile(argv[2]);
+        if (!profile.event_dispatch) throw std::runtime_error("Map probe requires a dispatch profile");
+        const auto id = [](const char* value) {
+            std::size_t used = 0; const auto n = std::stoul(value,&used);
+            if (used != std::string_view(value).size() || n > 255) throw std::runtime_error("Invalid record ID");
+            return static_cast<std::uint8_t>(n);
+        };
+        const auto geo = DaxArchive::from_file(argv[3]);
+        ExplorationSession context;
+        context.map = extract_geo16_map(geo,id(argv[4]));
+        context.ecl_record = DaxArchive::from_file(argv[5]).extract(id(argv[6]));
+        const auto& config = *profile.event_dispatch;
+        context.dialect = {config.dialect,config.code_base,config.square_info_address,true,config.position_addresses};
+        context.opcodes = minimal_vm_opcodes(profile.image_dialect == "ssi-images-3-v1" ? EclImageDialect::sprite3 : EclImageDialect::disabled,
+            profile.area_dialect == "ssi-area-map3-v1" ? EclAreaDialect::map3 : EclAreaDialect::disabled);
+        context.maps = MapResources{[geo](std::uint8_t record) { return extract_geo16_map(geo,record); },"read-only-local-probe"};
+        struct Probe : EclHost {
+            ExplorationSession& session;
+            DaxArchive definitions, tiles, shared;
+            unsigned texts{}, bindings{};
+            Probe(ExplorationSession& s, const char* d, const char* t, const char* c) : session(s),
+                definitions(DaxArchive::from_file(d)), tiles(DaxArchive::from_file(t)), shared(DaxArchive::from_file(c)) {}
+            void text(std::string_view,bool) override { ++texts; }
+            void wall_banks(std::array<std::uint8_t,3> values) override {
+                const auto walls = load_wall_graphics(definitions,tiles,shared,values);
+                for (const auto& cell : session.map.cells)
+                    for (const auto wall : {cell.north,cell.east,cell.south,cell.west})
+                        if (wall && (wall > 15 || !walls.present[wall-1])) throw std::runtime_error("Map has an unbound wall");
+                session.wall_banks = values; ++bindings;
+            }
+        } probe(context,argv[7],argv[8],argv[9]);
+        const auto run = context.trigger(EclEventKind::initialize,probe,{1000,64});
+        std::cout << "exited=" << run.exited << " steps=" << run.steps << " offset=" << run.bytecode_offset
+                  << " map=" << unsigned(context.map.dax_record_id) << " wallBindings=" << probe.bindings
+                  << " textCalls=" << probe.texts << " diagnostic=" << run.diagnostic << '\n';
+        if (context.wall_banks) std::cout << "banks=" << unsigned((*context.wall_banks)[0]) << ','
+            << unsigned((*context.wall_banks)[1]) << ',' << unsigned((*context.wall_banks)[2]) << '\n';
+        return run.exited ? 0 : 1;
+    }
     if (argc == 3) {
         ImageArchives assets{DaxArchive::from_file(argv[1]),DaxArchive::from_file(argv[2])};
         ImagePresentation display(assets);
@@ -219,6 +260,24 @@ int main(int argc, char** argv) {
     window({SDLK_F9,SDLK_ESCAPE},missing);
     assert(session.row == 2 && session.state.memory[0x4a01] == 99); // Failed visual restore is atomic.
     assert((session.wall_banks == std::array<std::uint8_t,3>{8,255,255}));
+    std::filesystem::remove(save);
+    session = {}; session.map.dax_record_id = 6; session.dialect = dialect;
+    session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3);
+    session.maps = MapResources{[](std::uint8_t id) {
+        if (id != 6 && id != 9) throw std::runtime_error("Missing synthetic map");
+        formats::GeoMap map; map.dax_record_id = id;
+        if (id == 9) { map.cells[0].north = 1; map.cells[0].raw_event = 0x81; }
+        return map;
+    },"synthetic-window-maps-v1"};
+    session.ecl_record = program({0x21,0,9,0,2,0,255,0x37,0,7,0,255,0,255,9,0,42,1,1,0x4a,0});
+    window({SDLK_SPACE,SDLK_F5,SDLK_ESCAPE},walls);
+    assert(session.map.dax_record_id == 9 && session.state.memory[0x4a01] == 42);
+    assert(session.state.memory[dialect.square_info_address] == 0x81);
+    session.load_area({6,2,255});
+    assert(session.map.dax_record_id == 6);
+    window({SDLK_F9,SDLK_ESCAPE},walls);
+    assert(session.map.dax_record_id == 9 && session.map.cells[0].north == 1);
+    assert(session.state.memory[0x4a01] == 42);
     std::filesystem::remove(save);
 #endif
 }

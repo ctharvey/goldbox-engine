@@ -10,6 +10,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <sstream>
 
 #include <boost/json.hpp>
@@ -331,17 +332,23 @@ int main(int argc, char** argv) {
         if (!profile.event_dispatch || profile.archive_format != "dax-v1") throw std::runtime_error("Unsupported exploration profile");
         const auto& config = *profile.event_dispatch;
         const auto geo_id = record_id(argv[3]), ecl_id = record_id(argv[5]);
-        const auto raw_map = goldbox::formats::DaxArchive::from_file(argv[2]).extract(geo_id);
+        const auto geo_archive = std::make_shared<goldbox::formats::DaxArchive>(goldbox::formats::DaxArchive::from_file(argv[2]));
+        const auto raw_map = geo_archive->extract(geo_id);
         auto ecl = goldbox::formats::DaxArchive::from_file(argv[4]).extract(ecl_id);
         goldbox::ExplorationSession session;
 #ifdef GOLDBOX_RENDERER
         session.wall_banks = initial_banks;
 #endif
         session.map = goldbox::formats::decode_geo16_record(raw_map, geo_id);
+        session.initial_map_record = geo_id;
+        session.maps = goldbox::MapResources{
+            [geo_archive](std::uint8_t id) { return goldbox::formats::extract_geo16_map(*geo_archive,id); },
+            "dax-fnv1a64:" + std::to_string(checksum(geo_archive->source_bytes()))};
         session.ecl_record = std::move(ecl);
         session.dialect = {config.dialect, config.code_base, config.square_info_address, true, config.position_addresses};
         session.opcodes = goldbox::minimal_vm_opcodes(profile.image_dialect == "ssi-images-3-v1" ?
-            goldbox::EclImageDialect::sprite3 : goldbox::EclImageDialect::disabled);
+            goldbox::EclImageDialect::sprite3 : goldbox::EclImageDialect::disabled,
+            profile.area_dialect == "ssi-area-map3-v1" ? goldbox::EclAreaDialect::map3 : goldbox::EclAreaDialect::disabled);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
         std::ostringstream identity;
         identity << profile.id << ':' << fs::path(argv[2]).filename().string() << ':' << unsigned(geo_id) << ':'

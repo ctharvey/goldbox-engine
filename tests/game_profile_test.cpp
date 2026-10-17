@@ -20,6 +20,7 @@ int main(int argc, char** argv) {
     assert(pool.validation_status == "unverified");
     assert(pool.resource_patterns.size() == 4);
     assert(pool.image_dialect == "ssi-images-3-v1" && curse.image_dialect == "disabled");
+    if (pool.area_dialect != "ssi-area-map3-v1" || curse.area_dialect != "disabled") return 1;
     if (!pool.color_backdrop || curse.color_backdrop ||
         pool.color_backdrop->sky_color_addresses != std::array<std::uint16_t,2>{0x49fd,0x49fe}) return 1;
     if (!pool.portrait || curse.portrait || pool.portrait->head_id_address != 0x6de1 ||
@@ -74,5 +75,13 @@ int main(int argc, char** argv) {
     const auto custom = goldbox::read_game_profile(path);
     fs::remove(path);
     if (!custom.portrait || custom.portrait->head_id_address != 0x1234 || custom.portrait->layout.width != 16) return 1;
+    auto area_prefix = prefix;
+    area_prefix.replace(area_prefix.find("colorBackdrop"),13,"areaDialect");
+    { std::ofstream o(path); o << area_prefix << R"("unknown-area"})"; }
+    rejected = false;
+    try { (void)goldbox::read_game_profile(path); }
+    catch (const std::runtime_error&) { rejected = true; }
+    fs::remove(path);
+    if (!rejected) return 1;
     return 0;
 }

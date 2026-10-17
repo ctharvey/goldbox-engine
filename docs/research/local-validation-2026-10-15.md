@@ -245,8 +245,48 @@ after the unsupported result and quit request. No original text or artwork was
 emitted by the validation wrapper; only status, step count and diagnostics were
 retained privately outside the repository.
 
-This is the current original-event graphics integration blocker: map/campaign
-resource loading is not implemented, so this original initialization cannot yet
-establish its map and decoration state. It is not evidence of matched-scene
-parity or complete campaign startup. Implement map-loading/resource resolution
-through a reusable adapter before claiming the original initialization works.
+At that checkpoint, map/campaign resource loading was not implemented, so this
+original initialization could not establish its map and decoration state. This
+was not evidence of matched-scene parity or complete campaign startup. The
+map-loading resolution described below supersedes that specific blocker.
+
+
+## Map-loading blocker resolved (2026-10-16)
+
+The profile-selected three-operand LOAD_AREA_MAP adapter now resolves normalized
+maps through a supplied read-only resolver. The CLI binds that resolver to the
+explicit GEO archive snapshot; there is no automatic archive or ECL-program
+selection. Synthetic tests cover changing map records, retained/all-zero modes,
+invalid requests, missing/wrong records, position bounds, dialect conflicts,
+map-aware save rebind, changed sources and legacy single-map saves. The SDL
+path also loads a synthetic map, binds walls, saves, changes map and restores
+both geometry and wall selection.
+
+The original GEO1/ECL1 record-18 initialization was repeated from the same empty
+prototype baseline. In the ordinary headless harness it passed the formerly
+unknown opcode and selected area [18,2,255], map record 18, then stopped at the
+absent wall-graphics host. That is a host limitation, not an unimplemented opcode.
+
+An opt-in read-only probe with the explicitly supplied WALLDEF1/8X8D1/shared
+8X8D1 archives then executed the complete original initialization entry:
+`exited=1`, 15 steps, reported offset 184, map 18, one wall-bank binding [1,3,5],
+zero text calls, and no diagnostic. It decoded the actual selected wall resources
+and checked every wall ID in the loaded map. Only counts/IDs/diagnostics were
+emitted; original text and pixels were suppressed. The private result is retained
+outside the repository.
+
+This resolves the specific map-18 initialization blocker. It does not establish
+full campaign startup, NEW_ECL/program switching, automatic archive-group changes,
+party initialization, combat or matched-scene graphical parity. Prototype map
+save identities use a non-cryptographic archive change detector; this is not an
+integrity guarantee or the installation scanner's SHA-256 inventory.
+
+To repeat the same class of local probe with explicit authorized resources:
+
+```sh
+timeout 30 ./build/tests/goldbox_image_host_tests initialize /private/profile.json \
+  /private/GEO.DAX 18 /private/ECL.DAX 18 \
+  /private/WALLDEF.DAX /private/8X8D.DAX /private/shared-8X8D.DAX
+```
+
+Public CTest remains synthetic and does not access an installation.

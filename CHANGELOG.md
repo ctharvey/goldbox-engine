@@ -2,6 +2,11 @@
 
 ## 2026-10-16
 
+- Execute profile-selected three-operand LOAD_AREA_MAP through a reusable,
+  read-only map resolver. Validate geometry/positions before switching, preserve
+  the current ECL program, bind map-aware saves to the supplied resource identity,
+  and restore old single-map saves without inventing archive-group selection.
+
 - Execute opt-in LOAD_AREA_DECO through a typed host callback, replacing wall
   banks only after resource/map validation. Persist selected IDs as optional
   save state and rebind before restoring the window's game state. Preserve the

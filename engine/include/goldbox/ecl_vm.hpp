@@ -14,6 +14,7 @@ struct EclState {
     int comparison{};
 };
 enum class EclImageDialect { disabled, sprite3 };
+enum class EclAreaDialect { disabled, map3 };
 struct EclSpriteRequest {
     std::uint8_t sprite{}, distance{}, replacement_picture{};
 };
@@ -30,6 +31,7 @@ public:
     virtual void sprite_advance();
     virtual void clear_images();
     virtual void wall_banks(std::array<std::uint8_t,3> banks);
+    virtual void load_area(std::array<std::uint8_t,3> values);
 };
 
 struct EclLimits {
@@ -57,6 +59,7 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEvent
     const formats::EclDispatchDialect& dialect, std::span<const formats::EclOpcodeSpec> opcodes,
     EclState& state, EclHost& host, EclLimits limits = {});
 
-std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled);
+std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
+    EclAreaDialect area = EclAreaDialect::disabled);
 
 } // namespace goldbox

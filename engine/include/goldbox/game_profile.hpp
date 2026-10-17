@@ -38,6 +38,7 @@ struct GameProfile {
         formats::EgaPortraitLayout layout;
     };
     std::optional<Portrait> portrait;
+    std::string area_dialect{"disabled"};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

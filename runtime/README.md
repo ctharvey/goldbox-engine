@@ -129,6 +129,16 @@ instead of guessing. Image/portrait overlays remain transient and are cleared.
 Graphics archive fingerprints are not yet part of save identity: this is record
 selection persistence, not proof that the same artwork or original scene is loaded.
 
+The selected `areaDialect` can execute LOAD_AREA_MAP through the shared session
+adapter in terminal, harness and window modes. It loads supported dungeon records
+from the explicitly supplied GEO archive, preserving the current ECL program.
+Missing records, unsupported scene modes and invalid script positions stop with
+diagnostics. The CLI does not guess archive groups or change ECL records.
+Map-aware saves bind the selected map to that archive snapshot's change detector;
+restore rebuilds geometry before the window rebinds saved walls. Older single-map
+saves remain readable. See the ECL format document for supported selector modes
+and the non-cryptographic prototype identity limitation.
+
 Reuse decision: use SDL3's zlib-licensed platform/input/rendering/font services
 instead of implementing platform backends. Validated with SDL 3.2.28 at
 `7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`; no upstream source or artwork copied.

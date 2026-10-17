@@ -58,9 +58,11 @@ void EclHost::sprite_start(EclSpriteRequest) { throw EclDecodeError("Sprite host
 void EclHost::sprite_advance() { throw EclDecodeError("Sprite host unavailable"); }
 void EclHost::clear_images() { throw EclDecodeError("Image host unavailable"); }
 void EclHost::wall_banks(std::array<std::uint8_t,3>) { throw EclDecodeError("Wall graphics host unavailable"); }
+void EclHost::load_area(std::array<std::uint8_t,3>) { throw EclDecodeError("Map host unavailable"); }
 
-std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images) {
+std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDialect area) {
     require(images == EclImageDialect::disabled || images == EclImageDialect::sprite3,"Unknown image dialect");
+    require(area == EclAreaDialect::disabled || area == EclAreaDialect::map3,"Unknown area dialect");
     auto result = routing_ecl_opcodes();
     result.push_back({0x15, "MENU_VERTICAL", 3, 2});
     result.push_back({0x2b, "MENU_HORIZONTAL", 2, 1});
@@ -71,6 +73,7 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images) {
         result.push_back({0x31,"SPRITE_OFF",0});
         result.push_back({0x37,"LOAD_AREA_DECO",3});
     }
+    if (area == EclAreaDialect::map3) result.push_back({0x21,"LOAD_AREA_MAP",3});
     return result;
 }
 
@@ -81,6 +84,10 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
     try {
         const auto image_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0c; });
         const bool images_enabled = image_spec != opcodes.end();
+        const auto area_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x21; });
+        if (area_spec != opcodes.end()) require(area_spec->operand_count == 3 && area_spec->variable_count_operand == -1 &&
+            std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x21; }) == 1,
+            "Conflicting VM area opcode definition");
         if (images_enabled) require(image_spec->operand_count == 3 && image_spec->variable_count_operand == -1 &&
             std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0c; }) == 1,
             "Conflicting VM opcode definition");
@@ -112,7 +119,7 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             if (next != boundaries.begin()) require(std::prev(next)->second <= offset, "ECL branch inside operand data");
             boundaries[offset] = end;
             // Decode arity from profile, but reject semantic conflicts explicitly.
-            const auto expected = minimal_vm_opcodes(EclImageDialect::sprite3);
+            const auto expected = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3);
             const auto spec = std::find_if(expected.begin(), expected.end(), [&](const auto& s) { return s.opcode == instruction.opcode; });
             if (spec != expected.end()) {
                 const auto actual = std::find_if(opcodes.begin(), opcodes.end(), [&](const auto& s) { return s.opcode == instruction.opcode; });
@@ -234,6 +241,16 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                     banks[i] = static_cast<std::uint8_t>(id);
                 }
                 host.wall_banks(banks);
+                break;
+            }
+            case 0x21: {
+                std::array<std::uint8_t,3> values{};
+                for (std::size_t i = 0; i < values.size(); ++i) {
+                    const auto value = numeric(args[i]);
+                    require(value <= 255,"Map selector outside byte range");
+                    values[i] = static_cast<std::uint8_t>(value);
+                }
+                host.load_area(values);
                 break;
             }
             default: throw EclDecodeError("Unsupported VM opcode " + std::to_string(instruction.opcode));

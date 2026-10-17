@@ -69,4 +69,43 @@ Absent hosts and out-of-range values fail explicitly. Legacy saves without this
 metadata remain readable by the engine; the wall-enabled window rejects an
 ambiguous visual restore. Selecting archives or loading maps remains separate.
 
+## Three-operand dungeon map loading
+
+`areaDialect: ssi-area-map3-v1` explicitly selects opcode 0x21 with three numeric
+byte operands; absent/disabled preserves the old unsupported behavior. Pool
+opts in, while other profiles remain unchanged. Conflicting arity, duplicate
+definitions, invalid operand types and values above 255 are rejected. The VM
+calls `EclHost::load_area`; it does not open archives or select a game by name.
+
+The shared exploration adapter supports the researched GEO dungeon modes:
+all-zero selectors load record 0; a first selector other than 127/255 with
+second selector 2/127/255 loads the first selector's record; (255,2,*) retains
+the current dungeon. The third byte is preserved without assigning invented
+meaning. Runic/overland/clear-map variants are explicitly unsupported here.
+
+`MapResources` supplies a read-only resolver to normalized GEO16 content and a
+caller-owned source identity. The CLI supplies the explicit GEO archive already
+selected at launch, with an immutable snapshot and a non-cryptographic FNV-1a
+change detector. It never searches similarly named archives. Another title or
+campaign can provide a different resolver rather than adding title branches.
+
+Lookup, returned record identity and position/direction are validated before
+publishing a transition. Configured position bytes can supply script-written
+coordinates at the load. The ECL program remains unchanged; NEW_ECL is a separate
+unsupported operation. Earlier VM writes retain partial-progress semantics on
+failure. Successful decoration loading refreshes current square-info context.
+
+After a map load, prototype saves also contain `area`, `mapRecord`, and
+`mapSource`. All three are required together. Restore resolves/validates the map
+and checks the source identity before publishing state; changed sources, missing
+maps or inconsistent bindings fail atomically. Older saves without these fields
+remain readable and restore the launch map when necessary. This is not an
+original SSI save format or a complete campaign loader. The change detector is
+not a cryptographic integrity guarantee; installation inventory still uses SHA-256.
+
+SSI Engine's pinned Pool configuration, EclOpCode, VirtualMachine and Engine
+were consulted for operand arity, dungeon mode selectors and separation from
+program loading. The resolver, session transition and save implementation are
+independent C++; no Java source was copied or ported.
+
 See [original-resource evidence and remaining gates](../research/local-validation-2026-10-15.md).

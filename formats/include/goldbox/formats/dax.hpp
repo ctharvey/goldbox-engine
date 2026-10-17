@@ -25,6 +25,8 @@ public:
     [[nodiscard]] static DaxArchive from_file(const std::filesystem::path& file);
     [[nodiscard]] const std::vector<DaxRecord>& records() const noexcept { return records_; }
     [[nodiscard]] std::uint16_t data_offset() const noexcept { return data_offset_; }
+    // Immutable archive snapshot, e.g. for caller-owned save fingerprints.
+    [[nodiscard]] std::span<const std::uint8_t> source_bytes() const noexcept { return bytes_; }
     [[nodiscard]] std::vector<std::uint8_t> extract(std::uint8_t record_id) const;
 
 private:

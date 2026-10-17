@@ -71,5 +71,81 @@ int main() {
     session.ecl_record[20] = 0xff;
     assert(!session.trigger(EclEventKind::move, host).exited);
     assert(session.row == 0 && session.column == 1); // errors retain explicit partial progress
+    ExplorationSession loading;
+    loading.map.dax_record_id = 7;
+    loading.row = 3; loading.column = 4;
+    loading.dialect = session.dialect;
+    loading.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::map3);
+    unsigned lookups = 0;
+    loading.maps = MapResources{[&](std::uint8_t id) {
+        ++lookups;
+        if (id != 0 && id != 7 && id != 8) throw std::runtime_error("Missing synthetic map");
+        GeoMap map; map.dax_record_id = id;
+        if (id == 8) { map.cells[3*16+4].north = 5; map.cells[3*16+4].raw_event = 0x82; }
+        return map;
+    },"synthetic-map-archive-v1"};
+    const auto legacy = serialize_exploration(loading,identity);
+    for (int i = 0; i < 5; ++i) loading.ecl_record.insert(loading.ecl_record.end(),{1,1,20,0x99});
+    loading.ecl_record.insert(loading.ecl_record.end(),{0x21,0,8,0,2,0,99,9,0,42,1,0,0x4a,0});
+    const auto script = loading.ecl_record;
+    assert(loading.trigger(EclEventKind::initialize,host).exited);
+    assert(loading.map.dax_record_id == 8 && loading.map.cells[3*16+4].north == 5);
+    assert(loading.row == 3 && loading.column == 4 && loading.initial_map_record == 7);
+    assert(loading.ecl_record == script && loading.state.memory[0x4a00] == 42);
+    assert((loading.area == std::array<std::uint8_t,3>{8,2,99}));
+    const auto before_reuse = lookups;
+    loading.load_area({255,2,44});
+    assert(lookups == before_reuse && loading.map.dax_record_id == 8);
+    const auto bound = serialize_exploration(loading,identity);
+    restore_exploration(loading,legacy,identity);
+    assert(loading.map.dax_record_id == 7 && !loading.area);
+    restore_exploration(loading,bound,identity);
+    assert(loading.map.dax_record_id == 8 && loading.area);
+    const auto good_area = loading.area;
+    for (const auto mode : {2,127,255}) loading.load_area({8,static_cast<std::uint8_t>(mode),1});
+    rejects([&] { loading.load_area({9,2,0}); });
+    rejects([&] { loading.load_area({127,2,0}); });
+    rejects([&] { loading.load_area({255,16,0}); });
+    assert(loading.map.dax_record_id == 8 && loading.row == 3);
+    loading.state.memory[0xc04b] = 255;
+    rejects([&] { loading.load_area({7,2,0}); });
+    assert(loading.map.dax_record_id == 8 && loading.column == 4);
+    loading.state.memory[0xc04b] = 4;
+    loading.maps->source_identity = "changed-archive";
+    rejects([&] { restore_exploration(loading,bound,identity); });
+    assert(loading.map.dax_record_id == 8);
+    loading.maps->source_identity = "synthetic-map-archive-v1";
+    const auto resolver = *loading.maps;
+    loading.maps->resolve = [](std::uint8_t) { GeoMap map; map.dax_record_id = 3; return map; };
+    rejects([&] { loading.load_area({8,2,0}); });
+    rejects([&] { restore_exploration(loading,bound,identity); });
+    loading.maps = resolver;
+    loading.load_area({0,0,0});
+    assert(loading.map.dax_record_id == 0);
+    restore_exploration(loading,bound,identity);
+    loading.maps.reset();
+    rejects([&] { loading.load_area({8,2,0}); });
+    rejects([&] { restore_exploration(loading,bound,identity); });
+    assert(loading.map.dax_record_id == 8 && loading.area == good_area);
+    auto conflicting = loading.opcodes;
+    for (auto& op : conflicting) if (op.opcode == 0x21) op.operand_count = 2;
+    assert(!execute_ecl(script,EclEventKind::initialize,loading.dialect,conflicting,loading.state,host).exited);
+    conflicting = loading.opcodes; conflicting.push_back({0x21,"OTHER_MAP",3});
+    assert(!execute_ecl(script,EclEventKind::initialize,loading.dialect,conflicting,loading.state,host).exited);
+    assert(!execute_ecl(script,EclEventKind::initialize,loading.dialect,loading.opcodes,loading.state,host).exited);
+    assert(!execute_ecl(script,EclEventKind::initialize,loading.dialect,minimal_vm_opcodes(),loading.state,host).exited);
+    auto bad_operand = script; bad_operand[21] = 2; bad_operand.insert(bad_operand.begin()+23,2); // 520, not a byte.
+    assert(!execute_ecl(bad_operand,EclEventKind::initialize,loading.dialect,loading.opcodes,loading.state,host).exited);
+    loading.maps = resolver;
+    for (const auto& change : {std::pair{std::string("\"mapRecord\":8"),std::string("\"mapRecord\":256")},
+        std::pair{std::string("\"area\":[255,2,44]"),std::string("\"area\":[255,16,44]")},
+        std::pair{std::string("\"area\":[255,2,44]"),std::string("\"area\":[255,2]")}}) {
+        auto invalid_binding = bound;
+        const auto at = invalid_binding.find(change.first);
+        assert(at != std::string::npos);
+        invalid_binding.replace(at,change.first.size(),change.second);
+        rejects([&] { restore_exploration(loading,invalid_binding,identity); });
+        assert(loading.map.dax_record_id == 8 && loading.area == good_area);
+    }
     return 0;
 }

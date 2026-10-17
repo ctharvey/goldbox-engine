@@ -5,6 +5,67 @@
 #include <stdexcept>
 
 namespace goldbox {
+namespace {
+std::optional<std::uint8_t> area_record(std::array<std::uint8_t,3> values) {
+    if (values == std::array<std::uint8_t,3>{0,0,0}) return 0;
+    if (values[0] != 127 && values[0] != 255 &&
+        (values[1] == 2 || values[1] == 127 || values[1] == 255)) return values[0];
+    if (values[0] == 255 && values[1] == 2) return std::nullopt; // Keep current dungeon.
+    throw std::runtime_error("Unsupported LOAD_AREA_MAP mode (dungeon GEO16 only)");
+}
+void require_maps(const std::optional<MapResources>& maps) {
+    if (!maps || !maps->resolve || maps->source_identity.empty() || maps->source_identity.size() > 4096)
+        throw std::runtime_error("Map resource resolver/identity unavailable");
+}
+formats::GeoMap resolve_map(const MapResources& maps, std::uint8_t id) {
+    auto map = maps.resolve(id);
+    if (map.dax_record_id != id) throw std::runtime_error("Map resolver returned the wrong record");
+    return map;
+}
+class SessionHost final : public EclHost {
+    ExplorationSession& session;
+    EclHost& delegate;
+public:
+    SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {}
+    void text(std::string_view value, bool clear) override { delegate.text(value,clear); }
+    std::size_t menu(std::span<const std::string> choices, std::string_view prompt, bool vertical) override {
+        return delegate.menu(choices,prompt,vertical);
+    }
+    void combat(EclState& state) override { delegate.combat(state); }
+    void picture(std::uint8_t id) override { delegate.picture(id); }
+    void sprite_start(EclSpriteRequest r) override { delegate.sprite_start(r); }
+    void sprite_advance() override { delegate.sprite_advance(); }
+    void clear_images() override { delegate.clear_images(); }
+    void wall_banks(std::array<std::uint8_t,3> banks) override {
+        delegate.wall_banks(banks);
+        session.state.memory[session.dialect.square_info_address] = session.map.cell(session.row,session.column).raw_event;
+    }
+    void load_area(std::array<std::uint8_t,3> values) override { session.load_area(values); }
+};
+} // namespace
+
+void ExplorationSession::load_area(std::array<std::uint8_t,3> values) {
+    const auto record = area_record(values);
+    require_maps(maps);
+    auto next = record ? resolve_map(*maps,*record) : map;
+    auto next_row = row, next_column = column;
+    auto next_facing = facing;
+    if (dialect.position_addresses) {
+        const auto& addresses = *dialect.position_addresses;
+        next_column = state.memory[addresses[0]];
+        next_row = state.memory[addresses[1]];
+        next_facing = static_cast<Direction>(state.memory[addresses[2]]);
+    }
+    (void)next.cell(next_row,next_column);
+    if (static_cast<unsigned>(next_facing) > 3) throw std::runtime_error("Invalid map-load direction");
+    // Lookup/validation failures publish no map transition. Prior VM writes
+    // retain the existing partial-progress semantics.
+    if (!initial_map_record) initial_map_record = map.dax_record_id;
+    map = std::move(next);
+    row = next_row; column = next_column; facing = next_facing;
+    area = values;
+}
+
 bool ExplorationSession::move(Direction direction) {
     const auto& cell = map.cell(row, column);
     const std::uint8_t walls[]{cell.north, cell.east, cell.south, cell.west};
@@ -32,7 +93,8 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
         state.memory[addresses[1]] = row;
         state.memory[addresses[2]] = static_cast<std::uint8_t>(facing);
     }
-    return execute_ecl(ecl_record, kind, dialect, opcodes, state, host, limits);
+    SessionHost session_host(*this,host);
+    return execute_ecl(ecl_record, kind, dialect, opcodes, state, session_host, limits);
 }
 
 std::string serialize_exploration(const ExplorationSession& session, std::string_view source_identity) {
@@ -52,6 +114,16 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
         for (const auto id : *session.wall_banks) banks.push_back(id);
         object["wallBanks"] = std::move(banks);
     }
+    if (session.area) {
+        require_maps(session.maps);
+        const auto record = area_record(*session.area);
+        if (record && *record != session.map.dax_record_id) throw std::runtime_error("Area/map record mismatch");
+        bj::array values;
+        for (const auto value : *session.area) values.push_back(value);
+        object["area"] = std::move(values);
+        object["mapRecord"] = session.map.dax_record_id;
+        object["mapSource"] = session.maps->source_identity;
+    }
     const auto json = bj::serialize(object);
     if (json.size() > 4 * 1024 * 1024) throw std::runtime_error("Save exceeds 4 MiB limit");
     return json;
@@ -62,7 +134,8 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     if (json.size() > 4 * 1024 * 1024) throw std::runtime_error("Save exceeds 4 MiB limit");
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
-    j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks"}, "save");
+    j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks",
+        "area", "mapRecord", "mapSource"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -94,7 +167,33 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
         banks.emplace();
         for (std::size_t i = 0; i < 3; ++i) (*banks)[i] = static_cast<std::uint8_t>(bounded(a[i],255));
     }
+    auto map = session.map;
+    std::optional<std::array<std::uint8_t,3>> area;
+    const auto* area_value = root.if_contains("area");
+    const auto* record_value = root.if_contains("mapRecord");
+    const auto* source_value = root.if_contains("mapSource");
+    if (area_value || record_value || source_value) {
+        if (!area_value || !record_value || !source_value) throw std::runtime_error("Incomplete saved map binding");
+        require_maps(session.maps);
+        if (j::string(*source_value,"mapSource") != session.maps->source_identity)
+            throw std::runtime_error("Saved map resource source mismatch");
+        const auto& values = j::array(*area_value,"area");
+        if (values.size() != 3) throw std::runtime_error("Saved area requires three selectors");
+        area.emplace();
+        for (std::size_t i = 0; i < 3; ++i) (*area)[i] = static_cast<std::uint8_t>(bounded(values[i],255));
+        const auto id = static_cast<std::uint8_t>(bounded(*record_value,255));
+        const auto selected = area_record(*area);
+        if (selected && *selected != id) throw std::runtime_error("Saved area/map record mismatch");
+        map = resolve_map(*session.maps,id);
+    } else if (session.initial_map_record && *session.initial_map_record != map.dax_record_id) {
+        require_maps(session.maps);
+        map = resolve_map(*session.maps,*session.initial_map_record);
+    }
+    (void)map.cell(row,column);
     // Publish only after validating the entire save; failed loads change nothing.
+    if (!session.initial_map_record) session.initial_map_record = session.map.dax_record_id;
+    session.map = std::move(map);
+    session.area = area;
     session.wall_banks = banks;
     session.state = std::move(state);
     session.row = static_cast<std::uint8_t>(row);
