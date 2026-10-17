@@ -151,6 +151,33 @@ generator. Matching this screen does not establish gameplay/event parity.
 Original-code calls have instruction/time budgets and process deadlines; public
 CI uses only synthetic inputs and does not require original games or Unicorn.
 
+`goldbox_rng_debug_tests` runs automatically in the existing CTest/CI pipeline.
+It checks 280 fixed numeric observations from original runtime execution: five
+seeds, seven bounds and eight draws each, including every before/after state.
+Expected results are stored as numeric facts, not regenerated from our formula.
+Tests also cover continuation, zero-bound consumption, deliberate value/state
+mismatches, uninitialized/ambiguous capture, unstable memory reads, timeout and
+owned-process/configuration cleanup. No original instructions are in the tests.
+
+The separate `goldbox_rng_original_integration_tests` CTest entry is labelled
+`private-assets`. Unconfigured environments explicitly report **Skipped** (exit
+77); this is not an original-game parity pass. To run its entire capture/replay
+check on native Windows, configure the private inputs and invoke:
+
+```powershell
+$env:GOLDBOX_RNG_IMAGE = 'C:\private\pool-load-image.bin'
+$env:GOLDBOX_RNG_DOSBOX = 'C:\private\reference\DOSBox.exe'
+$env:GOLDBOX_RNG_UNICORN_PATH = 'C:\private\rng-analysis-tools'
+python tests/rng_original_integration_test.py build/apps/goldbox_rng_probe
+```
+
+The Unicorn path is optional when installed on that Python's normal path. The
+test checks 280 original-code/C++ draws, captures a fresh live DOS state, and
+checks another 160 draws over five bounds. Values and states must all match.
+Partial configuration, bad fingerprints, capture failure, timeouts and mismatch
+fail the run. Budgets remain enforced. It needs no manual UI interaction and
+does not trace live gameplay draw order.
+
 ### Experimental JSONL parity-harness protocol
 
 `goldbox_explore --harness <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id>

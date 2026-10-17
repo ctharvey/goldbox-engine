@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Automate RNG regression coverage with 280 fixed original-runtime numeric
+  observations, exact state checks and synthetic capture/cleanup failure tests
+  in public CI. Add a bounded opt-in native integration test for 280 original
+  draws plus 160 draws from a freshly captured DOS seed; missing private inputs
+  explicitly skip, while partial configuration and mismatches fail.
+
 - Add a seeded RNG debug screen with original-code versus C++ values and state
   comparisons, mismatch highlighting, and read-only seed capture from an owned
   private DOSBox copy. Add a reusable parameterized generator and bounded probe.

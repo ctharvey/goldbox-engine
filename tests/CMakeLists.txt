@@ -61,6 +61,10 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME goldbox_rng_debug_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/rng_debug_test.py $<TARGET_FILE:goldbox_rng_probe>)
 set_tests_properties(goldbox_rng_debug_tests PROPERTIES TIMEOUT 30)
+add_test(NAME goldbox_rng_original_integration_tests COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/rng_original_integration_test.py $<TARGET_FILE:goldbox_rng_probe>)
+set_tests_properties(goldbox_rng_original_integration_tests PROPERTIES
+    TIMEOUT 120 SKIP_RETURN_CODE 77 LABELS "private-assets")
 add_executable(goldbox_party_memory_tests party_memory_test.cpp)
 target_link_libraries(goldbox_party_memory_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_party_memory_tests COMMAND goldbox_party_memory_tests
