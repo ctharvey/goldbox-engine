@@ -634,6 +634,52 @@ def test_compiled_engine(fixture, executable, profile):
     check(state["memory"][0x4a00] == 0x81, "compiled event state was not persisted")
 
 
+def test_launcher_and_containment_bypasses(fixture):
+    # Counterexamples: a bare bash.exe resolves to Git's bash for which() but to
+    # System32's WSL redirector for CreateProcess; path aliases and ancestors of
+    # the repository must not pass the "outside the repository" rule.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    for name in ("wsl.exe", "WSL", "bash", "bash.exe", "BASH.EXE", "bash.exe ",
+                 r"C:\Windows\System32\bash.exe", "C:/Windows/Sysnative/wsl.exe",
+                 "ubuntu.exe", "Ubuntu2204.exe", "debian.exe"):
+        check(compare_game.is_wsl_launcher_name(name), f"launcher not recognized: {name!r}")
+    for name in ("python.exe", "goldbox_explore.exe", "DOSBox.exe", "/usr/bin/python3"):
+        check(not compare_game.is_wsl_launcher_name(name), f"false launcher match: {name!r}")
+    marker = fixture.engine_dir / "fixture-marker.txt"
+    if os.name == "nt":
+        for launcher in ("bash.exe", "bash", "BASH.EXE"):
+            config = fixture.config("hang", name="bare-bash.json",
+                                    engine={"command": [launcher, "-c", "uname -sr"],
+                                            "cwd": str(fixture.engine_dir)})
+            outcome = run_controller(config, "normal")
+            check(outcome.returncode == 1 and "unsupported backend" in outcome.stderr
+                  and "Linux" not in outcome.stdout,
+                  f"bare {launcher}: {outcome.returncode} {outcome.stdout!r} {outcome.stderr!r}")
+        probe = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            image = compare_game._suspended_image_path(probe)
+            check(image is not None and os.path.samefile(image, sys.executable),
+                  f"image path of a live child: {image!r}")
+        finally:
+            probe.kill()
+            probe.wait(timeout=5)
+    repository = CONTROLLER.parent.parent.resolve()
+    aliases = [repository.parent, Path(repository.anchor)]
+    if os.name == "nt":
+        drive, tail = os.path.splitdrive(str(repository / "scripts"))
+        aliases.append("\\\\?\\" + drive + tail)
+        unc = "\\\\localhost\\" + drive[0] + "$" + tail
+        if os.path.isdir(unc):
+            aliases.append(unc)
+    for alias in aliases:
+        config = fixture.config("hang", name="alias.json", private=alias)
+        outcome = run_controller(config, "normal")
+        check(outcome.returncode == 1 and "outside the repository" in outcome.stderr,
+              f"privateRoot {alias!s} accepted: {outcome.returncode} {outcome.stderr!r}")
+    check(marker.read_bytes() == b"synthetic fixture only\n", "fixture modified")
+
+
 def main():
     with tempfile.TemporaryDirectory() as temp:
         fixture = Fixture(temp)
@@ -648,6 +694,7 @@ def main():
         test_lock_contention(fixture)
         test_paths_with_spaces(fixture)
         test_no_writes_no_match_claim(fixture)
+        test_launcher_and_containment_bypasses(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])
     print("compare_game tests passed")

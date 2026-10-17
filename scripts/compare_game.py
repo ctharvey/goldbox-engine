@@ -103,22 +103,29 @@ def _absolute_dir(value, context):
         raise ControlledError(f"{context} cannot be resolved: {error}") from error
 
 
-def _split_resolved(path):
-    return os.path.normcase(str(Path(path).resolve()))
-
-
 def _contains(parent, child):
-    parent, child = _split_resolved(parent), _split_resolved(child)
-    prefix = parent if parent.endswith(os.sep) else parent + os.sep
-    return child == parent or child.startswith(prefix)
+    """True when child is parent or lies below it, by file identity.
+
+    Identity (samefile) rather than path text, so UNC/\\\\?\\ aliases, junctions
+    and case variants of the same directory cannot slip past a prefix compare.
+    Any stat failure counts as "contained" so callers fail closed.
+    """
+    try:
+        current = Path(child).resolve()
+        while True:
+            if os.path.samefile(parent, current):
+                return True
+            if current.parent == current:
+                return False
+            current = current.parent
+    except OSError:
+        return True
 
 
 def _outside_repository(path):
-    repository = _split_resolved(Path(__file__).resolve().parent.parent)
-    child = _split_resolved(path)
-    if os.name == "nt" and child.split(":")[0] != repository.split(":")[0]:
-        return True
-    return child != repository and not child.startswith(repository + os.sep)
+    """True only when path neither lies inside nor contains the repository."""
+    repository = Path(__file__).resolve().parent.parent
+    return not _contains(repository, path) and not _contains(path, repository)
 
 
 def parse_config(path):
@@ -272,7 +279,6 @@ if os.name == "nt":
     THREAD_SUSPEND_RESUME = 0x0002
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
     JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS = 9
-    WSL_BASENAMES = frozenset({"wsl.exe", "wsl", "wslg.exe", "wslhost.exe"})
 
     class _IO_COUNTERS(ctypes.Structure):
         _fields_ = [(name, ctypes.c_ulonglong) for name in
@@ -397,23 +403,44 @@ def _job_process_count(job):
     return box.NumberOfAssignedProcesses
 
 
+_WSL_STEMS = frozenset({"wsl", "wslg", "wslhost", "bash"})
+_WSL_DISTRO_PREFIXES = ("ubuntu", "debian", "kali", "opensuse", "suse", "sles",
+                        "oraclelinux", "almalinux", "archlinux", "fedora")
+
+
+def is_wsl_launcher_name(path):
+    """True when the final path component names a WSL launcher or redirector.
+
+    Name-based on purpose: Windows may resolve a bare name (bash.exe) through
+    System32 before PATH, so which() cannot say what CreateProcess will start.
+    Matches bash/bash.exe too, so a Git bash earlier on PATH is rejected as well
+    (fail closed). Separators of either style are honored on every platform.
+    """
+    name = str(path).replace("\\", "/").rsplit("/", 1)[-1].strip().rstrip(" .").lower()
+    stem = name[:-4] if name.endswith(".exe") else name
+    return stem in _WSL_STEMS or stem.startswith(_WSL_DISTRO_PREFIXES)
+
+
 def _reject_wsl(argv):
     if os.name != "nt":
         return
-    basename = os.path.basename(argv[0]).lower()
-    if basename in WSL_BASENAMES:
+    if is_wsl_launcher_name(argv[0]):
         raise ControlledError(
             f"unsupported backend: {argv[0]!r} is a WSL launcher; a Job Object "
             "cannot own its Linux children")
-    if basename == "bash.exe":
-        resolved = shutil.which(argv[0])
-        if resolved:
-            redirector = os.path.join(os.path.expandvars(r"%SystemRoot%"),
-                                      "System32", "bash.exe")
-            if os.path.normcase(resolved) == os.path.normcase(redirector):
-                raise ControlledError(
-                    f"unsupported backend: {resolved} is the WSL bash redirector; this "
-                    "controller does not own its Linux children")
+
+
+def _suspended_image_path(process):
+    """Executable image the OS actually mapped for a started process, or None."""
+    size = ctypes.wintypes.DWORD(32768)
+    buffer = ctypes.create_unicode_buffer(size.value)
+    query = _KERNEL32.QueryFullProcessImageNameW
+    query.argtypes = [ctypes.wintypes.HANDLE, ctypes.wintypes.DWORD,
+                      ctypes.wintypes.LPWSTR, ctypes.POINTER(ctypes.wintypes.DWORD)]
+    query.restype = ctypes.wintypes.BOOL
+    if not query(ctypes.wintypes.HANDLE(process._handle), 0, buffer, ctypes.byref(size)):
+        return None
+    return buffer.value
 
 
 def _abort_windows_launch(job, process, message):
@@ -478,6 +505,15 @@ class OwnedProcess:
             _abort_windows_launch(job, process, None)
             raise ControlledError(
                 f"cannot adopt {argv[0]!r} into the session job object (error {error}); killed")
+        if not allow_wsl:
+            # The OS-resolved image, not argv[0], decides: still suspended here.
+            image = _suspended_image_path(process)
+            if image is None or is_wsl_launcher_name(image):
+                _abort_windows_launch(job, process, None)
+                raise ControlledError(
+                    f"unsupported backend: {argv[0]!r} resolved to "
+                    f"{image or 'an unknown image'}, a WSL launcher or an image that "
+                    "cannot be verified; killed before it ran")
         try:
             threads = _thread_ids_of(process.pid)
         except BaseException:
