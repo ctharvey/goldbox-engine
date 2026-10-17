@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Add a seeded RNG debug screen with original-code versus C++ values and state
+  comparisons, mismatch highlighting, and read-only seed capture from an owned
+  private DOSBox copy. Add a reusable parameterized generator and bounded probe.
+  This tests the compatibility primitive; gameplay RANDOM/party RNG integration
+  and live game draw tracing remain separate work.
+
 - Verify the original DOS ECL RANDOM handler with 2,080 isolated executions.
   Document inclusive bounds below 255, the 255 edge case, word-to-byte narrowing
   and one draw even for a zero result. Engine RANDOM remains unsupported; live

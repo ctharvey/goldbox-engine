@@ -546,3 +546,36 @@ Live native save/reload and idle-loop RNG observations remain unperformed; the
 save-state conclusion above is still based on static analysis. Future engine
 support should select these semantics through a compatibility profile rather
 than imposing this build's byte narrowing on every game.
+
+### Seeded comparison laboratory and live capture (2026-10-17)
+
+`scripts/rng_debug.py` adds an original-runtime versus C++ comparison window.
+The reusable engine primitive accepts explicit seed/multiplier/increment values;
+the separate Pool adapter owns the fingerprint and native memory locations.
+The original oracle executes the fingerprinted routine in a bounded external
+Unicorn subprocess, not another implementation of its formula. No emulator or
+original bytes are bundled with the engine.
+
+The Windows capture path successfully launched an owned private DOSBox copy,
+located the runtime body supplied by the private image, checked the DOS PSP and
+relocated segment references, and read the same four-byte state twice. It waits
+past the initial zero-filled state. A fresh captured state was `0x2E4D0932`;
+32 isolated original-runtime draws with runtime bound 20 matched the C++ values
+and before/after states exactly. A separate matrix passed 280 draws across five
+seeds, seven bounds including 0 and 65535, and eight consecutive draws per case.
+Native reference cleanup completed after capture. The numeric report stays at
+the private cache's `rng-debug-live-comparison.json`.
+
+The serialized, two-job build and full CTest run passed **24/24 suites**. Synthetic
+RNG tests cover an independently observed vector, seed continuation, zero-bound
+consumption, configurable arithmetic/wraparound, invalid inputs, deliberately
+mismatching states, incomplete sequences, rejected images and validated seed
+location. They require no original resources or Unicorn. Desktop window launch
+completed, but visual inspection through computer-use was not completed because
+the app-access approval timed out.
+
+This verifies live seed extraction followed by isolated generator replay. It does
+not observe live game roll calls, capture an atomic whole-game snapshot, validate
+native save/reload, or align gameplay draw consumption. The gameplay ECL RANDOM
+instruction remains unsupported; existing party creation still uses its previous
+generator. Native gameplay parity is not established by the comparison window.

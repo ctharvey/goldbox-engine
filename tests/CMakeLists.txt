@@ -58,6 +58,9 @@ set_tests_properties(goldbox_image_host_tests PROPERTIES TIMEOUT 20
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME goldbox_rng_debug_tests COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/rng_debug_test.py $<TARGET_FILE:goldbox_rng_probe>)
+set_tests_properties(goldbox_rng_debug_tests PROPERTIES TIMEOUT 30)
 add_executable(goldbox_party_memory_tests party_memory_test.cpp)
 target_link_libraries(goldbox_party_memory_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_party_memory_tests COMMAND goldbox_party_memory_tests

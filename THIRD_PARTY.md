@@ -1,5 +1,29 @@
 # Third-party licensing and provenance
 
+## RNG debug laboratory (2026-10-17)
+
+The optional external analysis tool is Unicorn Engine 2.1.4, revision
+`8028ec436f2d9376525352dd38ed9ed6b9f6be10`. Its README identifies GPLv2 and
+COPYING contains GPL version 2; the public API header separately states LGPL2.
+We conservatively record the tool as GPL-2.0-only rather than assuming a later
+version grant. Its COPYING is preserved in `licenses/unicorn-GPL-2.0.txt`.
+Authorship includes Nguyen Anh Quynh, Chen Huitao and the upstream contributors;
+see upstream CREDITS.TXT and individual notices.
+
+No Unicorn implementation is copied or adapted. The independently written
+`scripts/rng_original_probe.py` calls the separately installed tool in a bounded
+analysis subprocess, exchanging numeric rows with the debug screen. Unicorn is
+not linked into, bundled with, or required to build/test the C++ engine. This
+does not authorize distributing a combined GPLv2/GPLv3 artifact. The registry
+records this optional tool dependency separately from adopted source.
+
+The four-line mathematical LCG update and high-word modulo mapping are an
+independent implementation of observed runtime behavior. Reusing a CPU emulator
+provides the independent original-code oracle; porting another game's RNG or
+embedding an emulator in the engine would offer no benefit here. Native seed
+capture uses documented Windows memory-query/read APIs against an owned child.
+No original machine-code bytes, memory dumps or game assets are distributed.
+
 ## Character creation (2026-10-16)
 
 SSI Engine `engine/character/CharacterCreator.java`,

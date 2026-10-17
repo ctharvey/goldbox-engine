@@ -113,6 +113,44 @@ path for each run and keep saves, reports and captured game text outside this
 repository. `timeout` is a WSL/Linux example; native Windows callers must also
 bound the process lifetime in their launcher.
 
+### Seeded RNG debug screen
+
+`python scripts/rng_debug.py --engine build/apps/goldbox_rng_probe --image <private-load-image>`
+opens a five-minute debug window. Enter a 32-bit seed (decimal or `0x` hex),
+runtime bound 0..65535 and 1..64 draws, then choose **Compare rolls**. Each row
+shows the original runtime's result and before/after state beside the engine's
+C++ result and state. Differences are highlighted. Editing an input clears the
+old result. Bound `n` means runtime Random(n), normally 0..n-1; zero still advances
+the state. These are runtime bounds, not ECL's inclusive upper operands.
+
+The original side executes locally supplied original routine bytes under the
+optional, separately installed Unicorn 2.1.4 analysis tool. Supply
+`--unicorn-path <private-python-dependency-directory>` if it is not on Python's
+path. `--image` is the existing private 68,592-byte unpacked load image from the
+[RNG investigation](docs/research/local-validation-2026-10-15.md#original-dos-random-generator-investigation-2026-10-17),
+not START.EXE; its full SHA-256 must match. No original bytes or emulator package
+are distributed. Tkinter is required for the window; `--check` instead emits
+numeric comparison JSON and exits nonzero on mismatch or failure.
+
+Add `--dosbox <private-reference-directory>/DOSBox.exe` to enable **Capture seed
+from private DOSBox**. Use the harness's copied `GAME/POOLRAD/START.EXE` layout,
+outside the repository and installed game. Capture launches its own ten-second
+reference process, verifies the game fingerprint and relocated resident memory,
+then reads the current seed twice without writing process memory. Initial zero
+state is skipped; a legitimate all-zero clock seed is therefore inconclusive.
+The owned reference is terminated before capture returns. Capture does not
+attach to an arbitrary PID or alter an existing game session. Replaying that
+seed on both sides remains isolated, not a live trace of the game's next rolls.
+With `--dosbox`, the window captures and compares on startup; the capture button
+repeats both steps with a fresh reference launch.
+
+The new `HighWordLcg32` compatibility primitive accepts caller-supplied multiplier
+and increment; only the debug adapter selects Pool's constants and memory map.
+The gameplay VM still rejects RANDOM, and party creation still uses its existing
+generator. Matching this screen does not establish gameplay/event parity.
+Original-code calls have instruction/time budgets and process deadlines; public
+CI uses only synthetic inputs and does not require original games or Unicorn.
+
 ### Experimental JSONL parity-harness protocol
 
 `goldbox_explore --harness <profile.json> <GEO.DAX> <geo-id> <ECL.DAX> <ecl-id>

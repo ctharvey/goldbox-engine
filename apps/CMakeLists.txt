@@ -8,3 +8,6 @@ if(GOLDBOX_BUILD_RENDERER)
 endif()
 find_package(Boost 1.75 CONFIG REQUIRED)
 target_include_directories(goldbox_explore PRIVATE ${Boost_INCLUDE_DIRS})
+
+add_executable(goldbox_rng_probe rng_probe.cpp)
+target_link_libraries(goldbox_rng_probe PRIVATE goldbox_core)

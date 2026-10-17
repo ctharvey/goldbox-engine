@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastReviewed": "2026-10-12",
+  "lastReviewed": "2026-10-17",
   "description": "Provenance inventory of adopted code, external dependencies and research-only references. Only kind=adapted means upstream implementation has been ported/incorporated.",
   "entries": [
     {
@@ -235,6 +235,30 @@
       "purpose": "SSI EGA single-image and multi-frame packed-pixel decoding plus monochrome 8x8 tile strips",
       "modifications": "Adapted C# decoding to bounded C++ indexed images. Exact payload/dimension/count checks; retain CGA mapping and offsets; no System.Drawing, filename-dependent palette guessing or count-plus-one heuristic. Wall assembly, bank loading and EGA bit-derived palette are independent additions in the same MIT file. No SSI images copied. Added explicit independent/XOR-first sequence modes, immutable base-frame decoding, raw timing/offset/header metadata, exact consumption, dimension/count limits and explicit standard/sprite/combat palettes. Mono bits become indexed black/white tiles; no filename-based format selection or partial decode results. Independent bounded portrait composition added beside the adapted decoder; no upstream portrait compositor copied.",
       "reviewed": "2026-10-16"
+    },
+    {
+      "id": "unicorn-analysis-tool",
+      "kind": "dependency",
+      "project": "Unicorn Engine",
+      "upstreamRepository": "https://github.com/unicorn-engine/unicorn",
+      "upstreamRevision": "8028ec436f2d9376525352dd38ed9ed6b9f6be10",
+      "version": "2.1.4; optional separately installed private analysis tool",
+      "upstreamFiles": [
+        "COPYING",
+        "README.md",
+        "include/unicorn/unicorn.h",
+        "bindings/python/unicorn/unicorn_py3/unicorn.py"
+      ],
+      "license": "GPL-2.0-only (conservative GPLv2 classification; API header separately LGPL2)",
+      "licenseFile": "licenses/unicorn-GPL-2.0.txt",
+      "licenseUrl": "https://github.com/unicorn-engine/unicorn/blob/8028ec436f2d9376525352dd38ed9ed6b9f6be10/COPYING",
+      "copyrightNotice": "Unicorn Engine contributors; Nguyen Anh Quynh (2015), Chen Huitao (2020); see upstream CREDITS.TXT and file notices",
+      "localFiles": [
+        "scripts/rng_original_probe.py"
+      ],
+      "purpose": "Optional external original-code RNG analysis, invoked across a subprocess boundary; never linked into or bundled with the C++ engine",
+      "modifications": "No upstream code adapted, copied or vendored. Independently written API client; user installs upstream tool privately. No combined artifact distributed. Public synthetic CI has no Unicorn dependency.",
+      "reviewed": "2026-10-17"
     }
   ]
 }
