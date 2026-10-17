@@ -63,6 +63,33 @@ std::vector<IndexedImage> decode_mono8_tiles(std::span<const std::uint8_t> recor
     return result;
 }
 
+IndexedImage compose_ega_portrait(const EgaImages& head, const EgaImages& body,
+    const EgaPortraitLayout& layout) {
+    if (!layout.width || layout.width > 320 || !layout.height || layout.height > 200)
+        throw std::runtime_error("Unsupported portrait canvas dimensions");
+    if (head.images.size() != 1 || body.images.size() != 1)
+        throw std::runtime_error("Portrait parts require exactly one frame");
+    const bool header_offsets = head.x_offset || head.y_offset || body.x_offset || body.y_offset;
+    IndexedImage result{layout.width,layout.height,std::vector<std::uint8_t>(std::size_t(layout.width)*layout.height,0)};
+    const auto paint = [&](const EgaImages& part, const std::array<std::uint16_t,2>& fallback) {
+        const auto& image = part.images.front();
+        const std::size_t x = header_offsets ? part.x_offset : fallback[0];
+        const std::size_t y = header_offsets ? part.y_offset : fallback[1];
+        if (!image.width || !image.height || image.pixels.size() != std::size_t(image.width)*image.height ||
+            x+image.width > layout.width || y+image.height > layout.height ||
+            std::any_of(image.pixels.begin(),image.pixels.end(),[](auto p) { return p > 15; }))
+            throw std::runtime_error("Portrait part exceeds canvas or has invalid pixels");
+        for (std::size_t row = 0; row < image.height; ++row)
+            std::copy_n(image.pixels.begin()+row*image.width,image.width,
+                result.pixels.begin()+(y+row)*layout.width+x);
+    };
+    // Independent bounded composition; SSI Engine was consulted for placement
+    // semantics only. Neither input pixels nor metadata are modified.
+    paint(head,layout.head_offset);
+    paint(body,layout.body_offset);
+    return result;
+}
+
 std::vector<EgaFrame> decode_ega_sequence(std::span<const std::uint8_t> record, EgaFrameEncoding encoding) {
     if (encoding != EgaFrameEncoding::independent && encoding != EgaFrameEncoding::xor_first)
         throw std::runtime_error("Invalid EGA frame encoding");

@@ -100,14 +100,16 @@
         "src/main/java/shared/GoldboxString.java",
         "src/main/java/shared/CustomGoldboxString.java",
         "src/main/java/ui/classic/AbstractRenderer.java",
-        "src/main/java/ui/shared/resource/UIResourceManager.java"
+        "src/main/java/ui/shared/resource/UIResourceManager.java",
+        "src/main/java/ui/shared/resource/UIScaler.java",
+        "src/main/java/ui/shared/resource/ImageCompositeResource.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,
       "licenseUrl": "https://github.com/TiCoKH/ssi-engine/blob/master/LICENSE",
       "copyrightNotice": "Upstream authors, as documented by source history",
       "localFiles": [],
-      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics; cross-check graphics headers, shared/additional tile ordering, bank continuation, transparency and native perspective geometry; cross-check PIC first-frame XOR semantics and per-frame metadata; research picture/sprite host calls, clearing, distance selection and unsupported timed replacement; cross-check COLOR backdrop addresses, indoor selector, sky palette indices and native band geometry; cross-check original font selection, SSI printable character order and foreground recoloring",
+      "purpose": "Research ECL lifecycle entries, code bases, typed memory, selector tables, VM instruction behavior and DAX index semantics; cross-check graphics headers, shared/additional tile ordering, bank continuation, transparency and native perspective geometry; cross-check PIC first-frame XOR semantics and per-frame metadata; research picture/sprite host calls, clearing, distance selection and unsupported timed replacement; cross-check COLOR backdrop addresses, indoor selector, sky palette indices and native band geometry; cross-check original font selection, SSI printable character order and foreground recoloring; cross-check opaque BODY/HEAD composition, embedded offsets and explicit fallback placement",
       "modifications": "No Java source copied or translated. Independent bounded C++ implementation informed by observable behavior; profile address facts transcribed from configuration. No upstream engine, dependency or rules implementation adopted. Independent C++ host callbacks/presentation state; no Java source translated. Three-operand image dialect is explicitly selected by profile; timed replacement is not emulated.",
       "reviewed": "2026-10-16"
     },
@@ -220,7 +222,7 @@
         "formats/src/graphics.cpp"
       ],
       "purpose": "SSI EGA single-image and multi-frame packed-pixel decoding plus monochrome 8x8 tile strips",
-      "modifications": "Adapted C# decoding to bounded C++ indexed images. Exact payload/dimension/count checks; retain CGA mapping and offsets; no System.Drawing, filename-dependent palette guessing or count-plus-one heuristic. Wall assembly, bank loading and EGA bit-derived palette are independent additions in the same MIT file. No SSI images copied. Added explicit independent/XOR-first sequence modes, immutable base-frame decoding, raw timing/offset/header metadata, exact consumption, dimension/count limits and explicit standard/sprite/combat palettes. Mono bits become indexed black/white tiles; no filename-based format selection or partial decode results.",
+      "modifications": "Adapted C# decoding to bounded C++ indexed images. Exact payload/dimension/count checks; retain CGA mapping and offsets; no System.Drawing, filename-dependent palette guessing or count-plus-one heuristic. Wall assembly, bank loading and EGA bit-derived palette are independent additions in the same MIT file. No SSI images copied. Added explicit independent/XOR-first sequence modes, immutable base-frame decoding, raw timing/offset/header metadata, exact consumption, dimension/count limits and explicit standard/sprite/combat palettes. Mono bits become indexed black/white tiles; no filename-based format selection or partial decode results. Independent bounded portrait composition added beside the adapted decoder; no upstream portrait compositor copied.",
       "reviewed": "2026-10-16"
     }
   ]

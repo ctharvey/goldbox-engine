@@ -25,6 +25,20 @@ void frame(std::vector<std::uint8_t>& bytes, unsigned height, std::uint8_t pixel
 }
 }
 int main(int argc, char** argv) {
+    if (argc == 4 && std::string_view(argv[1]) == "portrait") {
+        const auto heads = DaxArchive::from_file(argv[2]), bodies = DaxArchive::from_file(argv[3]);
+        unsigned pairs = 0;
+        for (const auto& h : heads.records()) for (const auto& b : bodies.records()) {
+            const auto head = decode_ega_images(heads.extract(h.id));
+            const auto body = decode_ega_images(bodies.extract(b.id));
+            const auto picture = compose_ega_portrait(head,body,{88,88,{0,0},{0,40}});
+            assert(picture.width == 88 && picture.height == 88 && picture.pixels.size() == 88*88);
+            ++pairs;
+        }
+        std::cout << "heads=" << heads.records().size() << " bodies=" << bodies.records().size()
+                  << " portrait pairs=" << pairs << '\n';
+        return pairs ? 0 : 1;
+    }
     if (argc >= 3) {
         // Explicit, opt-in local validation. Counts/diagnostics only; no exports.
         const std::string mode(argv[1]);
@@ -50,6 +64,37 @@ int main(int argc, char** argv) {
         return failed || !records ? 1 : 0;
     }
     assert(argc == 1);
+    EgaImages head, body;
+    head.images.push_back({8,2,std::vector<std::uint8_t>(16,3)});
+    body.images.push_back({8,2,std::vector<std::uint8_t>(16,4)});
+    const EgaPortraitLayout layout{16,8,{2,1},{4,4}};
+    auto portrait = compose_ega_portrait(head,body,layout);
+    assert(portrait.width == 16 && portrait.height == 8 && portrait.pixels[0] == 0);
+    assert(portrait.pixels[1*16+2] == 3 && portrait.pixels[4*16+4] == 4);
+    assert(portrait.pixels[3*16+4] == 0 && head.images[0].pixels[0] == 3);
+    // Header offsets override both fallbacks when even one part is positioned.
+    body.x_offset = 4; body.y_offset = 1;
+    portrait = compose_ega_portrait(head,body,layout);
+    assert(portrait.pixels[0] == 3 && portrait.pixels[1*16+4] == 4);
+    body.images[0].pixels[0] = 0;
+    body.images[0].pixels[1] = 13;
+    portrait = compose_ega_portrait(head,body,layout);
+    assert(portrait.pixels[1*16+4] == 0 && portrait.pixels[1*16+5] == 13); // Opaque black/magenta.
+    rejects([&] { compose_ega_portrait(head,body,{0,8,{},{}}); });
+    rejects([&] { compose_ega_portrait(head,body,{321,8,{},{}}); });
+    rejects([&] { compose_ega_portrait(head,body,{16,201,{},{}}); });
+    body.x_offset = 65535;
+    rejects([&] { compose_ega_portrait(head,body,layout); });
+    body.x_offset = 4;
+    auto broken = head; broken.images.clear();
+    rejects([&] { compose_ega_portrait(broken,body,layout); });
+    broken = head; broken.images.push_back(head.images[0]);
+    rejects([&] { compose_ega_portrait(broken,body,layout); });
+    broken = head; broken.images[0].pixels.pop_back();
+    rejects([&] { compose_ega_portrait(broken,body,layout); });
+    broken = head; broken.images[0].pixels[0] = 16;
+    rejects([&] { compose_ega_portrait(broken,body,layout); });
+    rejects([&] { compose_ega_portrait(head,body,{8,4,{},{}}); });
     std::vector<std::uint8_t> mono(16,0);
     mono[0] = 0x81; mono[8+7] = 0x40;
     const auto tiles = decode_mono8_tiles(mono);

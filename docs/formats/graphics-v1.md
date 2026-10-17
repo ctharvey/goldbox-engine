@@ -199,3 +199,37 @@ SSI Engine's pinned Pool properties, VirtualMemory, RendererState and
 DungeonRenderer were consulted for addresses, indoor selection, palette indices
 and band dimensions. The C++ rendering loops are independent; no Java source was
 copied or translated. Tests use synthetic maps, memory and ECL only.
+
+## Separate body/head portraits
+
+BODY and HEAD resources in the inspected installation use the existing strict
+17-byte EGA decoder. `compose_ega_portrait` is a separate SSI composition adapter
+that returns one normalized `IndexedImage`. Callers supply canvas dimensions
+and fallback head/body coordinates through `EgaPortraitLayout`; no game name,
+filename, record pairing or 88x88 geometry is inferred by the adapter.
+
+Each part must contain exactly one image. If either part has nonzero embedded
+offsets, both parts use their respective embedded offsets. Otherwise both use
+the explicit fallback coordinates. The head is painted first, then the body,
+opaquely: black and magenta remain visible pixels. Uncovered canvas pixels are
+black. Dimensions are bounded to 320x200; malformed pixels, missing/multiple
+frames and any part extending outside the canvas fail instead of being clipped.
+Inputs are not modified. Other formats or placement policies need a different
+adapter rather than a title-specific branch in this one.
+
+An opt-in local validation preset checks candidate pairs in an 88x88 canvas
+with head at (0,0), body at (0,40), matching the researched SSI placement:
+
+```sh
+timeout 30 ./build/tests/goldbox_image_sequence_tests portrait /private/HEAD1.DAX /private/BODY1.DAX
+```
+
+The output contains only counts. This tests structural fit, not which heads and
+bodies an original event actually pairs. ECL resource binding and renderer
+portrait selection remain unfinished. TITLE, combat and other static graphics
+use the existing explicit `ega` validation mode; FINAL5 contains both static
+images and picture sequences, so it must not be assigned one guessed decoder.
+
+SSI Engine's pinned `ClassicMode.java`, `Palette.java`, `UIResourceManager.java`
+and `UIScaler.java` were consulted for layering, opaque colors and placement.
+The C++ compositor was independently implemented; no Java was copied or ported.

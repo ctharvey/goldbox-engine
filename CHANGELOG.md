@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Add a reusable EGA body/head portrait composition adapter with explicit canvas
+  and fallback coordinates, embedded-offset handling, opaque layer order and
+  strict bounds. Keep composition separate from decoding, ECL and rendering;
+  add synthetic tests and opt-in local structural validation. Resource pairing
+  and original-event portrait selection remain unfinished.
+
 - Add explicit original-font selection for the exploration window. Decode SSI
   monochrome tiles into a transparent, tinted atlas; map printable characters,
   fold UI lowercase to uppercase, and use a question mark for unsupported bytes.

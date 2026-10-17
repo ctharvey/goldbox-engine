@@ -16,6 +16,16 @@ struct EgaImages {
 // Strict 17-byte SSI EGA header and packed high/low pixel nibbles. No heuristic
 // count adjustments or VGA/combat palette selection. Dimensions <=320x200.
 EgaImages decode_ega_images(std::span<const std::uint8_t> record);
+struct EgaPortraitLayout {
+    std::uint16_t width{}, height{};
+    std::array<std::uint16_t,2> head_offset{}, body_offset{};
+};
+// Explicit SSI composition adapter, separate from decoding and rendering.
+// Single-frame parts; if either header has an offset, use both header offsets.
+// Otherwise use the caller's layout offsets. Opaque layers, head then body.
+// Invalid sizes/pixels or parts outside the supplied canvas fail, never clip.
+IndexedImage compose_ega_portrait(const EgaImages& head, const EgaImages& body,
+    const EgaPortraitLayout& layout);
 using Rgba = std::array<std::uint8_t,4>;
 enum class EgaPaletteKind { standard, sprite, combat };
 std::array<Rgba,16> ega_palette(EgaPaletteKind kind = EgaPaletteKind::standard);

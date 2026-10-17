@@ -189,3 +189,35 @@ headless/harness unsupported-opcode diagnostics remain covered unchanged.
 Images are transient presentation state and are cleared on restoring engine
 state. Timed replacement pictures, four-operand sprite commands, original
 inter-command delays and picture animation remain unsupported or unverified.
+
+
+## Additional graphics and portrait structure (2026-10-16)
+
+Read-only checks show the existing strict EGA decoder also handles TITLE
+(2 records/2 images), CBODY (128/128), CHEAD (56/56), COMSPR (26/26),
+BACPAC (1/40), ICON (6/6), and SQRPACI (2/256) in this installation.
+FINAL5 records 1, 3, 4, 5 and 6 decode as static EGA (one image each);
+records 2, 7 and 8 decode as explicit XOR-first sequences (4, 6 and 6 frames).
+This is an observed inventory, not a filename-based decoder heuristic.
+
+The separate EGA portrait adapter decoded and structurally composed all candidate
+head/body pairs within each archive group, using an explicit 88x88 canvas and
+fallback positions head (0,0), body (0,40):
+
+| Group | Head records | Body records | Candidate pairs | Failures |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 3 | 3 | 9 | 0 |
+| 2 | 5 | 6 | 30 | 0 |
+| 3 | 21 | 16 | 336 | 0 |
+| 4 | 3 | 3 | 9 | 0 |
+| 5 | 11 | 6 | 66 | 0 |
+| 6 | 7 | 5 | 35 | 0 |
+| 7 | 10 | 4 | 40 | 0 |
+| 8 | 3 | 3 | 9 | 0 |
+
+Totals: 63 head records, 46 body records, 534 candidate pairs. These checks
+establish decoding and bounded geometric fit, not original-event pairing,
+correct character identities or visual parity. No portrait selection has been
+wired into ECL or the SDL window in this increment. The private report retains
+file sizes and SHA-256 fingerprints outside the repository. No pixels, extracted
+artwork or proprietary text are included here.

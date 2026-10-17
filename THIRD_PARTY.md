@@ -140,3 +140,9 @@ properties and `MonocromeSymbols`, `GoldboxString`, `CustomGoldboxString`,
 order and foreground recoloring. It uses the existing MIT-adapted monochrome
 decoder and independently written C++ atlas/SDL rendering. No Java source was
 copied or translated; original glyphs remain in the user's local installation.
+
+The independent EGA portrait compositor consults SSI Engine's pinned
+`ClassicMode.java`, `Palette.java`, `UIResourceManager.java` and `UIScaler.java`
+for head/body placement, opaque palette behavior and offset precedence. It uses
+the existing EGA decoder and caller-supplied geometry; no Java compositor was
+copied or translated. These remain research references in the attribution registry.
