@@ -1,5 +1,26 @@
 # Third-party licensing and provenance
 
+## Character creation (2026-10-16)
+
+SSI Engine `engine/character/CharacterCreator.java`,
+`engine/rulesystem/standard/{StandardFlavor,RaceData,ClassData}.java` and
+`engine/rulesystem/Dice.java` at
+`51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` were consulted for creation
+stages, single-class availability, alignments and 4d6 drop-lowest rolls.
+These are research-only references; no Java implementation or character-byte
+layout was copied/translated. Existing JSON validation, save and SDL menu
+components were reused. Upstream fixed-HP and zero-racial-adjustment placeholders
+were not adopted. The normalized character model, data profile, bounded dice,
+save validation and SDL creator are independent project code.
+
+The locally installed Pool manual (PDF pages 4, 5 and 17; character/party
+sections and race-limit table) was read to cross-check six races, four base
+classes, six PCs, 15-character names and race/gender ability caps. Only mechanical
+facts were independently represented in the rules profile. No manual text,
+images, executable character data or proprietary character files are distributed.
+The rules profile is provisional: exact original rolling, racial adjustments,
+alignment availability and exceptional-strength distributions need parity tests.
+
 ## Startup title/menu shell (2026-10-16)
 
 SSI Engine Pool properties, `ui/classic/ClassicMode.java`,

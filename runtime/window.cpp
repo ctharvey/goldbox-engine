@@ -42,6 +42,7 @@ public:
     std::vector<std::string> choices;
     std::size_t selected{};
     Uint64 image_clock{};
+    std::mt19937 creation_random{static_cast<unsigned>(SDL_GetPerformanceCounter())};
 
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
         const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
@@ -133,13 +134,14 @@ public:
         const std::string json{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
         restore(json,identity);
     }
-    // Returns 0=quit, 1=initialize exploration, 2=load engine save.
-    int startup(std::span<const formats::IndexedImage> screens, const std::string& error) {
-        std::size_t screen = error.empty() ? 0 : screens.size()-1;
+    // Returns 0=quit, 1=initialize exploration, 2=load engine save, 3=manage party.
+    int startup(std::span<const formats::IndexedImage> screens, const std::string& error, bool show_titles = true) {
+        std::size_t screen = show_titles && error.empty() ? 0 : screens.size()-1;
         std::size_t selection = 0;
         std::size_t uploaded = screens.size();
         std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> title(nullptr,SDL_DestroyTexture);
-        constexpr const char* options[]{"START EXPLORATION", "LOAD ENGINE SAVE", "QUIT"};
+        std::vector<std::string> options{"START EXPLORATION", "LOAD ENGINE SAVE", "QUIT"};
+        if (session.character_rules) options.insert(options.begin(),"CREATE / MANAGE PARTY");
         while (running) {
             if (uploaded != screen) {
                 title.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,320,200));
@@ -158,7 +160,7 @@ public:
             if (menu) {
                 color(0,0,0); rectangle(240,448,480,152);
                 color(207,176,112); label(264,464,"GOLDBOX ENGINE - EXPLORATION PREVIEW");
-                for (std::size_t i = 0; i < 3; ++i) {
+                for (std::size_t i = 0; i < options.size(); ++i) {
                     color(i == selection ? 255 : 160,i == selection ? 220 : 160,160);
                     label(264,492+float(i)*28,std::string(i == selection ? "> " : "  ")+options[i]);
                 }
@@ -177,9 +179,13 @@ public:
             if (!menu) {
                 if (key == SDLK_RETURN || key == SDLK_SPACE) ++screen;
             } else {
-                if (key == SDLK_UP) selection = (selection+2)%3;
-                if (key == SDLK_DOWN) selection = (selection+1)%3;
-                if (key == SDLK_RETURN) return selection == 2 ? 0 : static_cast<int>(selection+1);
+                if (key == SDLK_UP) selection = (selection+options.size()-1)%options.size();
+                if (key == SDLK_DOWN) selection = (selection+1)%options.size();
+                if (key == SDLK_RETURN) {
+                    if (session.character_rules && selection == 0) return 3;
+                    const auto action = selection-(session.character_rules ? 1 : 0);
+                    return action == 2 ? 0 : static_cast<int>(action+1);
+                }
             }
         }
         return 0;
@@ -238,6 +244,110 @@ public:
         }
         if (!line.empty()) lines.push_back(std::move(line));
         while (lines.size() > 80) lines.pop_front();
+    }
+    std::optional<std::size_t> pick(const std::vector<std::string>& values, const std::string& prompt) {
+        text(prompt,true);
+        return choose(values,"",true);
+    }
+    template<class T> std::optional<std::size_t> pick_option(const std::vector<T>& values, const char* prompt) {
+        std::vector<std::string> labels;
+        for (const auto& v : values) labels.push_back(v.label);
+        return pick(labels,prompt);
+    }
+    std::string character_summary(const Character& c) {
+        const auto& rules = *session.character_rules;
+        std::string result = c.name + " / " + c.race + " / " + c.character_class + " / " + c.alignment + "\n";
+        for (std::size_t i = 0; i < c.abilities.size(); ++i) {
+            result += rules.abilities[i].label + " " + std::to_string(c.abilities[i].value);
+            if (c.abilities[i].percentile) result += "/" + (c.abilities[i].percentile == 100 ?
+                std::string("00") : std::to_string(c.abilities[i].percentile));
+            result += i%2 ? "\n" : "   ";
+        }
+        return result;
+    }
+    std::optional<std::string> character_name(std::size_t limit) {
+        auto* window = SDL_GetRenderWindow(renderer);
+        checked(SDL_StartTextInput(window));
+        struct StopInput { SDL_Window* window; ~StopInput() { SDL_StopTextInput(window); } } stop{window};
+        text("TYPE A NAME. ENTER ACCEPTS, ESC CANCELS, F10 RESTARTS.",true);
+        std::string name;
+        while (running) {
+            choices = {"NAME: " + name}; selected = 0; draw();
+            SDL_Event event; checked(SDL_WaitEvent(&event));
+            if (event.type == SDL_EVENT_QUIT) { running = false; break; }
+            if (event.type == SDL_EVENT_TEXT_INPUT) {
+                for (const unsigned char c : std::string_view(event.text.text))
+                    if (c >= 32 && c < 127 && name.size() < limit) name += static_cast<char>(c);
+            }
+            if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
+            if (event.key.key == SDLK_F10) {
+                restart_requested = true; throw std::runtime_error("Restart requested during character creation");
+            }
+            if (event.key.key == SDLK_ESCAPE) break;
+            if (event.key.key == SDLK_BACKSPACE && !name.empty()) name.pop_back();
+            if (event.key.key == SDLK_RETURN && name.find_first_not_of(' ') != std::string::npos) {
+                choices.clear();
+                return name.substr(name.find_first_not_of(' '),name.find_last_not_of(' ')-name.find_first_not_of(' ')+1);
+            }
+        }
+        choices.clear(); return std::nullopt;
+    }
+    void create_character() {
+        const auto& rules = *session.character_rules;
+        if (session.party.size() >= rules.party_limit) throw std::runtime_error("Party is full");
+        Character c;
+        const auto race = pick_option(rules.races,"CREATE CHARACTER / RACE"); if (!race) return;
+        c.race = rules.races[*race].id;
+        const auto gender = pick_option(rules.genders,"CREATE CHARACTER / GENDER"); if (!gender) return;
+        c.gender = rules.genders[*gender].id;
+        while (true) {
+            c.abilities = roll_abilities(rules,c.race,c.gender,creation_random);
+            const auto choice = pick({"KEEP SCORES","REROLL","CANCEL"},character_summary(c));
+            if (!choice || *choice == 2) return;
+            if (*choice == 0) break;
+        }
+        const auto available = eligible_classes(rules,c);
+        std::vector<std::string> labels;
+        for (const auto i : available) labels.push_back(rules.classes[i].label);
+        const auto selected_class = pick(labels,"CREATE CHARACTER / CLASS"); if (!selected_class) return;
+        const auto& class_rule = rules.classes[available[*selected_class]]; c.character_class = class_rule.id;
+        labels.clear();
+        for (const auto& a : class_rule.alignments) {
+            const auto it = std::find_if(rules.alignments.begin(),rules.alignments.end(),[&](const auto& v) { return v.id == a; });
+            labels.push_back(it->label);
+        }
+        const auto alignment = pick(labels,"CREATE CHARACTER / ALIGNMENT"); if (!alignment) return;
+        c.alignment = class_rule.alignments[*alignment];
+        const auto name = character_name(rules.name_limit); if (!name) return;
+        c.name = *name; c = finish_character(rules,std::move(c),creation_random);
+        const auto confirm = pick({"ADD TO PARTY","CANCEL"},character_summary(c));
+        if (confirm && *confirm == 0) add_character(session.party,rules,std::move(c));
+    }
+    void manage_party() {
+        std::string diagnostic;
+        while (running) {
+            const auto action = pick({"CREATE CHARACTER","VIEW CHARACTER","REMOVE CHARACTER","BACK"},
+                "PARTY " + std::to_string(session.party.size()) + "/" +
+                std::to_string(session.character_rules->party_limit) + "\n" + diagnostic);
+            diagnostic.clear();
+            if (!action || *action == 3) return;
+            try {
+                if (*action == 0) { create_character(); continue; }
+                if (session.party.empty()) throw std::runtime_error("Party is empty");
+                std::vector<std::string> names;
+                for (const auto& c : session.party) names.push_back(c.name + " / " + c.character_class);
+                const auto member = pick(names,"SELECT CHARACTER"); if (!member) continue;
+                const auto summary = character_summary(session.party[*member]);
+                if (*action == 1) (void)pick({"BACK"},summary);
+                else {
+                    const auto remove = pick({"REMOVE FROM PARTY","CANCEL"},summary);
+                    if (remove && *remove == 0) session.party.erase(session.party.begin()+*member);
+                }
+            } catch (const std::exception& error) {
+                if (restart_requested || !running) throw;
+                diagnostic = error.what();
+            }
+        }
     }
     void draw() {
         color(13,18,24);
@@ -303,6 +413,11 @@ public:
         const char* directions[]{"NORTH","EAST","SOUTH","WEST"};
         label(664,370,"ROW " + std::to_string(session.row) + "  COL " + std::to_string(session.column));
         label(664,390,std::string("FACING ") + directions[facing]);
+        if (!session.party.empty()) {
+            label(664,416,"PARTY");
+            for (std::size_t i = 0; i < session.party.size(); ++i)
+                label(664,436+float(i)*20,(session.party[i].name+" / "+session.party[i].character_class).substr(0,35));
+        }
         color(145,157,167);
         label(24,448,"ARROWS/WASD move + turn | SPACE search | R rest | I initialize");
         label(24,464,"F5 save | F9 load | F10 restart | ESC quit");
@@ -320,7 +435,7 @@ public:
         }
         checked(SDL_RenderPresent(renderer));
     }
-    std::size_t menu(std::span<const std::string> values, std::string_view prompt, bool) override {
+    std::optional<std::size_t> choose(std::span<const std::string> values, std::string_view prompt, bool cancelable) {
         if (values.empty()) throw std::runtime_error("Empty event menu");
         text(prompt,false);
         choices.assign(values.begin(),values.end());
@@ -330,6 +445,9 @@ public:
             draw();
             SDL_Event event;
             if (!wait(event)) continue;
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE && cancelable) {
+                choices.clear(); return std::nullopt;
+            }
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) {
                 running = false;
@@ -350,6 +468,9 @@ public:
         }
         choices.clear();
         throw std::runtime_error("Window closed during event menu");
+    }
+    std::size_t menu(std::span<const std::string> values, std::string_view prompt, bool) override {
+        return *choose(values,prompt,false);
     }
 };
 } // namespace
@@ -385,12 +506,18 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
         auto window_host = create_host();
         if (!startup_screens.empty()) {
             std::string error;
+            bool show_titles = true;
             while (true) {
-                const auto action = window_host->startup(startup_screens,error);
+                const auto action = window_host->startup(startup_screens,error,show_titles);
+                show_titles = false;
                 if (window_host->restart_requested) break;
                 if (!action) return 0;
+                const auto before_action = session;
                 try {
+                    if (action == 3) { window_host->manage_party(); continue; }
                     if (action == 1) {
+                        if (session.character_rules && session.party.empty())
+                            throw std::runtime_error("Create at least one character before starting");
                         const auto result = session.trigger(formats::EclEventKind::initialize,*window_host);
                         if (window_host->restart_requested) break;
                         if (!window_host->running) return 0;
@@ -398,9 +525,11 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                     } else window_host->load_save(save,identity);
                     break;
                 } catch (const std::exception& failure) {
+                    if (window_host->restart_requested) break;
+                    if (!window_host->running) return 0;
                     error = failure.what();
                     window_host.reset();
-                    session = initial_session;
+                    session = before_action;
                     window_host = create_host();
                 }
             }

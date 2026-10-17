@@ -348,6 +348,7 @@ int main(int argc, char** argv) {
         const auto raw_map = geo_archive->extract(geo_id);
         auto ecl = goldbox::formats::DaxArchive::from_file(argv[4]).extract(ecl_id);
         goldbox::ExplorationSession session;
+        session.character_rules = profile.character_rules;
 #ifdef GOLDBOX_RENDERER
         session.wall_banks = initial_banks;
 #endif

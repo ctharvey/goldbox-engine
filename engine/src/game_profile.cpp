@@ -15,7 +15,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     const auto& root = j::object(parsed, "game profile");
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
-        "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords"}, "game profile");
+        "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
+        "characterCreationRules"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -83,6 +84,12 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
             if (id < 0 || id > 255) throw std::runtime_error("Invalid startup title record");
             profile.startup_title_records.push_back(static_cast<std::uint8_t>(id));
         }
+    }
+    if (const auto* value = root.if_contains("characterCreationRules")) {
+        const auto path = std::filesystem::path(j::string(*value,"characterCreationRules"));
+        if (path.empty() || path.is_absolute()) throw std::runtime_error("Creation rules path must be relative");
+        profile.character_rules = read_creation_rules(file.parent_path()/path);
+        if (profile.character_rules->id != profile.rules_profile) throw std::runtime_error("Creation rules ID mismatch");
     }
     if (const auto* value = root.if_contains("picturePeriodMs")) {
         const auto period = j::integer(*value,"picturePeriodMs");

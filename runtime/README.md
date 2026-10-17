@@ -185,7 +185,29 @@ returns to the startup menu, and displays a diagnostic. Loading uses the same
 bounded save reader and resource-identity/graphics checks as F9; it does not
 rerun initialization. Saves are engine exploration saves, not DOS saves.
 
-This is a startup shell for the exploration pilot. Party creation, character
-import, original save import, campaign startup state and NEW_ECL transitions
-remain unfinished. The start action does not fabricate a party or claim that
+This is a startup shell for the exploration pilot. Full original character creation, character import, original save import,
+campaign startup state and NEW_ECL transitions remain unfinished. The current
+party creator is described below. The start action does not fabricate a party or claim that
 a standalone map initialization reproduces the original New Game sequence.
+
+## Party creation
+
+Profiles can opt into `characterCreationRules` with an explicit relative JSON
+path. Pool selects the separate `rules/adnd-first-edition-creation.json` profile.
+With startup enabled, choose Create / manage party, then Create character.
+Choose race and gender, keep or reroll scores, select a qualifying single class
+and alignment, enter a name, and confirm Add to party. Escape cancels the current
+selection/draft; F10 resets the entire launch session. View and Remove character
+operate on the current roster, with confirmation before removal.
+
+Pool allows up to six members and names up to 15 printable ASCII characters.
+Names must be distinct ignoring case. At least one member is required before
+starting through this startup menu. Failed map initialization preserves your
+created roster. The roster appears beside the exploration map. F5 stores it in
+the engine save; startup Load or F9 restores it with matching creation rules.
+Older engine saves without a party remain readable and restore an empty roster.
+
+This is a creation pilot: multi-classing, portraits, standalone character files,
+DOS save import, HP/AC, equipment, spells, advancement and ECL character-memory
+bindings are not implemented. Creating a party does not yet enable original
+character-dependent scripts or combat. See [creation rules](../docs/character-creation.md).

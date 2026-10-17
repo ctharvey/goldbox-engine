@@ -252,7 +252,10 @@ int main(int argc, char** argv) {
     const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true) {
         SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
         for (const auto code : keys) {
-            SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = code;
+            SDL_Event event{};
+            if (code == SDLK_UNKNOWN) {
+                event.type = SDL_EVENT_TEXT_INPUT; event.text.text = "ALICE";
+            } else { event.type = SDL_EVENT_KEY_DOWN; event.key.key = code; }
             assert(SDL_PushEvent(&event));
         }
         assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,nullptr,nullptr,{},
@@ -299,6 +302,32 @@ int main(int argc, char** argv) {
     { std::ofstream invalid(startup_save); invalid << "{}"; }
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.state.memory[0x4a00] == 11); // Failed restore does not enter exploration.
+    std::filesystem::remove(startup_save);
+    session = {}; session.dialect = dialect; session.opcodes = ops;
+    session.ecl_record = program({9,0,42,1,0,0x4a,0});
+    CreationRules creation;
+    creation.id = "synthetic-party"; creation.party_limit = 2; creation.name_limit = 15;
+    creation.dice_count = 3; creation.dice_sides = 6;
+    creation.abilities = {{"might","MIGHT"}}; creation.genders = {{"any","Any"}};
+    creation.alignments = {{"neutral","Neutral"}};
+    creation.classes = {{"adventurer","Adventurer",{3},{"neutral"},false}};
+    creation.races = {{"visitor","Visitor",{3},{{"any",{18}}},{{"any",0}},{"adventurer"}}};
+    session.character_rules = creation;
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.party.empty() && session.state.memory[0x4a00] == 0); // Cannot begin with an empty party.
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE,SDLK_ESCAPE});
+    assert(session.party.empty()); // Cancel race selection and return to startup without closing unexpectedly.
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_RETURN,SDLK_RETURN,SDLK_UNKNOWN,SDLK_RETURN,SDLK_RETURN,
+        SDLK_DOWN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_F5,SDLK_ESCAPE});
+    assert(session.party.size() == 1 && session.party[0].name == "ALICE");
+    assert(session.party[0].abilities.size() == 1 && session.state.memory[0x4a00] == 42);
+    session.party.clear();
+    startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
+    assert(session.party.size() == 1 && session.party[0].name == "ALICE");
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_DOWN,SDLK_DOWN,SDLK_RETURN,
+        SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE});
+    assert(session.party.empty()); // Remove member, return to startup, quit.
     std::filesystem::remove(startup_save);
     auto invalid_screens = screens; invalid_screens[0].pixels[0] = 16;
     rejects([&] { (void)run_exploration_window(session,"startup-synthetic",{},nullptr,nullptr,nullptr,{},

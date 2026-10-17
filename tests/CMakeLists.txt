@@ -1,4 +1,8 @@
 add_executable(goldbox_tests journal_test.cpp)
+add_executable(goldbox_party_tests party_test.cpp)
+target_link_libraries(goldbox_party_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_party_tests COMMAND goldbox_party_tests
+    ${PROJECT_SOURCE_DIR}/rules/adnd-first-edition-creation.json)
 target_link_libraries(goldbox_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_journal_test COMMAND goldbox_tests)
 

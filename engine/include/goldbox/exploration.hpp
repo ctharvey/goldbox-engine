@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "goldbox/ecl_vm.hpp"
+#include "goldbox/party.hpp"
 #include <functional>
 
 namespace goldbox {
@@ -28,6 +29,8 @@ struct ExplorationSession {
     std::optional<MapResources> maps{};
     std::optional<std::array<std::uint8_t,3>> area{};
     std::optional<std::uint8_t> initial_map_record{};
+    std::optional<CreationRules> character_rules{};
+    Party party;
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);

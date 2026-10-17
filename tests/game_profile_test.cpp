@@ -13,6 +13,8 @@ int main(int argc, char** argv) {
     assert(argc == 3);
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
+    if (!pool.character_rules || curse.character_rules || pool.character_rules->id != pool.rules_profile ||
+        pool.character_rules->party_limit != 6) return 1;
     if (pool.picture_period_ms != 400 || curse.picture_period_ms != 0) return 1;
     if (pool.startup_title_records != std::vector<std::uint8_t>{1,2} || !curse.startup_title_records.empty()) return 1;
     assert(pool.id != curse.id);

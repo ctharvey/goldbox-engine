@@ -10,6 +10,7 @@ add_library(goldbox_core STATIC
     src/ecl_vm.cpp
     src/exploration.cpp
     src/image_presentation.cpp
+    src/party.cpp
 )
 target_include_directories(goldbox_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${Boost_INCLUDE_DIRS})
 target_compile_features(goldbox_core PUBLIC cxx_std_20)

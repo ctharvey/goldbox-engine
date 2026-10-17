@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include "goldbox/party.hpp"
+#include "goldbox/exploration.hpp"
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <cassert>
+#include <fstream>
+#include <functional>
+#include <iostream>
+
+using namespace goldbox;
+namespace {
+void rejects(const std::function<void()>& action) {
+    bool failed = false;
+    try { action(); } catch (const std::exception&) { failed = true; }
+    assert(failed);
+}
+std::string changed(std::string value, const std::string& from, const std::string& to) {
+    const auto at = value.find(from); assert(at != std::string::npos); value.replace(at,from.size(),to); return value;
+}
+}
+int main(int argc, char** argv) {
+    assert(argc == 2);
+    const auto rules = read_creation_rules(argv[1]);
+    assert(rules.party_limit == 6 && rules.name_limit == 15 && rules.abilities.size() == 6);
+    assert(rules.races.size() == 6 && rules.classes.size() == 4);
+    std::mt19937 random(1234), same(1234);
+    const auto a = roll_abilities(rules,"human","male",random);
+    const auto b = roll_abilities(rules,"human","male",same);
+    for (std::size_t i = 0; i < a.size(); ++i) assert(a[i].value == b[i].value);
+    for (const auto& race : rules.races) for (const auto& gender : rules.genders) {
+        Character c; c.name = "Hero"; c.race = race.id; c.gender = gender.id;
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            c.abilities = roll_abilities(rules,race.id,gender.id,random);
+            const auto choices = eligible_classes(rules,c); assert(!choices.empty());
+            const auto& clazz = rules.classes[choices.front()];
+            c.character_class = clazz.id; c.alignment = clazz.alignments.front();
+            validate_character(rules,finish_character(rules,c,random));
+        }
+    }
+    Character hero{"Ada","human","female","cleric","lawful-good",std::vector<AbilityValue>(6,{15,0})};
+    validate_character(rules,hero);
+    Character fighter = hero; fighter.character_class = "fighter"; fighter.abilities[0].value = 18;
+    const auto exceptional = finish_character(rules,fighter,random);
+    assert(exceptional.abilities[0].percentile >= 1 && exceptional.abilities[0].percentile <= 50);
+    rejects([&] { validate_character(rules,fighter); }); // Missing exceptional score is not silently accepted.
+    for (int failure = 0; failure < 6; ++failure) {
+        auto invalid = hero;
+        if (failure == 0) invalid.race = "unknown";
+        if (failure == 1) invalid.gender = "unknown";
+        if (failure == 2) invalid.name = std::string(16,'x');
+        if (failure == 3) invalid.abilities[0].value = 19;
+        if (failure == 4) invalid.character_class = "thief"; // Disallowed alignment.
+        if (failure == 5) invalid.race = "dwarf"; // No dwarf cleric in this profile.
+        rejects([&] { validate_character(rules,invalid); });
+    }
+    Party party; add_character(party,rules,hero);
+    auto duplicate = hero; duplicate.name = "ada";
+    rejects([&] { add_character(party,rules,duplicate); });
+    for (int i = 1; i < 6; ++i) { auto c = hero; c.name = "Hero"+std::to_string(i); add_character(party,rules,c); }
+    const auto json = serialize_party(party,rules);
+    assert(serialize_party(read_party(json,rules),rules) == json);
+    rejects([&] { add_character(party,rules,hero); }); assert(serialize_party(party,rules) == json);
+    rejects([&] { (void)read_party(changed(json,rules.id,"other-rules"),rules); });
+    rejects([&] { (void)read_party(changed(json,"\"value\":15","\"value\":99"),rules); });
+    rejects([&] { (void)read_party(changed(json,"\"class\":\"cleric\"","\"class\":\"missing\""),rules); });
+    rejects([&] { (void)read_party(changed(json,"Hero1","Ada"),rules); });
+    ExplorationSession session; session.character_rules = rules; session.party = party;
+    session.state.memory[123] = 42;
+    const auto save = serialize_exploration(session,"party-test");
+    ExplorationSession loaded; loaded.character_rules = rules;
+    restore_exploration(loaded,save,"party-test");
+    assert(serialize_exploration(loaded,"party-test") == save);
+    rejects([&] { restore_exploration(loaded,changed(save,rules.id,"bad-rules"),"party-test"); });
+    assert(serialize_exploration(loaded,"party-test") == save);
+    ExplorationSession no_rules;
+    rejects([&] { restore_exploration(no_rules,save,"party-test"); });
+    const auto legacy = serialize_exploration(no_rules,"party-test");
+    restore_exploration(loaded,legacy,"party-test"); assert(loaded.party.empty() && loaded.character_rules);
+    auto custom = rules; custom.id = "other-family"; custom.abilities.resize(2); custom.races.resize(1);
+    custom.genders.resize(1); custom.classes.resize(1); custom.percentile_ability.reset();
+    custom.classes[0].minimum = {1,1}; custom.classes[0].percentile = false;
+    custom.races[0].minimum = {1,1}; custom.races[0].maximum = {{"male",{18,18}}};
+    custom.races[0].percentile_maximum = {{"male",0}}; custom.races[0].classes = {custom.classes[0].id};
+    Character other{"Other",custom.races[0].id,"male",custom.classes[0].id,custom.classes[0].alignments[0],{}};
+    other.abilities = roll_abilities(custom,other.race,other.gender,random);
+    validate_character(custom,finish_character(custom,other,random)); assert(other.abilities.size() == 2);
+    auto impossible = rules; impossible.dice_count = 1; impossible.dice_sides = 2; impossible.drop_lowest = 0;
+    rejects([&] { (void)roll_abilities(impossible,"human","male",random); });
+    std::ifstream source(argv[1]); const std::string original{std::istreambuf_iterator<char>(source),{}};
+    const auto invalid_file = std::filesystem::temp_directory_path()/"goldbox-invalid-creation-rules.json";
+    for (const auto& value : {changed(original,"\"partyLimit\": 6","\"partyLimit\": 0"),
+        changed(original,"\"dropLowest\": 1","\"dropLowest\": 4"),
+        changed(original,"\"id\": \"strength\"","\"id\": \"intelligence\""),
+        changed(original,"\"id\": \"fighter\"","\"id\": \"missing\"")}) {
+        { std::ofstream output(invalid_file); output << value; }
+        rejects([&] { (void)read_creation_rules(invalid_file); });
+    }
+    std::filesystem::remove(invalid_file);
+    std::cout << "Party creation, eligibility, bounded dice, save validation and alternate rules passed\n";
+}

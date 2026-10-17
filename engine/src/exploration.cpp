@@ -109,6 +109,9 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
     auto object = bj::object{{"schemaVersion", 1}, {"sourceIdentity", source_identity},
         {"dialect", session.dialect.id}, {"row", session.row}, {"column", session.column},
         {"facing", static_cast<unsigned>(session.facing)}, {"memory", std::move(memory)}, {"strings", std::move(strings)}};
+    if (session.character_rules) {
+        object["party"] = bj::parse(serialize_party(session.party,*session.character_rules));
+    } else if (!session.party.empty()) throw std::runtime_error("Party requires creation rules");
     if (session.wall_banks) {
         bj::array banks;
         for (const auto id : *session.wall_banks) banks.push_back(id);
@@ -135,7 +138,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
     j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks",
-        "area", "mapRecord", "mapSource"}, "save");
+        "area", "mapRecord", "mapSource", "party"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -189,6 +192,11 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
         require_maps(session.maps);
         map = resolve_map(*session.maps,*session.initial_map_record);
     }
+    Party party;
+    if (const auto* value = root.if_contains("party")) {
+        if (!session.character_rules) throw std::runtime_error("Saved party requires matching creation rules");
+        party = read_party(boost::json::serialize(*value),*session.character_rules);
+    }
     (void)map.cell(row,column);
     // Publish only after validating the entire save; failed loads change nothing.
     if (!session.initial_map_record) session.initial_map_record = session.map.dax_record_id;
@@ -196,6 +204,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     session.area = area;
     session.wall_banks = banks;
     session.state = std::move(state);
+    session.party = std::move(party);
     session.row = static_cast<std::uint8_t>(row);
     session.column = static_cast<std::uint8_t>(column);
     session.facing = static_cast<Direction>(facing);

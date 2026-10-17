@@ -28,6 +28,7 @@ still unverified. See the [local validation scope](docs/research/local-validatio
 - Optional SDL3 exploration window with procedural walls, map overview, event text/menus and save/load; opt-in original title screens and a startup menu can initialize exploration or load an engine save; see [renderer controls and limits](runtime/README.md).
 - SSI EGA tile and wall-definition decoding with explicit wall-bank rendering; original archive checks pass for one Pool installation, while automatic visual bindings and scene parity remain unverified.
 - Monochrome tile strips and independent/XOR-first picture/sprite decoding, with explicit palette policies; checked against local Pool picture, sprite and combat-image archives. An opt-in ECL host displays profile-timed pictures and non-replacement sprites from explicitly selected archives; original timing and scene parity remain unverified.
+- Startup party creation with data-selected races/classes/alignments, bounded ability rolling, roster review/removal and engine-save persistence; see [supported creation rules and limits](docs/character-creation.md).
 - Game profiles for Pool of Radiance and Curse of the Azure Bonds (**both unverified**, not playable compatibility claims).
 
 ## Build and run

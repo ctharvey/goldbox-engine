@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Add startup character creation, rerolling, party review/removal and party-aware
+  engine saves. Separate data-driven creation rules from normalized party state;
+  Pool opts into a six-race, four-single-class pilot with a six-member limit.
+  Preserve roster state when initialization fails and reset it on F10. Original
+  character byte layouts, combat statistics and creation parity remain unfinished.
+
 - Add F10 restart from exploration, event menus and startup. Restore launch
   state and recreate presentation resources, return to titles when enabled,
   and leave save files untouched.

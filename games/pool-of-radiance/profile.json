@@ -14,7 +14,8 @@
     "headOffset": [0, 0], "bodyOffset": [0, 40]},
   "eventDispatch": {"dialect": "ssi-five-entry-v1", "codeBase": 39168, "squareInfoAddress": 49231,
     "positionAddresses": [49227, 49228, 49229]},
-  "rulesProfile": "adnd-first-edition-unimplemented",
+  "rulesProfile": "adnd-first-edition-creation-v1",
+  "characterCreationRules": "../../rules/adnd-first-edition-creation.json",
   "validationStatus": "unverified",
   "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"]
 }

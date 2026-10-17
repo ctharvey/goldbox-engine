@@ -1,0 +1,420 @@
+{
+  "schemaVersion": 1,
+  "id": "adnd-first-edition-creation-v1",
+  "partyLimit": 6,
+  "nameLimit": 15,
+  "dice": {
+    "count": 4,
+    "sides": 6,
+    "dropLowest": 1
+  },
+  "abilities": [
+    {
+      "id": "strength",
+      "label": "STR"
+    },
+    {
+      "id": "intelligence",
+      "label": "INT"
+    },
+    {
+      "id": "wisdom",
+      "label": "WIS"
+    },
+    {
+      "id": "dexterity",
+      "label": "DEX"
+    },
+    {
+      "id": "constitution",
+      "label": "CON"
+    },
+    {
+      "id": "charisma",
+      "label": "CHA"
+    }
+  ],
+  "genders": [
+    {
+      "id": "male",
+      "label": "Male"
+    },
+    {
+      "id": "female",
+      "label": "Female"
+    }
+  ],
+  "alignments": [
+    {
+      "id": "lawful-good",
+      "label": "Lawful good"
+    },
+    {
+      "id": "lawful-neutral",
+      "label": "Lawful neutral"
+    },
+    {
+      "id": "lawful-evil",
+      "label": "Lawful evil"
+    },
+    {
+      "id": "neutral-good",
+      "label": "Neutral good"
+    },
+    {
+      "id": "true-neutral",
+      "label": "True neutral"
+    },
+    {
+      "id": "neutral-evil",
+      "label": "Neutral evil"
+    },
+    {
+      "id": "chaotic-good",
+      "label": "Chaotic good"
+    },
+    {
+      "id": "chaotic-neutral",
+      "label": "Chaotic neutral"
+    },
+    {
+      "id": "chaotic-evil",
+      "label": "Chaotic evil"
+    }
+  ],
+  "percentile": {
+    "ability": "strength",
+    "at": 18
+  },
+  "classes": [
+    {
+      "id": "cleric",
+      "label": "Cleric",
+      "minimum": [
+        3,
+        3,
+        9,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": false
+    },
+    {
+      "id": "fighter",
+      "label": "Fighter",
+      "minimum": [
+        9,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": true
+    },
+    {
+      "id": "magic-user",
+      "label": "Magic-user",
+      "minimum": [
+        3,
+        9,
+        3,
+        3,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-good",
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-good",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": false
+    },
+    {
+      "id": "thief",
+      "label": "Thief",
+      "minimum": [
+        3,
+        3,
+        3,
+        9,
+        3,
+        3
+      ],
+      "alignments": [
+        "lawful-neutral",
+        "lawful-evil",
+        "neutral-good",
+        "true-neutral",
+        "neutral-evil",
+        "chaotic-neutral",
+        "chaotic-evil"
+      ],
+      "percentile": false
+    }
+  ],
+  "races": [
+    {
+      "id": "dwarf",
+      "label": "Dwarf",
+      "minimum": [
+        8,
+        3,
+        3,
+        3,
+        12,
+        3
+      ],
+      "maximum": {
+        "male": [
+          18,
+          18,
+          18,
+          17,
+          19,
+          16
+        ],
+        "female": [
+          17,
+          18,
+          18,
+          17,
+          19,
+          16
+        ]
+      },
+      "percentileMaximum": {
+        "male": 99,
+        "female": 0
+      },
+      "classes": [
+        "fighter",
+        "thief"
+      ]
+    },
+    {
+      "id": "elf",
+      "label": "Elf",
+      "minimum": [
+        3,
+        8,
+        3,
+        7,
+        6,
+        8
+      ],
+      "maximum": {
+        "male": [
+          18,
+          18,
+          18,
+          19,
+          18,
+          18
+        ],
+        "female": [
+          16,
+          18,
+          18,
+          19,
+          18,
+          18
+        ]
+      },
+      "percentileMaximum": {
+        "male": 75,
+        "female": 0
+      },
+      "classes": [
+        "fighter",
+        "magic-user",
+        "thief"
+      ]
+    },
+    {
+      "id": "gnome",
+      "label": "Gnome",
+      "minimum": [
+        6,
+        7,
+        3,
+        3,
+        8,
+        3
+      ],
+      "maximum": {
+        "male": [
+          18,
+          18,
+          18,
+          18,
+          18,
+          18
+        ],
+        "female": [
+          15,
+          18,
+          18,
+          18,
+          18,
+          18
+        ]
+      },
+      "percentileMaximum": {
+        "male": 50,
+        "female": 0
+      },
+      "classes": [
+        "fighter",
+        "thief"
+      ]
+    },
+    {
+      "id": "half-elf",
+      "label": "Half-elf",
+      "minimum": [
+        3,
+        4,
+        3,
+        6,
+        6,
+        3
+      ],
+      "maximum": {
+        "male": [
+          18,
+          18,
+          18,
+          18,
+          18,
+          18
+        ],
+        "female": [
+          17,
+          18,
+          18,
+          18,
+          18,
+          18
+        ]
+      },
+      "percentileMaximum": {
+        "male": 90,
+        "female": 0
+      },
+      "classes": [
+        "cleric",
+        "fighter",
+        "magic-user",
+        "thief"
+      ]
+    },
+    {
+      "id": "halfling",
+      "label": "Halfling",
+      "minimum": [
+        6,
+        6,
+        3,
+        8,
+        10,
+        3
+      ],
+      "maximum": {
+        "male": [
+          17,
+          18,
+          17,
+          18,
+          19,
+          18
+        ],
+        "female": [
+          14,
+          18,
+          17,
+          18,
+          19,
+          18
+        ]
+      },
+      "percentileMaximum": {
+        "male": 0,
+        "female": 0
+      },
+      "classes": [
+        "fighter",
+        "thief"
+      ]
+    },
+    {
+      "id": "human",
+      "label": "Human",
+      "minimum": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "maximum": {
+        "male": [
+          18,
+          18,
+          18,
+          18,
+          18,
+          18
+        ],
+        "female": [
+          18,
+          18,
+          18,
+          18,
+          18,
+          18
+        ]
+      },
+      "percentileMaximum": {
+        "male": 100,
+        "female": 50
+      },
+      "classes": [
+        "cleric",
+        "fighter",
+        "magic-user",
+        "thief"
+      ]
+    }
+  ]
+}
