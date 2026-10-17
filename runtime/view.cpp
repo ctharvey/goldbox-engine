@@ -1,10 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "view.hpp"
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
 
 namespace goldbox {
+std::uint8_t font_glyph(unsigned char ascii) {
+    if (ascii >= 'a' && ascii <= 'z') ascii -= 'a'-'A';
+    if (ascii < 32 || ascii > 95) ascii = '?';
+    return ascii >= 64 ? ascii-64 : ascii;
+}
+formats::IndexedImage compose_font_atlas(std::span<const formats::IndexedImage> tiles) {
+    if (tiles.size() < 64 || tiles.size() > 256) throw std::runtime_error("SSI font requires 64..256 tiles");
+    for (const auto& tile : tiles) {
+        if (tile.width != 8 || tile.height != 8 || tile.pixels.size() != 64 ||
+            std::any_of(tile.pixels.begin(),tile.pixels.end(),[](auto p) { return p != 0 && p != 15; }))
+            throw std::runtime_error("SSI font requires monochrome 8x8 tiles");
+    }
+    formats::IndexedImage atlas{128,32,std::vector<std::uint8_t>(128*32,0)};
+    for (std::size_t i = 0; i < 64; ++i)
+        for (std::size_t y = 0; y < 8; ++y)
+            std::copy_n(tiles[i].pixels.begin()+y*8,8,atlas.pixels.begin()+((i/16)*8+y)*128+(i%16)*8);
+    return atlas;
+}
 formats::IndexedImage compose_wall_view(const ExplorationSession& session, const formats::WallGraphics& graphics,
     const GameProfile::ColorBackdrop* backdrop) {
     (void)session.map.cell(session.row,session.column);

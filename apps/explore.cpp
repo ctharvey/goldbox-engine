@@ -268,7 +268,17 @@ int main(int argc, char** argv) {
 #ifdef GOLDBOX_RENDERER
         std::optional<goldbox::formats::WallGraphics> graphics;
         std::optional<goldbox::ImageArchives> images;
-        while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" || std::string_view(argv[1]) == "--images")) {
+        std::vector<goldbox::formats::IndexedImage> font;
+        while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" ||
+            std::string_view(argv[1]) == "--images" || std::string_view(argv[1]) == "--font")) {
+            if (std::string_view(argv[1]) == "--font") {
+                if (argc < 4 || !font.empty()) throw std::runtime_error("--font requires one archive and record ID");
+                font = goldbox::formats::decode_mono8_tiles(
+                    goldbox::formats::DaxArchive::from_file(argv[2]).extract(record_id(argv[3])));
+                (void)goldbox::compose_font_atlas(font);
+                argc -= 3; argv += 3;
+                continue;
+            }
             if (std::string_view(argv[1]) == "--images") {
                 if (argc < 5 || images) throw std::runtime_error("--images requires one PIC and one SPRIT archive");
                 images.emplace(goldbox::ImageArchives{goldbox::formats::DaxArchive::from_file(argv[2]),
@@ -294,6 +304,7 @@ int main(int argc, char** argv) {
                          "With --harness as the first argument, the same six arguments run the JSONL protocol instead.\n";
             std::cout << "With --window, optional --walls <WALLDEF.DAX> <8X8D.DAX> <shared-8X8D.DAX> <bank1> <bank2> <bank3> precedes the six arguments.\n";
             std::cout << "Optional --images <PIC.DAX> <SPRIT.DAX> also precedes the six resource arguments.\n";
+            std::cout << "Optional --font <8X8D.DAX> <record-id> selects SSI-order monochrome text glyphs.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
@@ -326,7 +337,7 @@ int main(int argc, char** argv) {
 #ifdef GOLDBOX_RENDERER
         if (window) return goldbox::run_exploration_window(session, source_identity, save,
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
-            profile.color_backdrop ? &*profile.color_backdrop : nullptr);
+            profile.color_backdrop ? &*profile.color_backdrop : nullptr,font);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

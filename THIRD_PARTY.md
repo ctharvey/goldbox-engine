@@ -133,3 +133,10 @@ Engine revision's Pool properties, `VirtualMemory.java`, `ViewDungeonPosition.ja
 selection, sky palette indices and native band sizes. These remain research-only
 references; no Java source was copied or translated. Original scene parity and
 script overrides of the indoor context remain unverified.
+
+The original-font renderer similarly consults the pinned SSI Engine Pool
+properties and `MonocromeSymbols`, `GoldboxString`, `CustomGoldboxString`,
+`AbstractRenderer` and `UIResourceManager` for font-record selection, character
+order and foreground recoloring. It uses the existing MIT-adapted monochrome
+decoder and independently written C++ atlas/SDL rendering. No Java source was
+copied or translated; original glyphs remain in the user's local installation.

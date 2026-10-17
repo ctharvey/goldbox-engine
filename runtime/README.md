@@ -31,7 +31,7 @@ input/window event rather than rendering continuously.
 The default mode is a **procedural preview**; optional original wall artwork is
 described below. Neither mode is a verified original-game UI.
 It starts at (0,0), north, with empty state unless a matching engine save is
-loaded. The map overview reveals all cells. Text currently uses SDL's limited
+loaded. The map overview reveals all cells. Text defaults to SDL's limited
 ASCII debug font, with bounded wrapping/history and a scrolling menu selection.
 RmlUi, production fonts, audio and QuickJS-NG
 remain future work. Unsupported ECL/combat reports a diagnostic; changes made
@@ -83,6 +83,21 @@ requests are rejected. Four-operand sprite dialects remain unsupported.
 Image presentation lives outside ECL memory. Saves preserve existing engine
 state; images are transient and cleared after loading a save. This does not
 establish original scene/timing parity or full original-event compatibility.
+
+For the original monochrome font, insert `--font /private/8X8D1.DAX 201` before
+the six resource arguments. It can be combined with `--walls` and `--images`
+in any order. The record must contain 64..256 complete monochrome 8x8 tiles.
+The SSI character-order adapter uses tiles 0..63 for ASCII space through
+underscore: `@.._` maps to tiles 0..31, and space through `?` to tiles 32..63.
+Lowercase UI text is displayed in uppercase; other bytes display `?`. This
+does not interpret extended glyphs, runes or other font orders.
+
+All labels, menu choices and event text use the selected font at eight logical
+pixels per character. A single transparent white atlas is tinted to the current
+UI text color and scaled with nearest-neighbor sampling. Glyphs are decoded
+read-only from the supplied archive; no artwork is bundled. Font selection is
+explicit, does not affect game state, and is not a recreation of the original
+screen layout or a visual-parity claim.
 
 Reuse decision: use SDL3's zlib-licensed platform/input/rendering/font services
 instead of implementing platform backends. Validated with SDL 3.2.28 at

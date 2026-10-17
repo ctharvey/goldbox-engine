@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <iostream>
 
 using namespace goldbox;
 namespace {
@@ -22,7 +23,40 @@ void key(SDL_Keycode code) {
 }
 }
 int main(int argc, char** argv) {
-    assert(argc == 2);
+    assert(argc == 2 || argc == 4);
+    const std::string phrase = "Hello world!";
+    constexpr std::uint8_t glyphs[]{8,5,12,12,15,32,23,15,18,12,4,33};
+    for (std::size_t i = 0; i < phrase.size(); ++i) assert(font_glyph(phrase[i]) == glyphs[i]);
+    for (const unsigned char byte : {0,31,96,123,127,128,255}) assert(font_glyph(byte) == 63);
+    assert(font_glyph('@') == 0 && font_glyph('_') == 31 && font_glyph('[') == 27);
+    assert(font_glyph('A') == 1 && font_glyph('z') == 26);
+    assert(font_glyph(' ') == 32 && font_glyph('0') == 48 && font_glyph('?') == 63);
+    std::vector<formats::IndexedImage> font(64,{8,8,std::vector<std::uint8_t>(64,0)});
+    for (std::size_t i = 0; i < font.size(); ++i) font[i].pixels[i] = 15;
+    const auto atlas = compose_font_atlas(font);
+    assert(atlas.width == 128 && atlas.height == 32);
+    for (std::size_t i = 0; i < font.size(); ++i)
+        for (std::size_t y = 0; y < 8; ++y) for (std::size_t x = 0; x < 8; ++x)
+            assert(atlas.pixels[((i/16)*8+y)*128+(i%16)*8+x] == font[i].pixels[y*8+x]);
+    const auto rejects_font = [&](const auto& tiles) {
+        bool failed = false;
+        try { (void)compose_font_atlas(tiles); } catch (const std::exception&) { failed = true; }
+        assert(failed);
+    };
+    rejects_font(std::vector<formats::IndexedImage>{});
+    rejects_font(std::vector<formats::IndexedImage>(63,font[0]));
+    rejects_font(std::vector<formats::IndexedImage>(257,font[0]));
+    auto broken_font = font;
+    broken_font[3].pixels[0] = 13; rejects_font(broken_font);
+    broken_font = font; broken_font[0].width = 7; rejects_font(broken_font);
+    broken_font = font; broken_font[0].pixels.pop_back(); rejects_font(broken_font);
+    if (argc == 4) {
+        const auto id = std::stoi(argv[3]);
+        assert(id >= 0 && id <= 255);
+        font = formats::decode_mono8_tiles(formats::DaxArchive::from_file(argv[2]).extract(id));
+        (void)compose_font_atlas(font);
+        std::cout << "Local font tiles=" << font.size() << "; atlas validated\n";
+    }
     ExplorationSession session;
     session.row = 3;
     session.column = 4;
@@ -162,7 +196,7 @@ int main(int argc, char** argv) {
     key(SDLK_SPACE);
     key(SDLK_RETURN);
     key(SDLK_ESCAPE);
-    assert(run_exploration_window(session,"renderer-synthetic",save,&graphics,nullptr,&backdrop) == 0);
+    assert(run_exploration_window(session,"renderer-synthetic",save,&graphics,nullptr,&backdrop,font) == 0);
     assert(session.state.memory[0x4a03] == 0);
     SDL_Quit();
 }

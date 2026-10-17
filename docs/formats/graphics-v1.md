@@ -84,8 +84,24 @@ error. Keep installation tests and rendered original artwork outside the repo.
 tile, one byte per row, most-significant bit on the left, black index 0 and
 white index 15. Empty, partial and over-256-tile strips are rejected. It is
 never used as an automatic fallback for a failed EGA decode. In the inspected
-installation, `8X8D1.DAX` record 201 contains 177 such tiles. Glyph identity and
-character encoding are not established, and the UI font has not been replaced.
+installation, `8X8D1.DAX` record 201 contains 177 such tiles. The optional renderer
+font adapter now maps the first 64 tiles in explicit SSI character order:
+ASCII `@.._` uses 0..31, while space through `?` uses 32..63. UI lowercase folds
+to uppercase and unsupported bytes use `?`. Extended glyphs remain unidentified.
+This mapping is a separate rendering adapter, not part of monochrome decoding.
+
+The font atlas is 128x32 pixels, sixteen columns of eight-pixel glyphs in four
+rows. Input tiles must be 8x8 with exactly 64 binary palette pixels (0 or 15),
+and the strip must have 64..256 tiles. Zero becomes transparent; white pixels
+receive the current UI tint. The renderer retains its existing layout and text
+limits. See `--font` in the runtime README; no font artwork is redistributed.
+
+SSI Engine's pinned Pool properties, `MonocromeSymbols.java`,
+`GoldboxString.java`, `CustomGoldboxString.java`, `AbstractRenderer.java` and
+`UIResourceManager.java` were consulted for font selection, character order and
+foreground recoloring. This adapter is independently implemented; no Java was
+copied or translated. Synthetic tests cover character examples, atlas placement,
+invalid fonts and SDL menu/text rendering; local assets are checked separately.
 
 `decode_ega_sequence` takes an explicit independent or XOR-first mode. A leading
 byte gives 1..8 frames, each with this 21-byte header followed by packed nibbles:

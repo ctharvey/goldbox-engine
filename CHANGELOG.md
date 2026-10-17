@@ -2,6 +2,12 @@
 
 ## 2026-10-16
 
+- Add explicit original-font selection for the exploration window. Decode SSI
+  monochrome tiles into a transparent, tinted atlas; map printable characters,
+  fold UI lowercase to uppercase, and use a question mark for unsupported bytes.
+  Labels, menus and event text share the atlas. Keep the debug-font default and
+  use synthetic tests; extended glyphs and original layout parity remain unverified.
+
 - Add an opt-in SSI color dungeon background behind original wall artwork.
   Pool's profile supplies sky-color addresses; GEO context selects indoors or
   outdoors. Render native sky/horizon/floor bands, reflect ECL memory changes,

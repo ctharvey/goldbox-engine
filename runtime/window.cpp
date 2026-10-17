@@ -26,15 +26,28 @@ public:
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     std::optional<ImagePresentation> images;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> font_texture{nullptr,SDL_DestroyTexture};
     bool running{true};
     std::deque<std::string> lines;
     std::vector<std::string> choices;
     std::size_t selected{};
 
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
-        const ImageArchives* archives, const GameProfile::ColorBackdrop* colors)
+        const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
+        std::span<const formats::IndexedImage> font)
         : session(value), renderer(target), graphics(walls), backdrop(colors) {
         if (archives) images.emplace(*archives);
+        if (!font.empty()) {
+            const auto atlas = compose_font_atlas(font);
+            std::vector<formats::Rgba> rgba;
+            rgba.reserve(atlas.pixels.size());
+            for (const auto pixel : atlas.pixels) rgba.push_back({255,255,255,std::uint8_t(pixel ? 255 : 0)});
+            font_texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,128,32));
+            if (!font_texture) throw std::runtime_error(SDL_GetError());
+            checked(SDL_SetTextureScaleMode(font_texture.get(),SDL_SCALEMODE_NEAREST));
+            checked(SDL_SetTextureBlendMode(font_texture.get(),SDL_BLENDMODE_BLEND));
+            checked(SDL_UpdateTexture(font_texture.get(),nullptr,rgba.data(),128*4));
+        }
         if (graphics) {
             texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,88,88));
             if (!texture) throw std::runtime_error(SDL_GetError());
@@ -80,7 +93,19 @@ public:
         checked(SDL_RenderFillRect(renderer, &rect));
     }
     void label(float x, float y, const std::string& value) {
-        checked(SDL_RenderDebugText(renderer, x, y, value.c_str()));
+        if (!font_texture) { checked(SDL_RenderDebugText(renderer,x,y,value.c_str())); return; }
+        std::uint8_t r,g,b,a;
+        checked(SDL_GetRenderDrawColor(renderer,&r,&g,&b,&a));
+        checked(SDL_SetTextureColorMod(font_texture.get(),r,g,b));
+        const float start_x = x;
+        for (const unsigned char ch : value) {
+            if (ch == '\n') { x = start_x; y += 8; continue; }
+            const auto glyph = font_glyph(ch);
+            const SDL_FRect source{float((glyph%16)*8),float((glyph/16)*8),8,8};
+            const SDL_FRect target{x,y,8,8};
+            checked(SDL_RenderTexture(renderer,font_texture.get(),&source,&target));
+            x += 8;
+        }
     }
     void text(std::string_view value, bool clear) override {
         if (clear) lines.clear();
@@ -207,7 +232,7 @@ public:
 
 int run_exploration_window(ExplorationSession& session, std::string_view identity,
     const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images,
-    const GameProfile::ColorBackdrop* backdrop) {
+    const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font) {
     if (graphics) {
         for (const auto& cell : session.map.cells) {
             for (const auto id : {cell.north,cell.east,cell.south,cell.west}) {
@@ -227,7 +252,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
-    WindowHost host(session,raw_renderer,graphics,images,backdrop);
+    WindowHost host(session,raw_renderer,graphics,images,backdrop,font);
     host.text("Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented.",false);
     const auto trigger = [&](formats::EclEventKind kind) {
         const auto result = session.trigger(kind,host);
