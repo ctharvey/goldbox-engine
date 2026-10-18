@@ -2,6 +2,12 @@
 
 ## 2026-10-18
 
+- Wrap original-mode dialogue at word boundaries, preserve the cursor across
+  consecutive PRINT fragments, and pause before clearing a full page. Keep
+  engine notices separate from ECL dialogue. Highlight the selected party member
+  from the configured memory binding (white selected, cyan otherwise), with green
+  numeric fields. Add synthetic continuation, paging and selection regressions.
+
 - Add selectable original/enhanced display modes over the shared game state.
   Pool defaults to a profile-configured native canvas, imported symbol borders,
   scene/party/dialogue regions and paged text. Preserve the enhanced overview;

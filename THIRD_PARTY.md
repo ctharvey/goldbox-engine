@@ -12,6 +12,14 @@ Pool's border configuration was separately compared against a private DOS
 capture: all 14,400 configured border pixels matched. No SSI symbols, fonts,
 screenshots or other original artwork are distributed in this repository.
 
+At the same pinned revision, `StoryRenderer.java`, `AbstractStateRenderer.java`,
+`GoldboxStringPartFactory.java` and `FontColor.java` were consulted for word
+boundaries, PRINT continuation and selected-party colors. These remain
+research-only references. The C++ dialogue accumulator and selection helper are
+independently implemented and tested with synthetic text and state. Private DOS
+opening captures corroborate word wrapping; reveal timing and full UI parity
+remain unverified.
+
 ## Campaign opening and reference adapter (2026-10-18)
 
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` remains a

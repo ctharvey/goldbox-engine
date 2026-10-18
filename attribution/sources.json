@@ -117,7 +117,11 @@
         "src/main/java/engine/input/MenuHandler.java",
         "src/main/java/character/forgottenrealms/CharacterStatusForgottenRealms.java",
         "src/main/java/engine/input/ModeMenuHandler.java",
-        "src/main/java/engine/input/ProgramMenuBeginHandler.java"
+        "src/main/java/engine/input/ProgramMenuBeginHandler.java",
+        "src/main/java/ui/classic/StoryRenderer.java",
+        "src/main/java/ui/classic/AbstractStateRenderer.java",
+        "src/main/java/engine/text/GoldboxStringPartFactory.java",
+        "src/main/java/shared/FontColor.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,

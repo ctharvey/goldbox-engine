@@ -24,6 +24,44 @@ void key(SDL_Keycode code) {
 }
 int main(int argc, char** argv) {
     assert(argc == 2 || argc == 4);
+    std::deque<std::string> dialogue;
+    std::vector<std::deque<std::string>> pages;
+    const auto page = [&] { pages.push_back(dialogue); };
+    append_dialogue(dialogue,"HELLO",true,12,2,page);
+    append_dialogue(dialogue," WORLD",false,12,2,page);
+    assert(dialogue == std::deque<std::string>{"HELLO WORLD"} && pages.empty());
+    append_dialogue(dialogue,"ALPHA BETA",true,8,2,page);
+    assert((dialogue == std::deque<std::string>{"ALPHA","BETA"}));
+    append_dialogue(dialogue," GAMMA",false,8,2,page);
+    assert(pages.size() == 1 && (pages.front() == std::deque<std::string>{"ALPHA","BETA"}));
+    assert(dialogue == std::deque<std::string>{"GAMMA"});
+    append_dialogue(dialogue," DELTA\nEPSILON",false,8,2,page);
+    assert(pages.size() == 2 && (pages.back() == std::deque<std::string>{"GAMMA","DELTA"}));
+    assert(dialogue == std::deque<std::string>{"EPSILON"});
+    append_dialogue(dialogue,"A\n\nB",true,8,4,page);
+    assert((dialogue == std::deque<std::string>{"A","","B"}));
+    append_dialogue(dialogue,std::string(100,' ')+"Z",true,8,4,page);
+    assert(dialogue == std::deque<std::string>{"Z"});
+    append_dialogue(dialogue,"ABCDEFGHIJ",true,4,2,page);
+    assert((pages.back() == std::deque<std::string>{"ABCD","EFGH"}));
+    assert(dialogue == std::deque<std::string>{"IJ"});
+    for (const auto dimensions : {std::pair{0,2},std::pair{81,2},std::pair{8,0},std::pair{8,61}}) {
+        bool rejected = false;
+        try { append_dialogue(dialogue,"X",true,dimensions.first,dimensions.second,page); }
+        catch (const std::runtime_error&) { rejected = true; }
+        assert(rejected);
+    }
+    ExplorationSession selection;
+    selection.party.resize(2);
+    selection.loaded_character = 1;
+    assert(party_name_color(selection,0) == 15 && party_name_color(selection,1) == 11);
+    selection.party_memory.emplace(); selection.party_memory->selected_address = 0x1234;
+    selection.state.memory[0x1234] = 1;
+    assert(party_name_color(selection,0) == 11 && party_name_color(selection,1) == 15);
+    selection.loaded_character = 0;
+    assert(party_name_color(selection,1) == 15); // LOAD_CHARACTER must not move selection.
+    selection.state.memory[0x1234] = 255;
+    assert(party_name_color(selection,0) == 11 && party_name_color(selection,1) == 11);
     const std::string phrase = "Hello world!";
     constexpr std::uint8_t glyphs[]{8,5,12,12,15,32,23,15,18,12,4,33};
     for (std::size_t i = 0; i < phrase.size(); ++i) assert(font_glyph(phrase[i]) == glyphs[i]);

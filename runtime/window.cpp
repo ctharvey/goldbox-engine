@@ -320,26 +320,24 @@ public:
         }
     }
     void text(std::string_view value, bool clear) override {
-        if (clear) lines.clear();
-        const std::size_t columns = original ? original->layout.dialogue[2]/8 : 110;
-        const auto append = [&](std::string line) {
-            if (original && lines.size() >= original->layout.dialogue[3]/8) {
+        if (original) {
+            append_dialogue(lines,value,clear,original->layout.dialogue[2]/8,original->layout.dialogue[3]/8,[&] {
                 const std::array<std::string,1> next{"PRESS RETURN TO CONTINUE"};
                 (void)choose(next,"",false);
-                lines.clear();
-            }
-            lines.push_back(std::move(line));
-        };
+            });
+            return;
+        }
+        if (clear) lines.clear();
         std::string line;
         for (const unsigned char ch : value) {
-            if (ch == '\n' || line.size() == columns) {
-                append(std::move(line));
+            if (ch == '\n' || line.size() == 110) {
+                lines.push_back(std::move(line));
                 line.clear();
             }
             if (ch != '\n') line += ch >= 32 && ch < 127 ? char(ch) : '?';
             if (lines.size() > 80) lines.pop_front();
         }
-        if (!line.empty()) append(std::move(line));
+        if (!line.empty()) lines.push_back(std::move(line));
         while (lines.size() > 80) lines.pop_front();
     }
     std::optional<std::size_t> pick(const std::vector<std::string>& values, const std::string& prompt) {
@@ -591,10 +589,13 @@ public:
         label(party[0]+party[2]-48,party[1],"AC");
         label(party[0]+party[2]-16,party[1],"HP");
         const auto row_height = layout.party_row_height;
+        const auto palette = formats::ega_palette();
         for (std::size_t i = 0; i < session.party.size() && (i+1)*row_height+8 <= party[3]; ++i) {
-            color(i == 0 ? 85 : 255,255,i == 0 ? 85 : 255);
+            const auto ink = palette[party_name_color(session,i)];
+            color(ink[0],ink[1],ink[2]);
             const float y = party[1]+float(i+1)*row_height;
             label(party[0],y,session.party[i].name.substr(0,(party[2]-56)/8));
+            color(85,255,85);
             // Equipment/armor is not implemented; never invent an armor class.
             label(party[0]+party[2]-48,y,"?");
             const auto hp = session.party[i].hit_points;
@@ -855,12 +856,13 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
             }
         }
         auto& host = *window_host;
-        host.text(startup_screens.empty() ?
+        if (!original) host.text(startup_screens.empty() ?
             "Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented." :
             "Exploration ready. Arrows move, Space searches, F5 saves, F9 loads; I reruns initialization.",false);
+        const auto notify = [&](std::string_view value) { host.text(value,original != nullptr); };
         const auto trigger = [&](formats::EclEventKind kind) {
             const auto result = session.trigger(kind,host);
-            if (!result.exited && !host.restart_requested) host.text("Event stopped: " + result.diagnostic,false);
+            if (!result.exited && !host.restart_requested) notify("Event stopped: " + result.diagnostic);
         };
         while (host.running && !host.restart_requested) {
             host.animate();
@@ -883,7 +885,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                     const bool moved = session.move(static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4));
                     session.facing = facing;
                     if (moved) trigger(formats::EclEventKind::move);
-                    else host.text("Movement blocked.",false);
+                    else if (!original) notify("Movement blocked.");
                 } else if (key == SDLK_SPACE) trigger(formats::EclEventKind::search);
                 else if (key == SDLK_R) trigger(formats::EclEventKind::rest);
                 else if (key == SDLK_I) trigger(formats::EclEventKind::initialize);
@@ -893,13 +895,13 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                     std::ofstream output(save,std::ios::binary);
                     output << serialize_exploration(session,identity) << '\n';
                     if (!output) throw std::runtime_error("Failed writing save");
-                    host.text("State saved.",false);
+                    notify("State saved.");
                 } else if (key == SDLK_F9) {
                     host.load_save(save,identity);
-                    host.text("State restored.",false);
+                    notify("State restored.");
                 }
             } catch (const std::exception& error) {
-                host.text(error.what(),false);
+                notify(error.what());
             }
         }
         if (!host.restart_requested) return 0;

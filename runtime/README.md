@@ -21,6 +21,12 @@ panel, green dialogue below the scene and a separate command row. Profile fields
 select resource names, records, regions and repeated border symbols; the renderer
 contains no title checks. Long text pauses between pages rather than dropping lines.
 Original mode loads its configured font/symbol archive beside the GEO archive.
+Dialogue wraps at word boundaries, preserves explicit newlines and continues at
+the current cursor across PRINT fragments. Leading spaces are suppressed; words
+longer than the region are split safely. Engine notices replace the dialogue,
+and enhanced-mode control hints are omitted. Party names use the configured
+selected-member memory binding, independently of the loaded character: white
+for selected, bright cyan otherwise, with green numeric fields.
 
 This is an initial display implementation, not full visual parity. Armor class
 shows `?` because equipment is unfinished; the clock is omitted. Startup, creation
@@ -28,6 +34,11 @@ menus and statistics sheets still use the engine's interaction flow. Typewriter
 timing, text-color changes, exact command styling and monitor aspect correction
 remain unverified. The configured border tiles matched a private DOS capture in
 all 14,400 compared pixels. Original assets and reference screenshots stay private.
+The word-boundary behavior was compared with private DOS opening captures and
+manually exercised through creation paging and the installed campaign opening.
+Synthetic tests cover PRINT continuation, page boundaries, blank lines, oversized
+words and party selection. This does not establish full paragraph pixel parity,
+original text reveal timing or character-status indicators.
 
 Install SDL3 >=3.2 (for example, vcpkg `sdl3` on Windows), then configure:
 

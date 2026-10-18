@@ -6,6 +6,52 @@
 #include <stdexcept>
 
 namespace goldbox {
+std::uint8_t party_name_color(const ExplorationSession& session, std::size_t member) {
+    if (member >= session.party.size()) throw std::runtime_error("Party display index out of range");
+    const auto address = session.party_memory ? session.party_memory->selected_address : std::nullopt;
+    const std::size_t selected = address ? session.state.memory[*address] : 0;
+    return selected == member ? 15 : 11;
+}
+void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool clear,
+    std::size_t columns, std::size_t rows, const std::function<void()>& next_page) {
+    if (!columns || columns > 80 || !rows || rows > 60)
+        throw std::runtime_error("Invalid dialogue page dimensions");
+    if (clear) lines.clear();
+    if (lines.size() > rows || std::any_of(lines.begin(),lines.end(),
+        [columns](const auto& line) { return line.size() > columns; }))
+        throw std::runtime_error("Dialogue page does not fit its region");
+    if (text.empty()) return;
+    if (lines.empty()) lines.emplace_back();
+    const auto newline = [&] {
+        while (!lines.back().empty() && lines.back().back() == ' ') lines.back().pop_back();
+        if (lines.size() == rows) { next_page(); lines.clear(); }
+        lines.emplace_back();
+    };
+    for (std::size_t at = 0; at < text.size();) {
+        if (text[at] == '\n') { newline(); ++at; continue; }
+        const bool spaces = text[at] == ' ';
+        auto end = at+1;
+        while (end < text.size() && text[end] != '\n' && (text[end] == ' ') == spaces) ++end;
+        auto length = end-at;
+        if (spaces) {
+            if (!lines.back().empty()) {
+                if (length > columns-lines.back().size()) newline();
+                else lines.back().append(length,' ');
+            }
+        } else {
+            if (length <= columns && length > columns-lines.back().size()) newline();
+            while (at < end) {
+                if (lines.back().size() == columns) newline();
+                const auto count = std::min(end-at,columns-lines.back().size());
+                for (std::size_t i = 0; i < count; ++i) {
+                    const unsigned char ch = text[at++];
+                    lines.back() += ch >= 32 && ch < 127 ? char(ch) : '?';
+                }
+            }
+        }
+        at = end;
+    }
+}
 formats::IndexedImage compose_original_frame(const GameProfile::OriginalDisplay& layout,
     std::span<const formats::IndexedImage> symbols) {
     const auto width = layout.canvas[0], height = layout.canvas[1];

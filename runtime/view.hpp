@@ -6,6 +6,7 @@
 #include "goldbox/game_profile.hpp"
 #include "goldbox/formats/audio.hpp"
 #include <filesystem>
+#include <deque>
 
 namespace goldbox {
 struct WallArchives { formats::DaxArchive definitions, tiles, shared; };
@@ -13,6 +14,12 @@ struct CampaignGraphics { ImageArchives images; WallArchives walls; };
 struct OriginalPresentation { GameProfile::OriginalDisplay layout; formats::IndexedImage frame; };
 formats::IndexedImage compose_original_frame(const GameProfile::OriginalDisplay& layout,
     std::span<const formats::IndexedImage> symbols);
+// Stream PRINT fragments through a bounded, word-wrapped page. The callback
+// presents a completed page before it is cleared; no decoder or game state changes.
+void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool clear,
+    std::size_t columns, std::size_t rows, const std::function<void()>& next_page);
+// SSI selected-PC indices are zero-based; loading a PC does not select it.
+std::uint8_t party_name_color(const ExplorationSession& session, std::size_t member);
 struct WallHit {
     double distance{}; // Ray parameter; unnormalized camera rays avoid fisheye distortion.
     std::uint8_t wall{};
