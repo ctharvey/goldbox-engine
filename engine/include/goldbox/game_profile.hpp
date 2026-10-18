@@ -63,6 +63,15 @@ struct GameProfile {
     std::optional<EclSoundCall> sound_call{};
     // Zero preserves the legacy final-title menu; timed titles precede a separate menu.
     std::uint32_t startup_title_period_ms{};
+    struct CampaignStartup {
+        std::uint8_t map_record{}, program_record{};
+        std::vector<std::string> map_archives, program_archives;
+        std::uint16_t position_refresh_call{};
+        // Pictures, sprites, heads, bodies, wall definitions, wall tiles, shared tiles.
+        std::vector<std::string> graphics_archives;
+    };
+    std::optional<CampaignStartup> campaign_startup{};
+    std::uint32_t script_delay_ms{}, sprite_replacement_ms{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

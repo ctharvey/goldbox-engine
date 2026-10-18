@@ -243,7 +243,23 @@ int main(int argc, char** argv) {
     display.sprite_start({7,2,255},session); assert(display.frame()->image.pixels[1] == 2);
     rejects([&] { display.sprite_start({7,1,7},session); });
     assert(display.frame()->image.pixels[1] == 2);
+    assets.sprite_replacement_ms = 1000;
+    display.sprite_start({7,2,7},session); // Wall clamps the approach to distance zero.
+    assert(display.animation_wait_ms() == 1000);
+    assert(!display.advance_time(999) && display.animation_wait_ms() == 1);
+    assert(display.advance_time(1) && display.palette() == EgaPaletteKind::standard);
+    assert(display.frame()->image.pixels[1] == 2 && display.animation_wait_ms() == 400);
+    display.sprite_start({7,0,7},session);
+    display.clear(); assert(!display.advance_time(1000) && !display.frame());
+    rejects([&] { display.sprite_start({7,0,8},session); });
+    assert(!display.frame());
     session.map = {};
+    display.sprite_start({7,2,7},session);
+    assert(display.animation_wait_ms() == 0 && !display.advance_time(10000));
+    display.sprite_advance(); assert(display.animation_wait_ms() == 0);
+    display.sprite_advance(); assert(display.animation_wait_ms() == 1000);
+    assert(display.advance_time(UINT64_MAX));
+    assert(display.palette() == EgaPaletteKind::standard);
     session.map.cells[7*16+8].south = 1;
     display.sprite_start({7,2,255},session); assert(display.frame()->image.pixels[1] == 2);
     session.map = {};

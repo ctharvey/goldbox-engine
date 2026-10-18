@@ -199,4 +199,36 @@ int main(int argc, char** argv) {
     assert(run_exploration_window(session,"renderer-synthetic",save,&graphics,nullptr,&backdrop,font) == 0);
     assert(session.state.memory[0x4a03] == 0);
     SDL_Quit();
+
+    // Begin must use the campaign adapter, rather than the launch preview's ECL.
+    // Restart then exercises the same created party and startup route again.
+    session = {};
+    session.dialect = {"ssi-five-entry-v1",0x9900,0xc04f,true,std::nullopt};
+    session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3);
+    session.map.dax_record_id = 18;
+    session.sound_call = EclSoundCall{0xba03,0x03de,{{8,10}}};
+    std::vector<std::uint8_t> opening;
+    for (int i = 0; i < 5; ++i) opening.insert(opening.end(),{1,1,20,0x99});
+    opening.insert(opening.end(),{9,0,8,3,0xde,3,0x2d,1,3,0xba,0x0e,0,7,9,0,7,1,0x20,0x4a,0});
+    session.maps = MapResources{[](std::uint8_t id) {
+        formats::GeoMap map; map.dax_record_id = id; return map;
+    },"synthetic-startup-maps"};
+    session.programs = ProgramResources{[opening](std::uint8_t id) { return ProgramResource{id,opening}; },
+        "synthetic-startup-programs"};
+    session.campaign_start = std::array<std::uint8_t,2>{0,0};
+    session.party.emplace_back(); session.party[0].name = "TEST";
+    const std::vector<formats::IndexedImage> titles{{320,200,std::vector<std::uint8_t>(64000,0)}};
+    std::vector<std::uint8_t> picture(26,0);
+    picture[0] = 1; picture[5] = picture[7] = 1; picture[22] = 0x12;
+    std::vector<std::uint8_t> dax{9,0,7,0,0,0,0,26,0,27,0,25};
+    dax.insert(dax.end(),picture.begin(),picture.end());
+    ImageArchives launch_assets{}; // Deliberately lacks the opening picture.
+    CampaignGraphics campaign_assets{{formats::DaxArchive::parse(dax),{}},{}};
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_B); key(SDLK_F10); key(SDLK_B); key(SDLK_ESCAPE);
+    assert(run_exploration_window(session,"startup-synthetic",save,nullptr,&launch_assets,nullptr,{},nullptr,nullptr,
+        titles,nullptr,{},0,nullptr,&campaign_assets) == 0);
+    assert(session.map.dax_record_id == 0 && session.current_program_record == 0);
+    assert(session.state.memory[0x4a20] == 7 && session.party[0].name == "TEST");
+    SDL_Quit();
 }

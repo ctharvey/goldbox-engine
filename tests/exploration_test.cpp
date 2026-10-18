@@ -25,6 +25,74 @@ void rejects(const std::function<void()>& fn) {
 
 int main() {
     {
+        const auto script = [](std::initializer_list<std::uint8_t> body) {
+            std::vector<std::uint8_t> bytes;
+            for (int i = 0; i < 5; ++i) bytes.insert(bytes.end(),{1,1,20,0x99});
+            bytes.insert(bytes.end(),body); return bytes;
+        };
+        const auto boot = script({0x20,0,42});
+        const auto destination = script({9,0,3,1,0,0x4a,0x11,0x80,1,4,0});
+        ExplorationSession campaign;
+        campaign.dialect = {"ssi-five-entry-v1",0x9900,0xc04f,true,
+            std::array<std::uint16_t,3>{0xc04b,0xc04c,0xc04d}};
+        campaign.opcodes = minimal_vm_opcodes(); campaign.ecl_record = boot;
+        campaign.current_program_record = 0;
+        campaign.programs = ProgramResources{[&](std::uint8_t id) {
+            if (id != 0 && id != 42) throw std::runtime_error("Missing synthetic program");
+            return ProgramResource{id,id == 0 ? boot : destination};
+        },"synthetic-programs-v1"};
+        campaign.campaign_start = std::array<std::uint8_t,2>{0,0};
+        campaign.maps = MapResources{[](std::uint8_t id) { GeoMap map; map.dax_record_id = id; return map; },
+            "synthetic-maps-v1"};
+        Host begin_output;
+        rejects([&] { campaign.begin_campaign(begin_output); });
+        campaign.party.emplace_back(); campaign.party[0].name = "Synthetic";
+        campaign.state.random = HighWordLcg32(123,134775813,1);
+        campaign.state.memory[0x4a01] = 99;
+        auto begun = campaign;
+        assert(begun.begin_campaign(begin_output).exited && begin_output.output == "AAA");
+        assert(begun.state.memory[0x4a01] == 0 && begun.party[0].name == "Synthetic");
+        assert(begun.state.random->state() == 123);
+        campaign.party.clear(); campaign.state.random.reset();
+        auto initial = campaign; Host output;
+        const auto run = campaign.trigger(EclEventKind::initialize,output);
+        assert(run.exited && run.steps == 14 && !run.next_program && output.output == "AAA");
+        assert(campaign.current_program_record == 42 && campaign.state.memory[0x4a00] == 3);
+        const auto saved = serialize_exploration(campaign,"synthetic-campaign");
+        restore_exploration(initial,saved,"synthetic-campaign");
+        assert(initial.current_program_record == 42 && initial.ecl_record == destination);
+        assert(initial.state.memory == campaign.state.memory);
+        auto invalid = saved;
+        const auto location = invalid.find("synthetic-programs-v1");
+        assert(location != std::string::npos);
+        invalid.replace(location,21,"synthetic-programs-v2");
+        rejects([&] { restore_exploration(initial,invalid,"synthetic-campaign"); });
+        assert(initial.current_program_record == 42 && initial.ecl_record == destination);
+        campaign.ecl_record = boot; campaign.current_program_record = 0;
+        auto missing = campaign; missing.programs.reset();
+        assert(!missing.trigger(EclEventKind::initialize,output).exited && missing.current_program_record == 0);
+        auto wrong = campaign;
+        wrong.programs->resolve = [&](std::uint8_t) { return ProgramResource{43,destination}; };
+        assert(!wrong.trigger(EclEventKind::initialize,output).exited && wrong.ecl_record == boot);
+        auto malformed = campaign;
+        malformed.programs->resolve = [](std::uint8_t id) { return ProgramResource{id,{0xff}}; };
+        assert(!malformed.trigger(EclEventKind::initialize,output).exited && malformed.ecl_record == boot);
+        auto endless = campaign;
+        endless.programs->resolve = [&](std::uint8_t id) { return ProgramResource{id,boot}; };
+        assert(!endless.trigger(EclEventKind::initialize,output).exited);
+        assert(!campaign.trigger(EclEventKind::initialize,output,{5,64}).exited);
+        campaign.programs.reset(); campaign.current_program_record.reset();
+        campaign.position_refresh_call = 0x2c90;
+        campaign.map.cells[31].raw_event = 0x82;
+        campaign.ecl_record = script({9,0,15,1,0x4b,0xc0,9,0,1,1,0x4c,0xc0,
+            9,0,3,1,0x4d,0xc0,0x2d,1,0x90,0x2c,0});
+        assert(campaign.trigger(EclEventKind::initialize,output).exited);
+        assert(campaign.row == 1 && campaign.column == 15 && campaign.facing == Direction::west);
+        assert(campaign.state.memory[0xc04f] == 0x82);
+        campaign.sound_call = EclSoundCall{0x2c90,0x03de,{}};
+        assert(!campaign.trigger(EclEventKind::initialize,output).exited);
+    }
+    {
         ExplorationSession audio;
         audio.dialect = {"ssi-five-entry-v1",0x9900,0xc04f};
         audio.opcodes = minimal_vm_opcodes();

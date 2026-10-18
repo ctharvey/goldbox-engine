@@ -35,8 +35,13 @@ input/window event rather than rendering continuously.
 
 The default mode is a **procedural preview**; optional original wall artwork is
 described below. Neither mode is a verified original-game UI.
-It starts at (0,0), north, with empty state unless a matching engine save is
-loaded. The map overview reveals all cells. Text defaults to SDL's limited
+The explicit preview starts at (0,0), north, with empty state unless a matching engine save is
+loaded. With `--startup` and a campaign profile, Begin instead resolves the configured
+initial map/program, retains the created party and runs its opening event. Pool's
+program zero now runs through its city tour with original graphics. Engine saves
+bind the active ECL program as well as the map; complete DOS gameplay parity remains
+unverified. Without `--audio`, event sound requests are muted and startup continues.
+The map overview reveals all cells. Text defaults to SDL's limited
 ASCII debug font, with bounded wrapping/history and a scrolling menu selection.
 RmlUi, production fonts, complete game audio and QuickJS-NG
 remain future work. Unsupported ECL/combat reports a diagnostic; changes made

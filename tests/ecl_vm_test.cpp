@@ -15,6 +15,8 @@ struct Host : EclHost {
     std::size_t choice{1};
     bool cleared{};
     int combats{};
+    int delays{};
+    void delay() override { ++delays; }
     std::vector<std::uint16_t> calls;
     void native_call(std::uint16_t value) override { calls.push_back(value); }
     void text(std::string_view value, bool clear) override { output.emplace_back(value); cleared = clear; }
@@ -38,8 +40,19 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 } // namespace
 
 int main() {
+    {
+        EclState transfer_state; Host transfer_host;
+        const auto transfer = run(program({0x20,0,7,9,0,1,1,0,0x4a,0}),transfer_state,transfer_host);
+        assert(transfer.exited && transfer.next_program == 7 && transfer_state.memory[0x4a00] == 0);
+        assert(!run(program({0x20,2,0,1}),transfer_state,transfer_host).exited);
+    }
     EclState state;
     Host host;
+    assert(run(program({4,0,255,0,2,1,0,0x4a,0x3a,0}),state,host).exited);
+    assert(state.memory[0x4a00] == 1 && host.delays == 1);
+    assert(run(program({4,2,255,255,0,2,3,0,0x4a,0}),state,host).exited);
+    assert(state.memory[0x4a00] == 1 && state.memory[0x4a01] == 0);
+    assert(!run(program({4,0,1,0,2,0,0,0}),state,host).exited);
     for (const auto type : {1,2,3}) {
         const auto call = program({0x2d,static_cast<std::uint8_t>(type),3,0xba,0});
         assert(run(call,state,host).exited);

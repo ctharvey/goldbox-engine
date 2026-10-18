@@ -1333,3 +1333,69 @@ the v1.3 capture had zero nonzero bytes in 1,794,048 bytes. This verifies engine
 output and menu stopping, not parity with a recording of the original player.
 All probes had fixed timeouts and the shared compile lock. Only our engine code
 ran; downloaded programs and original installation files were untouched.
+
+## Original new-game opening (2026-10-18)
+
+The installed DOS v1.3 resources now drive a profile-selected campaign Begin.
+Pool's initial GEO/ECL record is zero in GEO3.DAX/ECL3.DAX; its own initialize
+entry writes the initial (15,1), west, position. The adapter resolves the explicit
+archive families, keeps the created party and its RNG continuation, clears fresh
+script state, and delegates presentation through the existing host interfaces.
+Preview/JSONL launches retain their explicit map/ECL behavior.
+The opening's sprite 12, head 8, body 9 and wall definition zero are in group 3,
+separate from the group-1 preview/creation resources. The profile now binds that
+startup artwork explicitly, and the SDL host switches resources on Begin/load
+while retaining creation portrait sources. A synthetic SDL regression uses an
+opening picture absent from the launch assets to catch incorrect resource reuse.
+
+The opt-in `goldbox_campaign_startup_tests` replay completed 761 instructions,
+42 text callbacks and eight deterministic menu choices with original wall,
+sprite and head/body decoding. The first-choice city-tour route ends at (0,4),
+west, in program zero. Repeating from the same created-party state produced an
+identical serialized result. Saving and restoring preserved all serialized
+script memory/strings, map/program bindings, wall selection, party and RNG state.
+The final fixture uses a male dwarf fighter named TEST, lawful good, matching
+the reference driver's creation choices. The native clock-seeded ability scores
+are not compared by this startup check.
+
+`scripts/pool_startup_reference.py` then drove the authorized installed game in
+a fresh private DOSBox copy: create, keep the portraits/icon, add the character,
+Begin and advance the tour. It waits for fingerprinted native menu captures
+before creation input, reads only its owned process, and stops at a stable
+matching checkpoint. Original program/menu resources were never patched.
+The native comparison passed for:
+
+- Position (0,4), west; the native direction byte 6 normalizes to west (3).
+- Opening flags 0x4A17=1, 0x4AC4=0, 0x4AC5=1. All three were zero before Begin.
+- Interpreter return address 44681, corresponding to code base 39168 plus
+  engine EXIT offset 5512 plus its one-byte instruction size.
+
+The engine checkpoint SHA-256 is
+`8ca96f8e31d6ef5e58e0a53a9ef54796e98a28b1ac516a9b920934ea65bc3973`.
+The original comparison recorded `matched=true`, `fullParityVerified=false`
+and verified owned-process cleanup. Its private workspace artifact is
+`.cache/goldbox-validation/startup-reference-j00bar_s/comparison.json`, outside
+the checkout; screenshots and copied game resources stay alongside it privately.
+The original START.EXE/GAME.OVR and installed DOSBox are fingerprinted before
+launch. The installed hardware setting `tandy=on` is retained while output is
+muted. Quarantined downloaded programs were not executed.
+
+The complete public suite passed (28 passed, two private-resource checks skipped).
+The installed opening check and live native comparison passed separately.
+The SDL regression also exercises campaign Begin, F10 restart and continuing
+through a sound request without optional audio resources. Attribution and
+hygiene checks passed. Builds used the shared lock, two workers and fixed limits.
+
+Reproduce by setting `GOLDBOX_POOL_INSTALLATION` to the authorized GAME/POOLRAD
+directory, then running `build/tests/goldbox_campaign_startup_tests` with the
+Pool profile path and redirecting its JSON output to a private checkpoint file.
+On native Windows, invoke `scripts/pool_startup_reference.py` with four positional
+paths: installation root (containing GAME and DOSBOX), existing private parent
+directory outside the checkout and installation, fingerprinted private resident
+load image used by the RNG laboratory, and that engine checkpoint JSON file.
+
+This establishes a narrow opening checkpoint, not full campaign parity. Native
+party scores/RNG streams, all remaining RAM, text pagination, pixels, sound,
+timing and original SSI saves are outside this comparison. Per-title temporary
+memory resets on NEW_ECL and later campaign transitions remain unverified.
+Automatic graphics changes for later programs/resource groups are also pending.

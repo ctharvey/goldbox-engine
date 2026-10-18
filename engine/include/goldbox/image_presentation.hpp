@@ -10,15 +10,17 @@ struct ImageArchives {
     formats::DaxArchive pictures, sprites;
     std::optional<PortraitArchives> portraits{};
     std::uint32_t picture_period_ms{}; // Explicit presentation policy; zero keeps pictures static.
+    std::uint32_t sprite_replacement_ms{}; // Zero rejects timed replacement.
 };
 // Presentation state only: never alters the decoded campaign or ECL memory.
-// Picture timing is supplied explicitly; sprite frames remain distance views.
+// Picture/replacement timing is supplied explicitly; sprite frames use distance views.
 class ImagePresentation {
 public:
     explicit ImagePresentation(const ImageArchives& archives) : archives_(archives) {}
     void picture(std::uint8_t id);
     void portrait(std::uint8_t head, std::uint8_t body, const formats::EgaPortraitLayout& layout);
-    void sprite_start(EclSpriteRequest request, const ExplorationSession& session);
+    void sprite_start(EclSpriteRequest request, const ExplorationSession& session,
+        std::optional<formats::EgaFrame> replacement_portrait = {});
     void sprite_advance();
     bool advance_time(std::uint64_t elapsed_ms);
     std::uint32_t animation_wait_ms() const;
@@ -31,5 +33,6 @@ private:
     std::size_t index_{};
     bool sprite_{};
     std::uint64_t elapsed_ms_{};
+    std::vector<formats::EgaFrame> replacement_;
 };
 } // namespace goldbox

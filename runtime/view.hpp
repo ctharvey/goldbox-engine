@@ -9,6 +9,7 @@
 
 namespace goldbox {
 struct WallArchives { formats::DaxArchive definitions, tiles, shared; };
+struct CampaignGraphics { ImageArchives images; WallArchives walls; };
 struct WallHit {
     double distance{}; // Ray parameter; unnormalized camera rays avoid fisheye distortion.
     std::uint8_t wall{};
@@ -38,5 +39,6 @@ int run_exploration_window(ExplorationSession& session, std::string_view source_
     std::span<const formats::IndexedImage> startup_screens = {},
     const formats::SpeakerClip* preview_audio = nullptr,
     std::function<formats::SpeakerClip(std::uint16_t)> sounds = {},
-    std::uint32_t startup_title_period_ms = 0, const formats::TandyClip* startup_music = nullptr);
+    std::uint32_t startup_title_period_ms = 0, const formats::TandyClip* startup_music = nullptr,
+    const CampaignGraphics* campaign_graphics = nullptr);
 } // namespace goldbox

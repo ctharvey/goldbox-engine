@@ -57,6 +57,7 @@ std::size_t EclHost::menu(std::span<const std::string>, std::string_view, bool) 
 void EclHost::combat(EclState&) { throw EclDecodeError("Combat host unavailable"); }
 void EclHost::native_call(std::uint16_t) { throw EclDecodeError("Unsupported native ECL call"); }
 void EclHost::sound(std::uint16_t) { throw EclDecodeError("Sound host unavailable"); }
+void EclHost::delay() { throw EclDecodeError("Delay host unavailable"); }
 void EclHost::picture(std::uint8_t) { throw EclDecodeError("Picture host unavailable"); }
 void EclHost::sprite_start(EclSpriteRequest) { throw EclDecodeError("Sprite host unavailable"); }
 void EclHost::sprite_advance() { throw EclDecodeError("Sprite host unavailable"); }
@@ -80,6 +81,8 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
     result.push_back({0x24, "COMBAT", 0});
     result.push_back({0x2a, "COPY_MEM", 3});
     result.push_back({0x2d, "CALL_HOST", 1});
+    result.push_back({0x20, "NEW_ECL", 1});
+    result.push_back({0x3a, "DELAY", 0});
     if (images == EclImageDialect::sprite3) {
         result.push_back({0x0c,"SPRITE_START3",3});
         result.push_back({0x31,"SPRITE_OFF",0});
@@ -169,6 +172,14 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             const auto& args = instruction.operands;
             switch (instruction.opcode) {
             case 0: result.exited = true; return result;
+            case 0x3a: host.delay(); break;
+            case 0x20: {
+                const auto id = numeric(args[0]);
+                require(id <= 255,"ECL program ID outside byte range");
+                result.next_program = static_cast<std::uint8_t>(id);
+                result.exited = true;
+                return result;
+            }
             case 0x2d:
                 require(args[0].type >= 1 && args[0].type <= 3,"Unsupported native ECL call operand");
                 host.native_call(static_cast<std::uint16_t>(args[0].value)); break;
@@ -191,6 +202,9 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             }
             case 0x14:
                 state.comparison = numeric(args[0]) == numeric(args[1]) && numeric(args[2]) == numeric(args[3]) ? 0 : 1;
+                break;
+            case 4:
+                store(args[2],numeric(args[0]) + numeric(args[1]));
                 break;
             case 8: {
                 require(random == EclRandomDialect::byte_upper,"Unsupported VM opcode 8 (random dialect disabled)");

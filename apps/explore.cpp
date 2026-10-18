@@ -12,6 +12,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <map>
 #include <sstream>
 
 #include <boost/json.hpp>
@@ -43,6 +44,25 @@ std::uint64_t checksum(std::span<const std::uint8_t> bytes) {
     std::uint64_t hash = 14695981039346656037ull;
     for (const auto byte : bytes) hash = (hash ^ byte) * 1099511628211ull;
     return hash;
+}
+
+struct ResourceFamily {
+    std::map<std::uint8_t,std::vector<std::uint8_t>> records;
+    std::string identity;
+};
+std::shared_ptr<const ResourceFamily> load_family(const fs::path& directory,
+    const std::vector<std::string>& filenames) {
+    auto result = std::make_shared<ResourceFamily>();
+    std::ostringstream identity;
+    for (const auto& filename : filenames) {
+        const auto archive = goldbox::formats::DaxArchive::from_file(directory/filename);
+        identity << filename << ':' << checksum(archive.source_bytes()) << ';';
+        for (const auto& record : archive.records())
+            if (!result->records.emplace(record.id,archive.extract(record.id)).second)
+                throw std::runtime_error("Ambiguous campaign archive record: " + std::to_string(record.id));
+    }
+    result->identity = identity.str();
+    return result;
 }
 
 class TerminalHost final : public goldbox::EclHost {
@@ -262,6 +282,7 @@ int main(int argc, char** argv) {
     if (window) { --argc; ++argv; }
     const bool harness = argc > 1 && std::string_view(argv[1]) == "--harness";
     if (harness) { --argc; ++argv; }
+    bool campaign_mode = false;
     try {
         if (window && harness) throw std::runtime_error("Window and harness modes are separate");
         std::optional<std::uint32_t> seed;
@@ -287,6 +308,7 @@ int main(int argc, char** argv) {
         std::optional<goldbox::WallArchives> wall_archives;
         std::optional<std::array<std::uint8_t,3>> initial_banks;
         std::optional<goldbox::ImageArchives> images;
+        std::optional<goldbox::CampaignGraphics> campaign_graphics;
         std::optional<goldbox::PortraitArchives> portraits;
         std::vector<goldbox::formats::IndexedImage> font;
         std::optional<goldbox::formats::DaxArchive> startup_archive;
@@ -398,6 +420,7 @@ int main(int argc, char** argv) {
         const auto startup_screens = startup_archive ?
             goldbox::load_startup_screens(*startup_archive,profile.startup_title_records) :
             std::vector<goldbox::formats::IndexedImage>{};
+        campaign_mode = startup_archive.has_value();
         if (portraits) {
             if (!images || !profile.portrait) throw std::runtime_error("Portraits require --images and a portrait profile");
             images->portraits = std::move(portraits);
@@ -411,6 +434,7 @@ int main(int argc, char** argv) {
         auto ecl = goldbox::formats::DaxArchive::from_file(argv[4]).extract(ecl_id);
         goldbox::ExplorationSession session;
         session.sound_call = profile.sound_call;
+        session.script_delay_ms = profile.script_delay_ms;
         session.character_rules = profile.character_rules;
         session.initial_random = profile.random;
         if (seed) {
@@ -422,6 +446,7 @@ int main(int argc, char** argv) {
 
         session.party_memory = profile.party_memory;
 #ifdef GOLDBOX_RENDERER
+        if (images) images->sprite_replacement_ms = profile.sprite_replacement_ms;
         session.wall_banks = initial_banks;
 #endif
         session.map = goldbox::formats::decode_geo16_record(raw_map, geo_id);
@@ -436,12 +461,41 @@ int main(int argc, char** argv) {
             profile.area_dialect == "ssi-area-map3-v1" ? goldbox::EclAreaDialect::map3 : goldbox::EclAreaDialect::disabled,
             profile.party_memory ? goldbox::EclPartyDialect::load_character : goldbox::EclPartyDialect::disabled);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
+        if (profile.campaign_startup && window && campaign_mode) {
+            const auto& start = *profile.campaign_startup;
+            const auto maps = load_family(fs::path(argv[2]).parent_path(),start.map_archives);
+            const auto programs = load_family(fs::path(argv[4]).parent_path(),start.program_archives);
+            session.maps = goldbox::MapResources{[maps](std::uint8_t id) {
+                return goldbox::formats::decode_geo16_record(maps->records.at(id),id);
+            },maps->identity};
+            session.programs = goldbox::ProgramResources{[programs, bound = !start.graphics_archives.empty(),
+                initial = start.program_record](std::uint8_t id) {
+                if (bound && id != initial) throw std::runtime_error("Campaign graphics binding unavailable for program");
+                return goldbox::ProgramResource{id,programs->records.at(id)};
+            },programs->identity};
+            session.current_program_record = ecl_id;
+            session.position_refresh_call = start.position_refresh_call;
+            session.campaign_start = std::array<std::uint8_t,2>{start.map_record,start.program_record};
+#ifdef GOLDBOX_RENDERER
+            if (!start.graphics_archives.empty()) {
+                const auto read = [&](std::size_t index) {
+                    return goldbox::formats::DaxArchive::from_file(fs::path(argv[4]).parent_path()/start.graphics_archives[index]);
+                };
+                goldbox::ImageArchives art{read(0),read(1)};
+                art.portraits = goldbox::PortraitArchives{read(2),read(3)};
+                art.picture_period_ms = profile.picture_period_ms;
+                art.sprite_replacement_ms = profile.sprite_replacement_ms;
+                campaign_graphics.emplace(goldbox::CampaignGraphics{std::move(art),{read(4),read(5),read(6)}});
+            }
+#endif
+        }
         std::ostringstream identity;
         identity << profile.id << ':' << fs::path(argv[2]).filename().string() << ':' << unsigned(geo_id) << ':'
                  << fs::path(argv[4]).filename().string() << ':' << unsigned(ecl_id) << ':'
                  << checksum(raw_map) << ':' << checksum(session.ecl_record) << ':'
                  << config.code_base << ':' << config.square_info_address;
         if (config.position_addresses) for (const auto address : *config.position_addresses) identity << ':' << address;
+        if (session.programs) identity << ':' << session.maps->source_identity << ':' << session.programs->source_identity;
         const auto source_identity = identity.str();
         const auto save = fs::absolute(argv[6]);
         if (save == fs::absolute(argv[1]) || save == fs::absolute(argv[2]) || save == fs::absolute(argv[4])) {
@@ -454,9 +508,11 @@ int main(int argc, char** argv) {
         if (window) return goldbox::run_exploration_window(session, source_identity, save,
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
             profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,
-            images && images->portraits ? &*profile.portrait : nullptr,wall_archives ? &*wall_archives : nullptr,
+            profile.portrait && ((images && images->portraits) || campaign_graphics) ? &*profile.portrait : nullptr,
+            wall_archives ? &*wall_archives : nullptr,
             startup_screens,preview_audio ? &*preview_audio : nullptr,sounds,profile.startup_title_period_ms,
-            startup_music && !startup_screens.empty() ? &*startup_music : nullptr);
+            startup_music && !startup_screens.empty() ? &*startup_music : nullptr,
+            campaign_graphics ? &*campaign_graphics : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

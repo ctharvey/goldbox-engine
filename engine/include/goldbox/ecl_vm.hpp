@@ -38,6 +38,8 @@ public:
     virtual void combat(EclState& state);
     virtual void native_call(std::uint16_t function);
     virtual void sound(std::uint16_t id);
+    // Presentation pacing belongs to the host; headless hosts use virtual time.
+    virtual void delay();
     virtual void picture(std::uint8_t id);
     virtual void sprite_start(EclSpriteRequest request);
     virtual void sprite_advance();
@@ -70,6 +72,8 @@ struct EclExecution {
     std::size_t bytecode_offset{};
     std::string diagnostic;
     std::vector<DispatchSelection> dispatches;
+    // A program transfer ends this invocation; the session resolves it safely.
+    std::optional<std::uint8_t> next_program;
 };
 
 // Headless, deterministic, bounded execution. Mutates only supplied state and

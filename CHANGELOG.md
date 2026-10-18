@@ -2,6 +2,13 @@
 
 ## 2026-10-18
 
+- Add profile-selected campaign Begin with created-party/RNG retention, initial
+  map/program resolution, ADD, host DELAY, position refresh and timed sprite-to-
+  portrait presentation. Bind active ECL programs in engine saves and bound
+  program transfers. Add optional installed-resource opening/save replay and a
+  code-driven DOS checkpoint comparison; full gameplay and timing parity remain
+  unverified.
+
 - Connect edition-matched Tandy music to startup through the existing --audio
   option. Keep edition fingerprints and audio tables in the game profile.
   Stop music at the menu, replace queued playback on F10 restart, and preserve

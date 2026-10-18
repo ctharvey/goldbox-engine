@@ -35,6 +35,7 @@ public:
     std::optional<formats::WallGraphics> selected_graphics;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     std::optional<ImagePresentation> images;
+    const ImageArchives* character_assets{};
     AudioPlayer* audio{};
     const formats::SpeakerClip* preview_audio{};
     const formats::TandyClip* startup_music{};
@@ -151,6 +152,7 @@ public:
         Uint64 screen_clock = SDL_GetTicks();
         std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> title(nullptr,SDL_DestroyTexture);
         std::vector<std::string> options{"BEGIN EXPLORATION [B]", "LOAD ENGINE SAVE [L]", "EXIT [E]"};
+        if (session.campaign_start) options[0] = "BEGIN GAME [B]";
         if (session.character_rules) options.insert(options.begin(),"CREATE / MANAGE PARTY [C]");
         while (running) {
             const bool menu = screen == menu_screen;
@@ -225,12 +227,36 @@ public:
         update_image();
     }
     void sound(std::uint16_t id) override {
-        if (!audio || !sounds) throw std::runtime_error("Sound resources unavailable; select --audio");
+        // Audio is optional presentation; a muted launch still executes the event.
+        if (!sounds) return;
+        if (!audio) throw std::runtime_error("Sound host unavailable");
         audio->play(sounds(id));
     }
     void sprite_start(EclSpriteRequest request) override {
         if (!images) throw std::runtime_error("No image archives selected");
-        images->sprite_start(request,session); update_image();
+        std::optional<formats::EgaFrame> portrait;
+        if (request.replacement_picture != 255 && portrait_config &&
+            session.state.memory[portrait_config->head_id_address] != 255) {
+            auto replacement = *images;
+            replacement.portrait(session.state.memory[portrait_config->head_id_address],
+                request.replacement_picture,portrait_config->layout);
+            portrait = *replacement.frame();
+        }
+        images->sprite_start(request,session,std::move(portrait)); update_image();
+    }
+    void delay() override {
+        const auto end = SDL_GetTicks() + session.script_delay_ms;
+        do {
+            animate(); draw();
+            const auto now = SDL_GetTicks();
+            if (now >= end) break;
+            SDL_Event event;
+            if (!SDL_WaitEventTimeout(&event,static_cast<Sint32>(std::min<Uint64>(end-now,20)))) continue;
+            if (event.type == SDL_EVENT_QUIT) { running = false; throw std::runtime_error("Window closed"); }
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F10) {
+                restart_requested = true; throw std::runtime_error("Restart requested");
+            }
+        } while (running);
     }
     void sprite_advance() override {
         if (!images) throw std::runtime_error("No image archives selected");
@@ -340,7 +366,11 @@ public:
         ImagePresentation saved;
         decltype(image_texture) texture;
         explicit PortraitPreview(WindowHost& value) : host(value),saved(std::move(*value.images)),
-            texture(std::move(value.image_texture)) {}
+            texture(std::move(value.image_texture)) {
+            if (value.character_assets) {
+                value.images.reset(); value.images.emplace(*value.character_assets);
+            }
+        }
         ~PortraitPreview() {
             host.images.reset(); host.images.emplace(std::move(saved));
             host.image_texture = std::move(texture); host.image_clock = SDL_GetTicks();
@@ -620,7 +650,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
     std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
     std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms,
-    const formats::TandyClip* startup_music) {
+    const formats::TandyClip* startup_music, const CampaignGraphics* campaign_graphics) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_title_period_ms > 60000) throw std::runtime_error("Invalid startup title period");
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
@@ -641,8 +671,12 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
+    bool campaign_assets_active = false;
     const auto create_host = [&] {
-        auto host = std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
+        const auto* active = campaign_assets_active ? campaign_graphics : nullptr;
+        auto host = std::make_unique<WindowHost>(session,raw_renderer,active ? nullptr : graphics,
+            active ? &active->images : images,backdrop,font,portrait,active ? &active->walls : wall_archives);
+        host->character_assets = images;
         host->audio = &audio;
         host->preview_audio = preview_audio;
         host->startup_music = startup_music;
@@ -651,6 +685,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     };
     const auto initial_session = session;
     while (true) {
+        campaign_assets_active = false;
         auto window_host = create_host();
         if (!startup_screens.empty()) {
             std::string error;
@@ -663,21 +698,29 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                 const auto before_action = session;
                 try {
                     if (action == 3) { window_host->manage_party(); continue; }
+                    if (campaign_graphics && session.campaign_start) {
+                        window_host.reset();
+                        session.wall_banks.reset();
+                        campaign_assets_active = true;
+                        window_host = create_host();
+                    }
                     if (action == 1) {
                         if (session.character_rules && session.party.empty())
                             throw std::runtime_error("Create at least one character before starting");
-                        const auto result = session.trigger(formats::EclEventKind::initialize,*window_host);
+                        const auto result = session.campaign_start ? session.begin_campaign(*window_host) :
+                            session.trigger(formats::EclEventKind::initialize,*window_host);
                         if (window_host->restart_requested) break;
                         if (!window_host->running) return 0;
                         if (!result.exited) throw std::runtime_error("Initialization stopped: " + result.diagnostic);
                     } else window_host->load_save(save,identity);
                     break;
                 } catch (const std::exception& failure) {
-                    if (window_host->restart_requested) break;
-                    if (!window_host->running) return 0;
+                    if (window_host && window_host->restart_requested) break;
+                    if (window_host && !window_host->running) return 0;
                     error = failure.what();
                     window_host.reset();
                     session = before_action;
+                    campaign_assets_active = false;
                     window_host = create_host();
                 }
             }

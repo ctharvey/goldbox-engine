@@ -100,6 +100,14 @@ add_test(NAME goldbox_ecl_vm_tests COMMAND goldbox_ecl_vm_tests)
 add_executable(goldbox_exploration_tests exploration_test.cpp)
 target_link_libraries(goldbox_exploration_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_exploration_tests COMMAND goldbox_exploration_tests)
+add_executable(goldbox_campaign_startup_tests campaign_startup_test.cpp)
+target_link_libraries(goldbox_campaign_startup_tests PRIVATE goldbox_core)
+add_test(NAME goldbox_campaign_startup_tests COMMAND goldbox_campaign_startup_tests
+    ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
+set_tests_properties(goldbox_campaign_startup_tests PROPERTIES TIMEOUT 30 SKIP_RETURN_CODE 77)
+add_test(NAME goldbox_pool_startup_reference_tests COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/pool_startup_reference_test.py)
+set_tests_properties(goldbox_pool_startup_reference_tests PROPERTIES TIMEOUT 10)
 add_test(NAME goldbox_exploration_cli_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/exploration_cli_test.py $<TARGET_FILE:goldbox_explore>
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)

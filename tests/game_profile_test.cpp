@@ -13,6 +13,12 @@ int main(int argc, char** argv) {
     assert(argc == 3);
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
+    if (!pool.campaign_startup || curse.campaign_startup || pool.campaign_startup->map_record != 0 ||
+        pool.campaign_startup->program_record != 0 || pool.campaign_startup->position_refresh_call != 0x2c90 ||
+        pool.campaign_startup->map_archives.size() != 8 || pool.campaign_startup->program_archives.size() != 8 ||
+        pool.campaign_startup->graphics_archives != std::vector<std::string>{"PIC3.DAX","SPRIT3.DAX","HEAD3.DAX",
+            "BODY3.DAX","WALLDEF3.DAX","8X8D3.DAX","8X8D1.DAX"} ||
+        pool.script_delay_ms != 400 || pool.sprite_replacement_ms != 1000) return 1;
     if (!pool.speaker_audio || curse.speaker_audio || pool.speaker_audio->segment_offset != 0x8ae0 ||
         pool.speaker_audio->effect_table != 0x55f || pool.speaker_audio->preview_entry != 8 ||
         pool.speaker_audio->tick_divisor != 5041) return 1;
@@ -172,5 +178,19 @@ int main(int argc, char** argv) {
     catch (const std::runtime_error&) { rejected = true; }
     fs::remove(path);
     if (!rejected) return 1;
+    auto campaign_prefix = prefix;
+    campaign_prefix.replace(campaign_prefix.find("colorBackdrop"),13,"campaignStartup");
+    for (const std::string field : {
+        R"({"mapRecord":256,"programRecord":0,"positionRefreshCall":1,"mapArchives":["GEO.DAX"],"programArchives":["ECL.DAX"]})",
+        R"({"mapRecord":0,"programRecord":0,"positionRefreshCall":1,"mapArchives":["../GEO.DAX"],"programArchives":["ECL.DAX"]})",
+        R"({"mapRecord":0,"programRecord":0,"positionRefreshCall":1,"mapArchives":["GEO.DAX","GEO.DAX"],"programArchives":["ECL.DAX"]})",
+        R"({"mapRecord":0,"programRecord":0,"positionRefreshCall":1,"mapArchives":[],"programArchives":["ECL.DAX"]})"}) {
+        { std::ofstream output(path); output << campaign_prefix << field << '}'; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        if (!rejected) return 1;
+    }
     return 0;
 }

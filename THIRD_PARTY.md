@@ -1,5 +1,28 @@
 # Third-party licensing and provenance
 
+## Campaign opening and reference adapter (2026-10-18)
+
+SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` remains a
+research-only reference. `engine/input/ModeMenuHandler.java`,
+`engine/input/ProgramMenuBeginHandler.java`, `engine/Engine.java`,
+`engine/VirtualMachine.java`, Pool properties and `ui/classic/ClassicMode.java`
+were consulted for initial program zero, NEW_ECL lifecycle order, ADD, host
+delays, nearest-sprite replacement and portrait selection. No Java source was
+copied or translated. The resolver, bounded execution, program-bound saves and
+profile-selected presentation intervals are independently implemented.
+Native position refresh and opening checkpoints were checked separately using
+the authorized installed executable/resources; no original bytes are distributed.
+
+DOSBox Staging `src/gui/sdl_mapper.cpp` at
+`70999dcf88b46929e69a3bdc8c72989d0df86ea2` (GPL-2.0-or-later) was consulted
+for mapper configuration and handler naming. The installed DOSBox's screenshot
+handler name was independently confirmed. The Python adapter writes its own
+private configuration and uses the existing owned-process/input/memory helpers;
+no DOSBox or SDL implementation was copied or translated. Native captures and
+game files stay outside this repository. The menu digest is a fingerprint,
+not an included screenshot. The installed DOSBox executable is fingerprinted
+before launch; no downloaded executable is used.
+
 ## First speaker audio slice (2026-10-17)
 
 SDL3 3.2.28 (existing zlib dependency) supplies audio devices, conversion and

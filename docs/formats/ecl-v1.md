@@ -137,3 +137,43 @@ in [character creation](../character-creation.md#read-only-script-adapter).
 Character mutation, numeric race/class encodings and native character import
 remain unsupported. Unsupported party access stops execution with a diagnostic;
 earlier script progress is retained under the existing VM failure policy.
+
+## Campaign startup and program binding (2026-10-18)
+
+An optional profile `campaignStartup` selects initial normalized map/program IDs,
+explicit map/program archive lists and a native position-refresh call token.
+Its optional seven-entry `graphicsArchives` array binds pictures, sprites, heads,
+bodies, wall definitions, wall tiles and shared tiles, in that order. Begin/load
+select these campaign resources; creation/party previews retain their selected
+portrait sources. Pool's opening uses group 3 and shared tiles from group 1.
+The graphical adapter rejects a program change without a corresponding graphics
+binding; later resource groups remain unfinished rather than reusing opening art.
+The startup window uses this adapter for Begin; explicit map/ECL preview and
+JSONL prototype modes retain their previous behavior. Begin resolves both inputs
+before publishing, resets script RAM/strings, preserves the created party and
+its RNG continuation, and runs the initialize entry. Window errors restore the
+pre-Begin session. Pool starts program/map zero; its opening script selects
+(15,1), west, and the chosen city-tour route ends at (0,4), west.
+
+ADD stores through the existing typed memory interface with byte/word wrapping.
+DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and
+`spriteReplacementMs` are explicit presentation policies, currently 400/1000 ms
+for Pool based on SSI Engine research. A replacement portrait/picture appears
+after the approaching sprite reaches its nearest distance. Native timing parity
+has not been established.
+
+NEW_ECL ends an invocation with a typed program ID. The session resolves and
+validates that program, then invokes initialize/move/search with a shared step
+budget and a 32-transfer limit. No byte-pattern instruction search is involved.
+Saves with a program resolver contain `programRecord` and `programSource` as a
+required pair. Restore validates both source and resolved code before publishing
+any saved state. Per-title temporary-memory resets on NEW_ECL remain unverified;
+the original opening validation stays in program zero.
+
+`goldbox_campaign_startup_tests` is an opt-in original-resource check, enabled by
+`GOLDBOX_POOL_INSTALLATION` pointing to the authorized GAME/POOLRAD directory.
+It validates decoded graphics, deterministic opening execution and exact engine
+save round-trip. `scripts/pool_startup_reference.py` compares the resulting JSON
+checkpoint with a bounded, privately copied DOS session. Its coverage is position,
+facing, three opening flags and the original interpreter return address. It does
+not establish complete party, pixel, timing, sound or original-save parity.

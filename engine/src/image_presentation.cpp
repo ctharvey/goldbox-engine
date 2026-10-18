@@ -20,12 +20,16 @@ void ImagePresentation::picture(std::uint8_t id) {
     index_ = 0;
     sprite_ = false;
     elapsed_ms_ = 0;
+    replacement_.clear();
 }
-void ImagePresentation::sprite_start(EclSpriteRequest request, const ExplorationSession& session) {
-    // Upstream schedules a timed replacement at nearest distance. Until timing
-    // is verified, reject it instead of silently substituting a different flow.
-    if (request.replacement_picture != 255) throw std::runtime_error("Timed sprite replacement unsupported");
-    if (request.sprite == 255) { clear(); return; }
+void ImagePresentation::sprite_start(EclSpriteRequest request, const ExplorationSession& session,
+    std::optional<formats::EgaFrame> replacement_portrait) {
+    if (request.replacement_picture != 255 && !archives_.sprite_replacement_ms)
+        throw std::runtime_error("Timed sprite replacement policy unavailable");
+    if (request.sprite == 255) {
+        if (request.replacement_picture != 255) throw std::runtime_error("Replacement without sprite unsupported");
+        clear(); return;
+    }
     if (request.distance > 2) throw std::runtime_error("Invalid sprite distance");
     (void)session.map.cell(session.row,session.column);
     const auto direction = static_cast<unsigned>(session.facing);
@@ -51,7 +55,15 @@ void ImagePresentation::sprite_start(EclSpriteRequest request, const Exploration
     auto decoded = formats::decode_ega_sequence(archives_.sprites.extract(request.sprite),formats::EgaFrameEncoding::independent);
     validate(decoded);
     if (std::size_t(distance) >= decoded.size()) throw std::runtime_error("Sprite distance frame missing");
+    std::vector<formats::EgaFrame> replacement;
+    if (request.replacement_picture != 255) {
+        if (replacement_portrait) replacement.push_back(std::move(*replacement_portrait));
+        else replacement = formats::decode_ega_sequence(archives_.pictures.extract(request.replacement_picture),
+            formats::EgaFrameEncoding::xor_first);
+        validate(replacement);
+    }
     frames_ = std::move(decoded);
+    replacement_ = std::move(replacement);
     index_ = distance;
     sprite_ = true;
     elapsed_ms_ = 0;
@@ -67,16 +79,28 @@ void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const for
     validate(decoded);
     frames_ = std::move(decoded); index_ = 0; sprite_ = false;
     elapsed_ms_ = 0;
+    replacement_.clear();
 }
 void ImagePresentation::sprite_advance() {
-    if (sprite_ && index_) --index_;
+    if (sprite_ && index_) { --index_; elapsed_ms_ = 0; }
 }
 std::uint32_t ImagePresentation::animation_wait_ms() const {
+    if (sprite_ && !index_ && !replacement_.empty())
+        return archives_.sprite_replacement_ms - static_cast<std::uint32_t>(elapsed_ms_);
     if (sprite_ || frames_.size() < 2 || !archives_.picture_period_ms) return 0;
     return archives_.picture_period_ms - static_cast<std::uint32_t>(elapsed_ms_);
 }
 bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
     if (!animation_wait_ms()) return false;
+    bool replaced = false;
+    if (sprite_) {
+        const auto wait = animation_wait_ms();
+        if (elapsed_ms < wait) { elapsed_ms_ += elapsed_ms; return false; }
+        elapsed_ms -= wait;
+        frames_ = std::move(replacement_); replacement_.clear();
+        sprite_ = false; index_ = 0; elapsed_ms_ = 0; replaced = true;
+        if (!animation_wait_ms()) return true;
+    }
     const auto period = archives_.picture_period_ms;
     // Reduce before adding: even an arbitrarily large elapsed interval cannot overflow.
     const auto cycle = std::uint64_t(period) * frames_.size();
@@ -84,8 +108,8 @@ bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
     const auto previous = index_;
     index_ = (index_ + total / period) % frames_.size();
     elapsed_ms_ = total % period;
-    return index_ != previous;
+    return replaced || index_ != previous;
 }
-void ImagePresentation::clear() { frames_.clear(); index_ = 0; sprite_ = false; elapsed_ms_ = 0; }
+void ImagePresentation::clear() { frames_.clear(); replacement_.clear(); index_ = 0; sprite_ = false; elapsed_ms_ = 0; }
 const formats::EgaFrame* ImagePresentation::frame() const { return frames_.empty() ? nullptr : &frames_[index_]; }
 } // namespace goldbox

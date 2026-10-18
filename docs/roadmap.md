@@ -57,10 +57,12 @@ Research: [OpenXcom and Pool of Radiance](research/openxcom-mod-system-and-pool-
 - [ ] Display journal text sourced from user-provided materials
 - [ ] Toggle external mod without corrupting imported content
 - [x] Save and restore prototype position and event state; full campaign/mod save compatibility remains pending
+- [x] Profile-selected campaign Begin, original Pool opening replay and active-program save/reload checks
 
 Evidence: [local validation, 2026-10-15](research/local-validation-2026-10-15.md).
-This standalone slice uses empty initial state and an explicit map/ECL pairing;
-it does not establish original campaign startup or gameplay parity.
+The explicit preview uses empty initial state and an explicit map/ECL pairing.
+Campaign Begin now has a narrow original opening checkpoint; complete campaign
+and gameplay parity remain unverified.
 
 ## M4 — Gameplay parity
 - [ ] Party management, AD&D spell lists, combat, inventory, encounters

@@ -2,6 +2,7 @@
 #include "json_support.hpp"
 
 #include <regex>
+#include <algorithm>
 #include <stdexcept>
 
 namespace goldbox {
@@ -17,7 +18,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
-        "startupTitlePeriodMs", "tandyMusic"}, "game profile");
+        "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -40,6 +41,46 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         throw std::runtime_error("invalid or unsupported game profile metadata");
     }
     const auto& patterns = j::array(j::field(root, "resourcePatterns", "game profile"), "profile.resourcePatterns");
+    for (const auto& binding : {std::pair{"scriptDelayMs",&profile.script_delay_ms},
+        std::pair{"spriteReplacementMs",&profile.sprite_replacement_ms}}) {
+        if (const auto* value = root.if_contains(binding.first)) {
+            const auto n = j::integer(*value,binding.first);
+            if (n < 0 || n > 60000) throw std::runtime_error("Invalid presentation interval");
+            *binding.second = static_cast<std::uint32_t>(n);
+        }
+    }
+    if (const auto* value = root.if_contains("campaignStartup")) {
+        const auto& config = j::object(*value,"campaignStartup");
+        j::fields_only(config,{"mapRecord","programRecord","mapArchives","programArchives","positionRefreshCall","graphicsArchives"},
+            "campaignStartup");
+        const auto byte = [&](const char* name, std::int64_t maximum) {
+            const auto n = j::integer(j::field(config,name,"campaignStartup"),name);
+            if (n < 0 || n > maximum) throw std::runtime_error("Invalid campaign startup binding");
+            return n;
+        };
+        GameProfile::CampaignStartup startup;
+        startup.map_record = static_cast<std::uint8_t>(byte("mapRecord",255));
+        startup.program_record = static_cast<std::uint8_t>(byte("programRecord",255));
+        startup.position_refresh_call = static_cast<std::uint16_t>(byte("positionRefreshCall",65535));
+        const auto archives = [&](const char* name, auto& destination) {
+            const auto& values = j::array(j::field(config,name,"campaignStartup"),name);
+            if (values.empty() || values.size() > 64) throw std::runtime_error("Invalid campaign archive count");
+            for (const auto& entry : values) {
+                const auto filename = j::string(entry,name);
+                if (!std::regex_match(filename,std::regex(R"([A-Za-z0-9_-]+\.[A-Za-z0-9]+)")) ||
+                    std::find(destination.begin(),destination.end(),filename) != destination.end())
+                    throw std::runtime_error("Invalid or duplicate campaign archive name");
+                destination.push_back(filename);
+            }
+        };
+        archives("mapArchives",startup.map_archives);
+        archives("programArchives",startup.program_archives);
+        if (config.if_contains("graphicsArchives")) {
+            archives("graphicsArchives",startup.graphics_archives);
+            if (startup.graphics_archives.size() != 7) throw std::runtime_error("Startup graphics requires seven archives");
+        }
+        profile.campaign_startup = std::move(startup);
+    }
     if (patterns.size() > 64) throw std::runtime_error("too many resource patterns");
     for (const auto& value : patterns) {
         const auto pattern = j::string(value, "profile.resourcePatterns element");

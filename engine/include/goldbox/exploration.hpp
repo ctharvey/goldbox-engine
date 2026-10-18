@@ -14,6 +14,14 @@ struct MapResources {
     std::function<formats::GeoMap(std::uint8_t)> resolve;
     std::string source_identity;
 };
+struct ProgramResource {
+    std::uint8_t record_id{};
+    std::vector<std::uint8_t> bytes;
+};
+struct ProgramResources {
+    std::function<ProgramResource(std::uint8_t)> resolve;
+    std::string source_identity;
+};
 
 // Explicit initial map/ECL pairing and optional normalized-map resolver.
 // Map loading does not replace the ECL program or guess archive groups.
@@ -38,11 +46,18 @@ struct ExplorationSession {
     std::optional<HighWordLcg32> initial_random{};
     EclRandomDialect random_dialect{EclRandomDialect::disabled};
     std::optional<EclSoundCall> sound_call{};
+    std::optional<ProgramResources> programs{};
+    std::optional<std::uint8_t> current_program_record{};
+    std::optional<std::uint16_t> position_refresh_call{};
+    // Normalized map/program IDs selected by the campaign adapter.
+    std::optional<std::array<std::uint8_t,2>> campaign_start{};
+    std::uint32_t script_delay_ms{};
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);
     void load_area(std::array<std::uint8_t,3> values);
     EclExecution trigger(formats::EclEventKind kind, EclHost& host, EclLimits limits = {});
+    EclExecution begin_campaign(EclHost& host, EclLimits limits = {});
 };
 
 // Caller supplies source identity (including locally computed content hashes).

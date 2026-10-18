@@ -3,6 +3,7 @@
 #include "json_support.hpp"
 
 #include <algorithm>
+#include <deque>
 #include <stdexcept>
 
 namespace goldbox {
@@ -23,11 +24,23 @@ formats::GeoMap resolve_map(const MapResources& maps, std::uint8_t id) {
     if (map.dax_record_id != id) throw std::runtime_error("Map resolver returned the wrong record");
     return map;
 }
+ProgramResource resolve_program(const std::optional<ProgramResources>& resources, std::uint8_t id,
+    const formats::EclDispatchDialect& dialect, std::span<const formats::EclOpcodeSpec> opcodes) {
+    if (!resources || !resources->resolve || resources->source_identity.empty() ||
+        resources->source_identity.size() > 4096) throw std::runtime_error("Program resource resolver/identity unavailable");
+    auto program = resources->resolve(id);
+    if (program.record_id != id) throw std::runtime_error("Program resolver returned the wrong record");
+    (void)formats::decode_ecl_program_entries(program.bytes,dialect,opcodes);
+    return program;
+}
 class SessionHost final : public EclHost {
     ExplorationSession& session;
     EclHost& delegate;
 public:
     SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {
+        if (session.position_refresh_call && session.sound_call &&
+            *session.position_refresh_call == session.sound_call->function)
+            throw std::runtime_error("Conflicting native call bindings");
         if (session.party_memory) {
             if (!session.character_rules) throw std::runtime_error("Party memory requires creation rules");
             const auto& layout = *session.party_memory;
@@ -106,11 +119,23 @@ public:
         return delegate.write_string(address,value);
     }
     void text(std::string_view value, bool clear) override { delegate.text(value,clear); }
+    void delay() override { delegate.delay(); }
     std::size_t menu(std::span<const std::string> choices, std::string_view prompt, bool vertical) override {
         return delegate.menu(choices,prompt,vertical);
     }
     void combat(EclState& state) override { delegate.combat(state); }
     void native_call(std::uint16_t function) override {
+        if (session.position_refresh_call && function == *session.position_refresh_call) {
+            if (!session.dialect.position_addresses) throw std::runtime_error("Position refresh requires position bindings");
+            const auto& addresses = *session.dialect.position_addresses;
+            const auto column = session.state.memory[addresses[0]], row = session.state.memory[addresses[1]];
+            const auto direction = session.state.memory[addresses[2]];
+            const auto selector = session.map.cell(row,column).raw_event;
+            if (direction > 3) throw std::runtime_error("Invalid refreshed direction");
+            session.row = row; session.column = column; session.facing = static_cast<Direction>(direction);
+            session.state.memory[session.dialect.square_info_address] = selector;
+            return;
+        }
         if (!session.sound_call || function != session.sound_call->function) {
             delegate.native_call(function);
             return;
@@ -176,6 +201,26 @@ bool ExplorationSession::move(Direction direction) {
     return true;
 }
 
+EclExecution ExplorationSession::begin_campaign(EclHost& host, EclLimits limits) {
+    if (!campaign_start) throw std::runtime_error("Campaign startup adapter unavailable");
+    if (party.empty()) throw std::runtime_error("Campaign startup requires a party");
+    require_maps(maps);
+    auto next_map = resolve_map(*maps,(*campaign_start)[0]);
+    auto next_program = resolve_program(programs,(*campaign_start)[1],dialect,opcodes);
+    // Resolve and validate before publishing. Execution then has the same explicit
+    // partial-progress semantics as trigger(); callers may restore their snapshot.
+    auto candidate = *this;
+    candidate.map = std::move(next_map); candidate.ecl_record = std::move(next_program.bytes);
+    candidate.initial_map_record = candidate.map.dax_record_id;
+    candidate.current_program_record = next_program.record_id;
+    candidate.state = {}; candidate.state.random = state.random;
+    candidate.row = candidate.column = candidate.loaded_character = 0;
+    candidate.facing = Direction::north; candidate.area.reset(); candidate.wall_banks.reset();
+    (void)SessionHost(candidate,host);
+    *this = std::move(candidate);
+    return trigger(formats::EclEventKind::initialize,host,limits);
+}
+
 EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& host, EclLimits limits) {
     // The raw byte is the host context. Scripts perform their own masks.
     state.memory[dialect.square_info_address] = map.cell(row, column).raw_event;
@@ -185,11 +230,32 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
         state.memory[addresses[1]] = row;
         state.memory[addresses[2]] = static_cast<std::uint8_t>(facing);
     }
+    EclExecution result;
     try {
-        SessionHost session_host(*this,host);
-        return execute_ecl(ecl_record, kind, dialect, opcodes, state, session_host, limits, random_dialect);
+        std::deque<formats::EclEventKind> events{kind};
+        std::size_t transfers = 0;
+        while (!events.empty()) {
+            if (result.steps >= limits.steps) throw std::runtime_error("Campaign ECL step limit exceeded");
+            SessionHost session_host(*this,host);
+            auto remaining = limits; remaining.steps -= result.steps;
+            auto run = execute_ecl(ecl_record,events.front(),dialect,opcodes,state,session_host,remaining,random_dialect);
+            result.steps += run.steps; result.bytecode_offset = run.bytecode_offset;
+            result.dispatches.insert(result.dispatches.end(),run.dispatches.begin(),run.dispatches.end());
+            if (!run.exited) { result.diagnostic = std::move(run.diagnostic); return result; }
+            events.pop_front();
+            if (run.next_program) {
+                if (++transfers > 32) throw std::runtime_error("Campaign program transfer limit exceeded");
+                auto program = resolve_program(programs,*run.next_program,dialect,opcodes);
+                auto candidate = *this; candidate.ecl_record = program.bytes;
+                (void)SessionHost(candidate,host); // Validate bindings before publishing the new program.
+                ecl_record = std::move(program.bytes); current_program_record = program.record_id;
+                events = {formats::EclEventKind::initialize,formats::EclEventKind::move,formats::EclEventKind::search};
+            }
+        }
+        result.exited = true;
+        return result;
     } catch (const std::exception& error) {
-        EclExecution failure; failure.diagnostic = error.what(); return failure;
+        result.exited = false; result.diagnostic = error.what(); return result;
     }
 }
 
@@ -239,6 +305,12 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
         object["mapRecord"] = session.map.dax_record_id;
         object["mapSource"] = session.maps->source_identity;
     }
+    if (session.programs || session.current_program_record) {
+        if (!session.current_program_record) throw std::runtime_error("Missing current program binding");
+        (void)resolve_program(session.programs,*session.current_program_record,session.dialect,session.opcodes);
+        object["programRecord"] = *session.current_program_record;
+        object["programSource"] = session.programs->source_identity;
+    }
     const auto json = bj::serialize(object);
     if (json.size() > 4 * 1024 * 1024) throw std::runtime_error("Save exceeds 4 MiB limit");
     return json;
@@ -250,7 +322,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
     j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks",
-        "area", "mapRecord", "mapSource", "party", "loadedCharacter", "random"}, "save");
+        "area", "mapRecord", "mapSource", "party", "loadedCharacter", "random", "programRecord", "programSource"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -317,6 +389,21 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
         require_maps(session.maps);
         map = resolve_map(*session.maps,*session.initial_map_record);
     }
+    auto program = session.ecl_record;
+    auto program_id = session.current_program_record;
+    const auto* program_value = root.if_contains("programRecord");
+    const auto* program_source = root.if_contains("programSource");
+    if (program_value || program_source || session.programs) {
+        if (!program_value || !program_source || !session.programs)
+            throw std::runtime_error("Incomplete saved program binding");
+        if (j::string(*program_source,"programSource") != session.programs->source_identity)
+            throw std::runtime_error("Saved program resource source mismatch");
+        program_id = static_cast<std::uint8_t>(bounded(*program_value,255));
+        program = resolve_program(session.programs,*program_id,session.dialect,session.opcodes).bytes;
+        auto candidate = session; candidate.ecl_record = program;
+        struct ValidationHost final : EclHost { void text(std::string_view,bool) override {} } validation;
+        (void)SessionHost(candidate,validation);
+    }
     Party party;
     if (const auto* value = root.if_contains("party")) {
         if (!session.character_rules) throw std::runtime_error("Saved party requires matching creation rules");
@@ -333,6 +420,8 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     // Publish only after validating the entire save; failed loads change nothing.
     if (!session.initial_map_record) session.initial_map_record = session.map.dax_record_id;
     session.map = std::move(map);
+    session.ecl_record = std::move(program);
+    session.current_program_record = program_id;
     session.area = area;
     session.wall_banks = banks;
     session.state = std::move(state);
