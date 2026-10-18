@@ -100,6 +100,8 @@
         "src/main/java/shared/GoldboxString.java",
         "src/main/java/shared/CustomGoldboxString.java",
         "src/main/java/ui/classic/AbstractRenderer.java",
+        "src/main/java/ui/classic/FrameRendererSymbols.java",
+        "src/main/java/ui/classic/ProgramMenuRenderer.java",
         "src/main/java/ui/shared/resource/UIResourceManager.java",
         "src/main/java/ui/shared/resource/UIScaler.java",
         "src/main/java/ui/shared/resource/ImageCompositeResource.java",

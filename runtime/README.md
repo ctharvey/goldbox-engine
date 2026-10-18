@@ -6,8 +6,28 @@ map overview, coordinates/facing, event text, and keyboard-driven menus. Geometr
 checks walls on both sides of an edge and treats map bounds as solid, matching
 movement. All nonzero wall IDs remain blocking; door flags are not interactive.
 The renderer has no title checks and does not change decoder/VM state semantics.
-Choice menus use the right-hand overview panel, with two-line labels, leaving
+In enhanced mode, choice menus use the right-hand overview panel, with two-line labels, leaving
 portraits and cutscene artwork visible. Dialogue stays below the artwork.
+
+`--display original` selects the profile's original presentation adapter; Pool
+defaults to this mode. `--display enhanced` retains the larger scene and revealed
+map overview. Put this switch after `--window`, before the resource arguments.
+The two presentations use the same VM, rules, inputs and saves. Profiles without
+an original adapter default to enhanced; an explicit unsupported original mode fails.
+
+Pool's first original adapter renders a 320x200 logical canvas, an 88x88 scene at
+(24,24), original symbol borders from `8X8D1.DAX` record 202, native font, party
+panel, green dialogue below the scene and a separate command row. Profile fields
+select resource names, records, regions and repeated border symbols; the renderer
+contains no title checks. Long text pauses between pages rather than dropping lines.
+Original mode loads its configured font/symbol archive beside the GEO archive.
+
+This is an initial display implementation, not full visual parity. Armor class
+shows `?` because equipment is unfinished; the clock is omitted. Startup, creation
+menus and statistics sheets still use the engine's interaction flow. Typewriter
+timing, text-color changes, exact command styling and monitor aspect correction
+remain unverified. The configured border tiles matched a private DOS capture in
+all 14,400 compared pixels. Original assets and reference screenshots stay private.
 
 Install SDL3 >=3.2 (for example, vcpkg `sdl3` on Windows), then configure:
 

@@ -13,6 +13,10 @@ int main(int argc, char** argv) {
     assert(argc == 3);
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
+    assert(pool.original_display && !curse.original_display);
+    assert((pool.original_display->scene == std::array<std::uint16_t,4>{24,24,88,88}));
+    assert(pool.original_display->symbols_record == 202 && pool.original_display->frame_runs.size() == 26);
+    assert(pool.original_display->party_row_height == 16 && pool.original_display->party[3] == 104);
     if (!pool.campaign_startup || curse.campaign_startup || pool.campaign_startup->map_record != 0 ||
         pool.campaign_startup->program_record != 0 || pool.campaign_startup->position_refresh_call != 0x2c90 ||
         pool.campaign_startup->map_archives.size() != 8 || pool.campaign_startup->program_archives.size() != 8 ||
@@ -191,6 +195,23 @@ int main(int argc, char** argv) {
         catch (const std::runtime_error&) { rejected = true; }
         fs::remove(path);
         if (!rejected) return 1;
+    }
+    auto display_prefix = prefix;
+    display_prefix.replace(display_prefix.find("colorBackdrop"),13,"originalDisplay");
+    const std::string display = R"({"fontArchive":"FONT.DAX","fontRecord":1,"symbolsArchive":"SYMBOL.DAX",)"
+        R"("symbolsRecord":2,"canvas":[320,200],"position":[144,120],"scene":[32,24,88,88],)"
+        R"("party":[144,16,168,80],"dialogue":[8,136,304,48],"commands":[0,192,320,8],)"
+        R"("frameRuns":[[8,8,0,3,0]]})";
+    for (const auto& change : {std::pair{"FONT.DAX","../FONT.DAX"},std::pair{"[320,200]","[0,200]"},
+        std::pair{"[32,24,88,88]","[312,24,88,88]"},std::pair{"[8,8,0,3,0]","[8,8,0,0,0]"},
+        std::pair{"[8,8,0,3,0]","[8,8,0,3,2]"},std::pair{"[8,8,0,3,0]","[8,8,256,3,0]"}}) {
+        auto invalid = display;
+        invalid.replace(invalid.find(change.first),std::string_view(change.first).size(),change.second);
+        { std::ofstream output(path); output << display_prefix << invalid << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
     }
     return 0;
 }

@@ -12,6 +12,24 @@
   "spriteReplacementMs": 1000,
   "startupTitleRecords": [1, 2],
   "startupTitlePeriodMs": 5000,
+  "originalDisplay": {
+    "fontArchive": "8X8D1.DAX", "fontRecord": 201,
+    "symbolsArchive": "8X8D1.DAX", "symbolsRecord": 202,
+    "canvas": [320, 200], "scene": [24, 24, 88, 88],
+    "party": [136, 16, 176, 104], "dialogue": [8, 136, 304, 48],
+    "partyRowHeight": 16,
+    "commands": [0, 192, 320, 8], "position": [136, 120],
+    "frameRuns": [
+      [0,0,20,1,0], [8,0,22,15,0], [128,0,20,1,0], [136,0,22,22,0], [312,0,20,1,0],
+      [0,184,20,1,0], [8,184,22,38,0], [312,184,20,1,0],
+      [0,8,21,15,1], [0,128,20,1,0], [0,136,21,6,1],
+      [312,8,21,15,1], [312,128,20,1,0], [312,136,21,6,1],
+      [8,128,22,15,0], [128,128,20,1,0], [136,128,22,22,0], [128,8,21,15,1],
+      [16,16,20,1,0], [24,16,22,11,0], [112,16,20,1,0],
+      [16,112,20,1,0], [24,112,22,11,0], [112,112,20,1,0],
+      [16,24,21,11,1], [112,24,21,11,1]
+    ]
+  },
   "campaignStartup": {"mapRecord": 0, "programRecord": 0, "positionRefreshCall": 11408,
     "graphicsArchives": ["PIC3.DAX", "SPRIT3.DAX", "HEAD3.DAX", "BODY3.DAX", "WALLDEF3.DAX", "8X8D3.DAX", "8X8D1.DAX"],
     "mapArchives": ["GEO1.DAX", "GEO2.DAX", "GEO3.DAX", "GEO4.DAX", "GEO5.DAX", "GEO6.DAX", "GEO7.DAX", "GEO8.DAX"],

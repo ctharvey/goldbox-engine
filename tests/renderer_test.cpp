@@ -50,6 +50,26 @@ int main(int argc, char** argv) {
     broken_font[3].pixels[0] = 13; rejects_font(broken_font);
     broken_font = font; broken_font[0].width = 7; rejects_font(broken_font);
     broken_font = font; broken_font[0].pixels.pop_back(); rejects_font(broken_font);
+    // A different layout and synthetic symbols exercise the shared frame adapter.
+    GameProfile::OriginalDisplay layout;
+    layout.canvas = {320,200}; layout.scene = {32,24,88,88};
+    layout.party = {144,16,168,80}; layout.dialogue = {8,136,304,48};
+    layout.commands = {0,192,320,8}; layout.position = {144,120};
+    layout.frame_runs = {{8,8,0,3,0},{8,16,1,3,1}};
+    const std::vector<formats::IndexedImage> symbols{{8,8,std::vector<std::uint8_t>(64,4)},
+        {8,8,std::vector<std::uint8_t>(64,14)}};
+    OriginalPresentation original{layout,compose_original_frame(layout,symbols)};
+    assert(original.frame.pixels[8*320+8] == 4 && original.frame.pixels[15*320+31] == 4);
+    assert(original.frame.pixels[39*320+8] == 14 && original.frame.pixels[40*320+8] == 0);
+    assert(original.frame.pixels[24*320+32] == 0); // Scene is untouched.
+    for (const auto bad : {std::array<std::uint16_t,5>{8,8,2,1,0},{312,8,0,2,0},
+        {8,8,0,0,0},{8,8,0,1,2}}) {
+        auto invalid = layout; invalid.frame_runs = {bad};
+        bool rejected = false;
+        try { (void)compose_original_frame(invalid,symbols); }
+        catch (const std::runtime_error&) { rejected = true; }
+        assert(rejected);
+    }
     if (argc == 4) {
         const auto id = std::stoi(argv[3]);
         assert(id >= 0 && id <= 255);
@@ -198,6 +218,14 @@ int main(int argc, char** argv) {
     key(SDLK_ESCAPE);
     assert(run_exploration_window(session,"renderer-synthetic",save,&graphics,nullptr,&backdrop,font) == 0);
     assert(session.state.memory[0x4a03] == 0);
+    SDL_Quit();
+
+    // The same ECL menu and state mutation work with original presentation.
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_SPACE); key(SDLK_DOWN); key(SDLK_RETURN); key(SDLK_ESCAPE);
+    assert(run_exploration_window(session,"renderer-original",save,&graphics,nullptr,&backdrop,font,
+        nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+    assert(session.state.memory[0x4a03] == 1);
     SDL_Quit();
 
     // Begin must use the campaign adapter, rather than the launch preview's ECL.

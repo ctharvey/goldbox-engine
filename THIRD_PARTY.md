@@ -1,5 +1,17 @@
 # Third-party licensing and provenance
 
+## Original display adapter (2026-10-18)
+
+SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`, particularly
+Pool properties, `FrameRendererSymbols.java`, `DungeonRenderer.java`,
+`ProgramMenuRenderer.java` and `AbstractRenderer.java`, was consulted for symbol
+selection and screen-region conventions. It remains a research-only reference;
+no Java renderer was copied or translated. The C++ repeated-symbol compositor,
+profile validation, SDL layout and text paging are independently implemented.
+Pool's border configuration was separately compared against a private DOS
+capture: all 14,400 configured border pixels matched. No SSI symbols, fonts,
+screenshots or other original artwork are distributed in this repository.
+
 ## Campaign opening and reference adapter (2026-10-18)
 
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` remains a

@@ -72,6 +72,16 @@ struct GameProfile {
     };
     std::optional<CampaignStartup> campaign_startup{};
     std::uint32_t script_delay_ms{}, sprite_replacement_ms{};
+    struct OriginalDisplay {
+        std::string font_archive, symbols_archive;
+        std::uint8_t font_record{}, symbols_record{};
+        std::array<std::uint16_t,2> canvas{}, position{};
+        std::array<std::uint16_t,4> scene{}, party{}, dialogue{}, commands{};
+        std::uint16_t party_row_height{8};
+        // X, Y, symbol index, repeat count, vertical (0/1); symbols are 8x8.
+        std::vector<std::array<std::uint16_t,5>> frame_runs;
+    };
+    std::optional<OriginalDisplay> original_display{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

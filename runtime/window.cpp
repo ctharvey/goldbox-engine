@@ -47,14 +47,29 @@ public:
     std::deque<std::string> lines;
     std::vector<std::string> choices;
     std::size_t selected{};
+    const OriginalPresentation* original{};
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> frame_texture{nullptr,SDL_DestroyTexture};
     Uint64 image_clock{};
     std::mt19937 creation_random{static_cast<unsigned>(SDL_GetPerformanceCounter())};
 
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
         const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
-        std::span<const formats::IndexedImage> font, const GameProfile::Portrait* portrait, const WallArchives* sources)
-        : session(value), renderer(target), graphics(walls), backdrop(colors), portrait_config(portrait), wall_archives(sources) {
+        std::span<const formats::IndexedImage> font, const GameProfile::Portrait* portrait, const WallArchives* sources,
+        const OriginalPresentation* presentation)
+        : session(value), renderer(target), graphics(walls), backdrop(colors), portrait_config(portrait), wall_archives(sources),
+          original(presentation) {
         if (archives) images.emplace(*archives);
+        if (original) {
+            const auto& frame = original->frame;
+            frame_texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,
+                frame.width,frame.height));
+            if (!frame_texture) throw std::runtime_error(SDL_GetError());
+            checked(SDL_SetTextureScaleMode(frame_texture.get(),SDL_SCALEMODE_NEAREST));
+            const auto palette = formats::ega_palette();
+            std::vector<formats::Rgba> rgba;
+            for (const auto p : frame.pixels) rgba.push_back(palette.at(p));
+            checked(SDL_UpdateTexture(frame_texture.get(),nullptr,rgba.data(),frame.width*4));
+        }
         if (!font.empty()) {
             const auto atlas = compose_font_atlas(font);
             std::vector<formats::Rgba> rgba;
@@ -153,7 +168,7 @@ public:
         std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> title(nullptr,SDL_DestroyTexture);
         std::vector<std::string> options{"BEGIN EXPLORATION [B]", "LOAD ENGINE SAVE [L]", "EXIT [E]"};
         if (session.campaign_start) options[0] = "BEGIN GAME [B]";
-        if (session.character_rules) options.insert(options.begin(),"CREATE / MANAGE PARTY [C]");
+        if (session.character_rules) options.insert(options.begin(),original ? "CREATE / MANAGE [C]" : "CREATE / MANAGE PARTY [C]");
         while (running) {
             const bool menu = screen == menu_screen;
             if (menu && music_playing) { audio->stop(); music_playing = false; }
@@ -169,21 +184,37 @@ public:
                 screen_clock = SDL_GetTicks();
             }
             color(0,0,0); checked(SDL_RenderClear(renderer));
-            const SDL_FRect target{0,0,960,600};
+            const SDL_FRect target{0,0,original ? float(original->layout.canvas[0]) : 960,
+                original ? float(original->layout.canvas[1]) : 600};
             if (!menu || !period_ms) checked(SDL_RenderTexture(renderer,title.get(),nullptr,&target));
             if (menu) {
-                color(0,0,0); rectangle(240,448,480,152);
-                color(207,176,112); label(264,464,"GOLDBOX ENGINE - EXPLORATION PREVIEW");
-                for (std::size_t i = 0; i < options.size(); ++i) {
-                    color(i == selection ? 255 : 160,i == selection ? 220 : 160,160);
-                    label(264,492+float(i)*28,std::string(i == selection ? "> " : "  ")+options[i]);
+                if (original) {
+                    checked(SDL_RenderTexture(renderer,frame_texture.get(),nullptr,nullptr));
+                    const auto& r = original->layout.party;
+                    for (std::size_t i = 0; i < options.size(); ++i) {
+                        color(i == selection ? 85 : 255,255,i == selection ? 85 : 255);
+                        label(r[0],r[1]+float(i)*16,(i == selection ? "> " : "  ")+
+                            options[i].substr(0,r[2]/8-2));
+                    }
+                } else {
+                    color(0,0,0); rectangle(240,448,480,152);
+                    color(207,176,112); label(264,464,"GOLDBOX ENGINE - EXPLORATION PREVIEW");
+                    for (std::size_t i = 0; i < options.size(); ++i) {
+                        color(i == selection ? 255 : 160,i == selection ? 220 : 160,160);
+                        label(264,492+float(i)*28,std::string(i == selection ? "> " : "  ")+options[i]);
+                    }
                 }
             }
             color(220,220,220);
-            label(24,608,menu ? "UP / DOWN, ENTER OR LETTER TO SELECT - ESC TO QUIT - F10 RESTART" :
-                period_ms ? "ANY KEY TO CONTINUE - ESC TO QUIT - F10 RESTART" :
-                "ENTER / SPACE TO CONTINUE - ESC TO QUIT - F10 RESTART");
-            if (!error.empty()) { color(255,160,140); label(24,624,error.substr(0,114)); }
+            if (original) {
+                if (menu) label(0,original->layout.commands[1],"UP/DOWN ENTER  F10 RESTART");
+                if (!error.empty()) label(original->layout.dialogue[0],original->layout.dialogue[1],error.substr(0,38));
+            } else {
+                label(24,608,menu ? "UP / DOWN, ENTER OR LETTER TO SELECT - ESC TO QUIT - F10 RESTART" :
+                    period_ms ? "ANY KEY TO CONTINUE - ESC TO QUIT - F10 RESTART" :
+                    "ENTER / SPACE TO CONTINUE - ESC TO QUIT - F10 RESTART");
+                if (!error.empty()) { color(255,160,140); label(24,624,error.substr(0,114)); }
+            }
             checked(SDL_RenderPresent(renderer));
             SDL_Event event;
             if (!menu && period_ms) {
@@ -290,16 +321,25 @@ public:
     }
     void text(std::string_view value, bool clear) override {
         if (clear) lines.clear();
+        const std::size_t columns = original ? original->layout.dialogue[2]/8 : 110;
+        const auto append = [&](std::string line) {
+            if (original && lines.size() >= original->layout.dialogue[3]/8) {
+                const std::array<std::string,1> next{"PRESS RETURN TO CONTINUE"};
+                (void)choose(next,"",false);
+                lines.clear();
+            }
+            lines.push_back(std::move(line));
+        };
         std::string line;
         for (const unsigned char ch : value) {
-            if (ch == '\n' || line.size() == 110) {
-                lines.push_back(std::move(line));
+            if (ch == '\n' || line.size() == columns) {
+                append(std::move(line));
                 line.clear();
             }
             if (ch != '\n') line += ch >= 32 && ch < 127 ? char(ch) : '?';
             if (lines.size() > 80) lines.pop_front();
         }
-        if (!line.empty()) lines.push_back(std::move(line));
+        if (!line.empty()) append(std::move(line));
         while (lines.size() > 80) lines.pop_front();
     }
     std::optional<std::size_t> pick(const std::vector<std::string>& values, const std::string& prompt) {
@@ -518,7 +558,83 @@ public:
             }
         }
     }
+    void draw_original() {
+        const auto& layout = original->layout;
+        color(0,0,0); checked(SDL_RenderClear(renderer));
+        checked(SDL_RenderTexture(renderer,frame_texture.get(),nullptr,nullptr));
+        const auto& r = layout.scene;
+        const SDL_Rect clip{r[0],r[1],r[2],r[3]};
+        checked(SDL_SetRenderClipRect(renderer,&clip));
+        if (graphics) {
+            const auto frame = compose_wall_view(session,*graphics,backdrop);
+            const auto palette = formats::ega_palette();
+            std::vector<formats::Rgba> rgba;
+            for (const auto p : frame.pixels) rgba.push_back(palette[p]);
+            checked(SDL_UpdateTexture(texture.get(),nullptr,rgba.data(),88*4));
+            const SDL_FRect target{float(r[0]),float(r[1]),float(r[2]),float(r[3])};
+            checked(SDL_RenderTexture(renderer,texture.get(),nullptr,&target));
+        }
+        if (image_texture) {
+            const auto& frame = *images->frame();
+            if (images->palette() == formats::EgaPaletteKind::standard) {
+                color(0,0,0); rectangle(r[0],r[1],r[2],r[3]);
+            }
+            const float sx = r[2]/88.0f, sy = r[3]/88.0f;
+            const SDL_FRect target{r[0]+frame.x_offset*sx,r[1]+frame.y_offset*sy,
+                frame.image.width*sx,frame.image.height*sy};
+            checked(SDL_RenderTexture(renderer,image_texture.get(),nullptr,&target));
+        }
+        checked(SDL_SetRenderClipRect(renderer,nullptr));
+        const auto& party = layout.party;
+        color(255,255,255);
+        label(party[0],party[1],"NAME");
+        label(party[0]+party[2]-48,party[1],"AC");
+        label(party[0]+party[2]-16,party[1],"HP");
+        const auto row_height = layout.party_row_height;
+        for (std::size_t i = 0; i < session.party.size() && (i+1)*row_height+8 <= party[3]; ++i) {
+            color(i == 0 ? 85 : 255,255,i == 0 ? 85 : 255);
+            const float y = party[1]+float(i+1)*row_height;
+            label(party[0],y,session.party[i].name.substr(0,(party[2]-56)/8));
+            // Equipment/armor is not implemented; never invent an armor class.
+            label(party[0]+party[2]-48,y,"?");
+            const auto hp = session.party[i].hit_points;
+            const auto health = hp ? std::to_string(hp->current) : "?";
+            label(party[0]+party[2]-float(health.size()*8),y,health);
+        }
+        const char* directions[]{"N","E","S","W"};
+        color(85,255,85);
+        label(layout.position[0],layout.position[1],std::to_string(session.column)+","+
+            std::to_string(session.row)+" "+directions[static_cast<unsigned>(session.facing)]);
+        const auto& text = layout.dialogue;
+        const SDL_Rect text_clip{text[0],text[1],text[2],text[3]};
+        checked(SDL_SetRenderClipRect(renderer,&text_clip));
+        const std::size_t count = text[3]/8;
+        const auto first = lines.size() > count ? lines.size()-count : 0;
+        for (std::size_t i = first; i < lines.size(); ++i)
+            label(text[0],text[1]+float(i-first)*8,lines[i]);
+        checked(SDL_SetRenderClipRect(renderer,nullptr));
+        const auto& commands = layout.commands;
+        color(255,255,255);
+        if (choices.size() == 1) {
+            label(commands[0],commands[1],choices.front().substr(0,commands[2]/8));
+        } else if (!choices.empty()) {
+            color(0,0,0); rectangle(party[0],party[1],party[2],party[3]);
+            const auto visible = std::max<std::size_t>(1,party[3]/16);
+            const auto start = selected >= visible ? selected-visible+1 : 0;
+            const std::size_t width = party[2]/8;
+            for (std::size_t i = start; i < choices.size() && i < start+visible; ++i) {
+                color(i == selected ? 85 : 255,255,i == selected ? 85 : 255);
+                const auto option = (i == selected ? "> " : "  ")+choices[i];
+                const float y = party[1]+float(i-start)*16;
+                label(party[0],y,option.substr(0,width));
+                if (option.size() > width) label(party[0],y+8,option.substr(width,width));
+            }
+            color(255,255,255); label(commands[0],commands[1],"UP/DOWN ENTER  F10 RESTART");
+        } else label(commands[0],commands[1],"MOVE SEARCH REST  F5 SAVE F9 LOAD");
+        checked(SDL_RenderPresent(renderer));
+    }
     void draw() {
+        if (original) { draw_original(); return; }
         color(13,18,24);
         checked(SDL_RenderClear(renderer));
         color(207,176,112);
@@ -655,10 +771,16 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
     std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
     std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms,
-    const formats::TandyClip* startup_music, const CampaignGraphics* campaign_graphics) {
+    const formats::TandyClip* startup_music, const CampaignGraphics* campaign_graphics,
+    const OriginalPresentation* original) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_title_period_ms > 60000) throw std::runtime_error("Invalid startup title period");
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
+    if (original && (original->frame.width != original->layout.canvas[0] ||
+        original->frame.height != original->layout.canvas[1] || original->frame.pixels.size() !=
+        std::size_t(original->frame.width)*original->frame.height || original->layout.dialogue[2] < 8 ||
+        original->layout.dialogue[3] < 8 || original->layout.party[2] < 64 || original->layout.party[3] < 16))
+        throw std::runtime_error("Invalid original presentation");
     for (const auto& screen : startup_screens) {
         if (screen.width != 320 || screen.height != 200 || screen.pixels.size() != 320*200 ||
             std::any_of(screen.pixels.begin(),screen.pixels.end(),[](auto pixel) { return pixel > 15; }))
@@ -670,17 +792,19 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     AudioPlayer audio(preview_audio || bool(sounds) || startup_music);
     SDL_Window* raw_window{};
     SDL_Renderer* raw_renderer{};
-    checked(SDL_CreateWindowAndRenderer("Goldbox Engine - exploration preview",960,640,
+    checked(SDL_CreateWindowAndRenderer(original ? "Goldbox Engine - original" : "Goldbox Engine - enhanced",960,
+        original ? 600 : 640,
         SDL_WINDOW_RESIZABLE,&raw_window,&raw_renderer));
     std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> window(raw_window,SDL_DestroyWindow);
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
-    checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
+    checked(SDL_SetRenderLogicalPresentation(raw_renderer,original ? original->layout.canvas[0] : 960,
+        original ? original->layout.canvas[1] : 640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
     bool campaign_assets_active = false;
     const auto create_host = [&] {
         const auto* active = campaign_assets_active ? campaign_graphics : nullptr;
         auto host = std::make_unique<WindowHost>(session,raw_renderer,active ? nullptr : graphics,
-            active ? &active->images : images,backdrop,font,portrait,active ? &active->walls : wall_archives);
+            active ? &active->images : images,backdrop,font,portrait,active ? &active->walls : wall_archives,original);
         host->character_assets = images;
         host->audio = &audio;
         host->preview_audio = preview_audio;

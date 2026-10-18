@@ -97,8 +97,9 @@ This mapping is a separate rendering adapter, not part of monochrome decoding.
 The font atlas is 128x32 pixels, sixteen columns of eight-pixel glyphs in four
 rows. Input tiles must be 8x8 with exactly 64 binary palette pixels (0 or 15),
 and the strip must have 64..256 tiles. Zero becomes transparent; white pixels
-receive the current UI tint. The renderer retains its existing layout and text
-limits. See `--font` in the runtime README; no font artwork is redistributed.
+receive the current UI tint. Original and enhanced presentations share this
+atlas, with separate wrapping regions. See `--font` in the runtime README; no
+font artwork is redistributed.
 Four imported letter masks (256 pixels) matched a saved local DOS screenshot
 exactly, including detached strokes in the source font. This narrow check does
 not verify every glyph or all scaling behavior.

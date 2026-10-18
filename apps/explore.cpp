@@ -313,10 +313,17 @@ int main(int argc, char** argv) {
         std::vector<goldbox::formats::IndexedImage> font;
         std::optional<goldbox::formats::DaxArchive> startup_archive;
         std::optional<std::filesystem::path> audio_file;
+        std::optional<std::string> display_mode;
         while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" ||
             std::string_view(argv[1]) == "--images" || std::string_view(argv[1]) == "--font" ||
             std::string_view(argv[1]) == "--portraits" || std::string_view(argv[1]) == "--startup" ||
-            std::string_view(argv[1]) == "--audio")) {
+            std::string_view(argv[1]) == "--audio" || std::string_view(argv[1]) == "--display")) {
+            if (std::string_view(argv[1]) == "--display") {
+                if (argc < 3 || display_mode || (std::string_view(argv[2]) != "original" &&
+                    std::string_view(argv[2]) != "enhanced"))
+                    throw std::runtime_error("--display requires original or enhanced");
+                display_mode = argv[2]; argc -= 2; argv += 2; continue;
+            }
             if (std::string_view(argv[1]) == "--audio") {
                 if (argc < 3 || audio_file) throw std::runtime_error("--audio requires one executable");
                 audio_file = argv[2];
@@ -375,11 +382,23 @@ int main(int argc, char** argv) {
             std::cout << "Optional --font <8X8D.DAX> <record-id> selects SSI-order monochrome text glyphs.\n";
             std::cout << "Optional --portraits <HEAD.DAX> <BODY.DAX> enables profile-based portraits with --images.\n";
             std::cout << "Optional --startup <TITLE.DAX> opens profile-selected titles and the startup menu.\n";
+            std::cout << "Optional --display original|enhanced selects presentation; configured games default to original.\n";
             std::cout << "Optional --audio <START.EXE> enables profile-selected effects and edition-matched startup music; F8 auditions an effect.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
 #ifdef GOLDBOX_RENDERER
+        std::optional<goldbox::OriginalPresentation> original;
+        if (window && display_mode.value_or(profile.original_display ? "original" : "enhanced") == "original") {
+            if (!profile.original_display) throw std::runtime_error("Profile has no original display adapter");
+            const auto& layout = *profile.original_display;
+            const auto data = fs::path(argv[2]).parent_path();
+            if (font.empty()) font = goldbox::formats::decode_mono8_tiles(
+                goldbox::formats::DaxArchive::from_file(data/layout.font_archive).extract(layout.font_record));
+            const auto symbols = goldbox::formats::decode_ega_images(
+                goldbox::formats::DaxArchive::from_file(data/layout.symbols_archive).extract(layout.symbols_record));
+            original.emplace(goldbox::OriginalPresentation{layout,goldbox::compose_original_frame(layout,symbols.images)});
+        }
         if (images) images->picture_period_ms = profile.picture_period_ms;
         std::optional<goldbox::formats::SpeakerClip> preview_audio;
         std::optional<goldbox::formats::TandyClip> startup_music;
@@ -512,7 +531,7 @@ int main(int argc, char** argv) {
             wall_archives ? &*wall_archives : nullptr,
             startup_screens,preview_audio ? &*preview_audio : nullptr,sounds,profile.startup_title_period_ms,
             startup_music && !startup_screens.empty() ? &*startup_music : nullptr,
-            campaign_graphics ? &*campaign_graphics : nullptr);
+            campaign_graphics ? &*campaign_graphics : nullptr,original ? &*original : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

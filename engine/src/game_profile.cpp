@@ -18,7 +18,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
-        "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs"}, "game profile");
+        "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
+        "originalDisplay"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -41,6 +42,64 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         throw std::runtime_error("invalid or unsupported game profile metadata");
     }
     const auto& patterns = j::array(j::field(root, "resourcePatterns", "game profile"), "profile.resourcePatterns");
+    if (const auto* value = root.if_contains("originalDisplay")) {
+        const auto& config = j::object(*value,"originalDisplay");
+        j::fields_only(config,{"fontArchive","fontRecord","symbolsArchive","symbolsRecord","canvas","scene",
+            "party","dialogue","commands","position","frameRuns","partyRowHeight"},"originalDisplay");
+        GameProfile::OriginalDisplay display;
+        const auto numbers = [&](const auto& value, auto& destination) {
+            const auto& values = j::array(value,"display coordinates");
+            if (values.size() != destination.size()) throw std::runtime_error("Invalid display coordinates");
+            for (std::size_t i = 0; i < values.size(); ++i) {
+                const auto n = j::integer(values[i],"display coordinate");
+                if (n < 0 || n > 640) throw std::runtime_error("Display coordinate out of range");
+                destination[i] = static_cast<std::uint16_t>(n);
+            }
+        };
+        for (const auto& binding : {std::pair{"fontArchive",&display.font_archive},
+            std::pair{"symbolsArchive",&display.symbols_archive}}) {
+            *binding.second = j::string(j::field(config,binding.first,"originalDisplay"),binding.first);
+            if (!std::regex_match(*binding.second,std::regex(R"([A-Za-z0-9_-]+\.[A-Za-z0-9]+)")))
+                throw std::runtime_error("Unsafe display archive name");
+        }
+        for (const auto& binding : {std::pair{"fontRecord",&display.font_record},
+            std::pair{"symbolsRecord",&display.symbols_record}}) {
+            const auto n = j::integer(j::field(config,binding.first,"originalDisplay"),binding.first);
+            if (n < 0 || n > 255) throw std::runtime_error("Invalid display record");
+            *binding.second = static_cast<std::uint8_t>(n);
+        }
+        numbers(j::field(config,"canvas","originalDisplay"),display.canvas);
+        numbers(j::field(config,"position","originalDisplay"),display.position);
+        if (const auto* row = config.if_contains("partyRowHeight")) {
+            const auto n = j::integer(*row,"partyRowHeight");
+            if (n < 8 || n > 32 || n%8) throw std::runtime_error("Invalid party row height");
+            display.party_row_height = static_cast<std::uint16_t>(n);
+        }
+        if (display.canvas[0] < 160 || display.canvas[1] < 100 || display.canvas[1] > 480)
+            throw std::runtime_error("Invalid display canvas");
+        for (const auto& binding : {std::pair{"scene",&display.scene},std::pair{"party",&display.party},
+            std::pair{"dialogue",&display.dialogue},std::pair{"commands",&display.commands}}) {
+            numbers(j::field(config,binding.first,"originalDisplay"),*binding.second);
+            const auto& r = *binding.second;
+            if (!r[2] || !r[3] || r[0]+r[2] > display.canvas[0] || r[1]+r[3] > display.canvas[1] ||
+                r[2]%8 || r[3]%8) throw std::runtime_error("Invalid display region");
+        }
+        if (display.position[0]+8 > display.canvas[0] || display.position[1]+8 > display.canvas[1])
+            throw std::runtime_error("Invalid display position label");
+        if (display.party[2] < 64 || display.party[3] < 16)
+            throw std::runtime_error("Original party panel is too small");
+        const auto& runs = j::array(j::field(config,"frameRuns","originalDisplay"),"frameRuns");
+        if (runs.empty() || runs.size() > 128) throw std::runtime_error("Invalid frame run count");
+        for (const auto& run : runs) {
+            std::array<std::uint16_t,5> r{}; numbers(run,r);
+            if (r[2] > 255 || !r[3] || r[3] > 80 || r[4] > 1 ||
+                r[0]+(r[4] ? 8 : r[3]*8) > display.canvas[0] ||
+                r[1]+(r[4] ? r[3]*8 : 8) > display.canvas[1])
+                throw std::runtime_error("Invalid display frame run");
+            display.frame_runs.push_back(r);
+        }
+        profile.original_display = std::move(display);
+    }
     for (const auto& binding : {std::pair{"scriptDelayMs",&profile.script_delay_ms},
         std::pair{"spriteReplacementMs",&profile.sprite_replacement_ms}}) {
         if (const auto* value = root.if_contains(binding.first)) {

@@ -6,6 +6,26 @@
 #include <stdexcept>
 
 namespace goldbox {
+formats::IndexedImage compose_original_frame(const GameProfile::OriginalDisplay& layout,
+    std::span<const formats::IndexedImage> symbols) {
+    const auto width = layout.canvas[0], height = layout.canvas[1];
+    if (width < 160 || width > 640 || height < 100 || height > 480 || layout.frame_runs.size() > 128)
+        throw std::runtime_error("Invalid original display canvas");
+    formats::IndexedImage result{width,height,std::vector<std::uint8_t>(std::size_t(width)*height,0)};
+    for (const auto& r : layout.frame_runs) {
+        if (r[2] >= symbols.size() || !r[3] || r[3] > 80 || r[4] > 1 ||
+            r[0]+(r[4] ? 8 : r[3]*8) > width || r[1]+(r[4] ? r[3]*8 : 8) > height)
+            throw std::runtime_error("Invalid original frame symbol reference");
+        const auto& tile = symbols[r[2]];
+        if (tile.width != 8 || tile.height != 8 || tile.pixels.size() != 64 ||
+            std::any_of(tile.pixels.begin(),tile.pixels.end(),[](auto p) { return p > 15; }))
+            throw std::runtime_error("Invalid original frame symbol");
+        for (unsigned i = 0; i < r[3]; ++i) for (unsigned y = 0; y < 8; ++y)
+            std::copy_n(tile.pixels.begin()+y*8,8,result.pixels.begin()+
+                (r[1]+(r[4] ? i*8 : 0)+y)*width+r[0]+(r[4] ? 0 : i*8));
+    }
+    return result;
+}
 std::vector<formats::IndexedImage> load_startup_screens(const formats::DaxArchive& archive,
     std::span<const std::uint8_t> records) {
     if (records.empty() || records.size() > 64) throw std::runtime_error("Startup requires 1..64 title records");

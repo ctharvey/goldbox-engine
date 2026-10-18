@@ -2,6 +2,11 @@
 
 ## 2026-10-18
 
+- Add selectable original/enhanced display modes over the shared game state.
+  Pool defaults to a profile-configured native canvas, imported symbol borders,
+  scene/party/dialogue regions and paged text. Preserve the enhanced overview;
+  exact startup/creation screens, armor, clock and timing parity remain unfinished.
+
 - Move choice menus into the overview panel and wrap their labels so character
   portraits and opening cutscene artwork remain visible during input prompts.
 
