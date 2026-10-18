@@ -6,6 +6,39 @@
 #include <stdexcept>
 
 namespace goldbox {
+std::vector<ChoiceLabel> layout_choice_menu(std::span<const std::string> choices, std::size_t selected,
+    std::size_t columns, std::size_t rows, bool vertical) {
+    if (choices.empty() || selected >= choices.size() || !columns || columns > 80 || !rows || rows > 60)
+        throw std::runtime_error("Invalid menu viewport");
+    std::vector<ChoiceLabel> result;
+    if (vertical) {
+        const auto first = selected >= rows ? selected-rows+1 : 0;
+        for (auto i = first; i < choices.size() && i-first < rows; ++i)
+            result.push_back({i,0,i-first,std::min(columns,choices[i].size())});
+    } else {
+        auto first = selected;
+        auto used = std::min(columns,choices[selected].size());
+        while (first && choices[first-1].size()+1 <= columns-used) {
+            used += choices[--first].size()+1;
+        }
+        std::size_t column = 0;
+        for (auto i = first; i < choices.size(); ++i) {
+            const auto length = std::min(columns,choices[i].size());
+            if (length > columns-column) break;
+            result.push_back({i,column,0,length});
+            column += length;
+            if (column == columns) break;
+            ++column;
+        }
+    }
+    return result;
+}
+std::optional<std::size_t> choice_shortcut(std::span<const std::string> choices, unsigned char key) {
+    const auto upper = [](unsigned char c) { return c >= 'a' && c <= 'z' ? c-'a'+'A' : c; };
+    for (std::size_t i = 0; i < choices.size(); ++i)
+        if (!choices[i].empty() && upper(choices[i].front()) == upper(key)) return i;
+    return std::nullopt;
+}
 std::uint8_t party_name_color(const ExplorationSession& session, std::size_t member) {
     if (member >= session.party.size()) throw std::runtime_error("Party display index out of range");
     const auto address = session.party_memory ? session.party_memory->selected_address : std::nullopt;

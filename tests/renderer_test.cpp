@@ -24,6 +24,37 @@ void key(SDL_Keycode code) {
 }
 int main(int argc, char** argv) {
     assert(argc == 2 || argc == 4);
+    const std::vector<std::string> menu_labels{"YES","NO","LATER"};
+    auto menu_layout = layout_choice_menu(menu_labels,0,12,1,false);
+    assert(menu_layout.size() == 3 && menu_layout[0].column == 0 && menu_layout[1].column == 4 &&
+        menu_layout[2].column == 7 && menu_layout[2].length == 5);
+    menu_layout = layout_choice_menu(menu_labels,2,8,1,false);
+    assert(menu_layout.size() == 2 && menu_layout[0].choice == 1 && menu_layout[1].choice == 2 &&
+        menu_layout[1].column == 3);
+    menu_layout = layout_choice_menu(menu_labels,2,4,1,false);
+    assert(menu_layout.size() == 1 && menu_layout[0].choice == 2 && menu_layout[0].length == 4);
+    menu_layout = layout_choice_menu(menu_labels,2,8,2,true);
+    assert(menu_layout.size() == 2 && menu_layout[0].choice == 1 && menu_layout[0].row == 0 &&
+        menu_layout[1].choice == 2 && menu_layout[1].row == 1);
+    assert(choice_shortcut(menu_labels,'n') == 1 && choice_shortcut(menu_labels,'Y') == 0);
+    assert(!choice_shortcut(menu_labels,'x'));
+    assert(choice_shortcut(std::vector<std::string>{"","Again","ASK"},'a') == 1);
+    for (const auto dimensions : {std::pair{0,1},std::pair{81,1},std::pair{8,0},std::pair{8,61}}) {
+        bool rejected = false;
+        try { (void)layout_choice_menu(menu_labels,0,dimensions.first,dimensions.second,false); }
+        catch (const std::runtime_error&) { rejected = true; }
+        assert(rejected);
+    }
+    for (const auto selected : {std::size_t{3},std::size_t{100}}) {
+        bool rejected = false;
+        try { (void)layout_choice_menu(menu_labels,selected,8,1,false); }
+        catch (const std::runtime_error&) { rejected = true; }
+        assert(rejected);
+    }
+    bool empty_menu = false;
+    try { (void)layout_choice_menu({},0,8,1,false); }
+    catch (const std::runtime_error&) { empty_menu = true; }
+    assert(empty_menu);
     std::deque<std::string> dialogue;
     std::vector<std::deque<std::string>> pages;
     const auto page = [&] { pages.push_back(dialogue); };
@@ -306,12 +337,42 @@ int main(int argc, char** argv) {
     original_session.ecl_record.insert(original_session.ecl_record.begin()+20,{0x11,0x81,0,0x4b});
     original_session.state.strings[0x4b00] = "%FWHITE %CRED %0GREEN %% %Z";
     assert(SDL_Init(SDL_INIT_VIDEO));
-    key(SDLK_SPACE); key(SDLK_DOWN); key(SDLK_RETURN); key(SDLK_ESCAPE);
+    key(SDLK_SPACE); key(SDLK_RIGHT); key(SDLK_SPACE); key(SDLK_ESCAPE);
     assert(run_exploration_window(original_session,"renderer-original",save,&graphics,nullptr,&backdrop,font,
         nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
     assert(original_session.state.memory[0x4a03] == 1);
     assert(original_session.state.strings[0x4b00] == "%FWHITE %CRED %0GREEN %% %Z");
     SDL_Quit();
+
+    // Code-driven original ECL input: orientation, wrapping, shortcut activation,
+    // and confirmation must write the original choice index, never move the party.
+    const auto check_menu = [&](bool vertical, std::initializer_list<SDL_Keycode> keys, unsigned expected) {
+        auto candidate = session;
+        candidate.state.memory[0x4a03] = 99;
+        if (vertical) {
+            candidate.ecl_record.resize(20);
+            candidate.ecl_record.insert(candidate.ecl_record.end(),
+                {0x15,1,3,0x4a,0x81,0,0x4b,0,2,0x80,1,4,0x80,1,8,0});
+            candidate.state.strings[0x4b00] = "%FCHOOSE %0ONE";
+        }
+        assert(SDL_Init(SDL_INIT_VIDEO));
+        key(SDLK_SPACE);
+        for (const auto code : keys) key(code);
+        key(SDLK_ESCAPE);
+        assert(run_exploration_window(candidate,"renderer-menu",save,&graphics,nullptr,&backdrop,font,
+            nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+        assert(candidate.state.memory[0x4a03] == expected);
+        assert(candidate.row == session.row && candidate.column == session.column && candidate.facing == session.facing);
+        SDL_Quit();
+    };
+    check_menu(false,{SDLK_LEFT,SDLK_RETURN},1);
+    check_menu(false,{SDLK_A},0);
+    check_menu(false,{SDLK_B},1);
+    check_menu(false,{SDLK_DOWN,SDLK_RETURN},0); // Wrong-axis arrows do not select.
+    check_menu(true,{SDLK_DOWN,SDLK_SPACE},1);
+    check_menu(true,{SDLK_UP,SDLK_RETURN},1);
+    check_menu(true,{SDLK_B},1);
+    check_menu(true,{SDLK_RIGHT,SDLK_RETURN},0);
 
     // Begin must use the campaign adapter, rather than the launch preview's ECL.
     // Restart then exercises the same created party and startup route again.

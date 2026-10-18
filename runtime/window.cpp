@@ -46,6 +46,9 @@ public:
     bool restart_requested{};
     std::deque<std::string> lines;
     DialoguePage dialogue;
+    enum class ChoicePresentation { panel, horizontal, vertical };
+    ChoicePresentation choice_presentation{ChoicePresentation::panel};
+    DialoguePage menu_prompt;
     std::vector<std::string> choices;
     std::size_t selected{};
     const OriginalPresentation* original{};
@@ -611,11 +614,13 @@ public:
         const SDL_Rect text_clip{text[0],text[1],text[2],text[3]};
         checked(SDL_SetRenderClipRect(renderer,&text_clip));
         const std::size_t count = text[3]/8;
-        const auto first = dialogue.lines.size() > count ? dialogue.lines.size()-count : 0;
-        for (std::size_t i = first; i < dialogue.lines.size(); ++i) {
-            const auto& line = dialogue.lines[i];
+        const bool vertical_menu = !choices.empty() && choice_presentation == ChoicePresentation::vertical;
+        const auto& shown = vertical_menu ? menu_prompt : dialogue;
+        const auto first = shown.lines.size() > count ? shown.lines.size()-count : 0;
+        for (std::size_t i = first; i < shown.lines.size(); ++i) {
+            const auto& line = shown.lines[i];
             for (std::size_t x = 0; x < line.size(); ++x) {
-                const auto ink = palette[dialogue.ink[i][x]];
+                const auto ink = palette[shown.ink[i][x]];
                 color(ink[0],ink[1],ink[2]);
                 label(text[0]+float(x)*8,text[1]+float(i-first)*8,line.substr(x,1));
             }
@@ -623,7 +628,23 @@ public:
         checked(SDL_SetRenderClipRect(renderer,nullptr));
         const auto& commands = layout.commands;
         color(255,255,255);
-        if (choices.size() == 1) {
+        if (!choices.empty() && choice_presentation != ChoicePresentation::panel) {
+            const auto& region = vertical_menu ? text : commands;
+            const auto prompt_rows = vertical_menu ? menu_prompt.lines.size() : 0;
+            const auto items = layout_choice_menu(choices,selected,region[2]/8,
+                region[3]/8-prompt_rows,vertical_menu);
+            const SDL_Rect menu_clip{region[0],region[1],region[2],region[3]};
+            checked(SDL_SetRenderClipRect(renderer,&menu_clip));
+            for (const auto& item : items) {
+                const auto value = choices[item.choice].substr(0,item.length);
+                const float x = region[0]+float(item.column)*8;
+                const float y = region[1]+float(item.row+prompt_rows)*8;
+                color(255,255,255); label(x,y,value.substr(0,1));
+                color(item.choice == selected ? 255 : 85,255,item.choice == selected ? 255 : 85);
+                label(x+8,y,value.substr(std::min<std::size_t>(1,value.size())));
+            }
+            checked(SDL_SetRenderClipRect(renderer,nullptr));
+        } else if (choices.size() == 1) {
             label(commands[0],commands[1],choices.front().substr(0,commands[2]/8));
         } else if (!choices.empty()) {
             color(0,0,0); rectangle(party[0],party[1],party[2],party[3]);
@@ -733,10 +754,18 @@ public:
         }
         checked(SDL_RenderPresent(renderer));
     }
-    std::optional<std::size_t> choose(std::span<const std::string> values, std::string_view prompt, bool cancelable) {
+    std::optional<std::size_t> choose(std::span<const std::string> values, std::string_view prompt, bool cancelable,
+        ChoicePresentation presentation = ChoicePresentation::panel) {
         if (values.empty()) throw std::runtime_error("Empty event menu");
-        text(prompt,false);
+        if (original && presentation == ChoicePresentation::vertical) {
+            menu_prompt = {};
+            const auto rows = original->layout.dialogue[3]/8;
+            if (!prompt.empty() && rows < 2) throw std::runtime_error("No room for menu prompt and choices");
+            append_dialogue(menu_prompt,prompt,true,original->layout.dialogue[2]/8,
+                std::max<std::size_t>(1,rows-1),[] { throw std::runtime_error("Menu prompt exceeds its region"); });
+        } else text(prompt,false);
         choices.assign(values.begin(),values.end());
+        choice_presentation = presentation;
         selected = 0;
         while (running) {
             animate();
@@ -757,9 +786,19 @@ public:
                 choices.clear();
                 throw std::runtime_error("Restart requested during event menu");
             }
-            if (event.key.key == SDLK_UP) selected = (selected + choices.size()-1) % choices.size();
-            if (event.key.key == SDLK_DOWN) selected = (selected+1) % choices.size();
-            if (event.key.key == SDLK_RETURN) {
+            const bool native = original && presentation != ChoicePresentation::panel;
+            const bool horizontal = native && presentation == ChoicePresentation::horizontal;
+            if (event.key.key == (horizontal ? SDLK_LEFT : SDLK_UP))
+                selected = (selected + choices.size()-1) % choices.size();
+            if (event.key.key == (horizontal ? SDLK_RIGHT : SDLK_DOWN)) selected = (selected+1) % choices.size();
+            if (native && !(event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) &&
+                ((event.key.key >= SDLK_A && event.key.key <= SDLK_Z) ||
+                 (event.key.key >= SDLK_0 && event.key.key <= SDLK_9))) {
+                if (const auto match = choice_shortcut(choices,static_cast<unsigned char>(event.key.key))) {
+                    selected = *match; choices.clear(); return selected;
+                }
+            }
+            if (event.key.key == SDLK_RETURN || (native && event.key.key == SDLK_SPACE)) {
                 choices.clear();
                 return selected;
             }
@@ -767,8 +806,8 @@ public:
         choices.clear();
         throw std::runtime_error("Window closed during event menu");
     }
-    std::size_t menu(std::span<const std::string> values, std::string_view prompt, bool) override {
-        return *choose(values,prompt,false);
+    std::size_t menu(std::span<const std::string> values, std::string_view prompt, bool vertical) override {
+        return *choose(values,prompt,false,vertical ? ChoicePresentation::vertical : ChoicePresentation::horizontal);
     }
 };
 } // namespace

@@ -2,6 +2,13 @@
 
 ## 2026-10-18
 
+- Honor ECL menu orientation in original mode: horizontal choices occupy the
+  command row; vertical choices and their prompt use the dialogue region, keeping
+  portraits and the party panel visible. Add native-axis arrows, Space/Enter
+  confirmation, first-letter selection and bounded selected-item viewports.
+  Synthetic SDL tests cover choice indices, wraparound and unchanged party position;
+  complete recorded-original menu styling and timing remain unverified.
+
 - Render SSI inline dialogue colors in original mode without counting control
   codes as visible text. Preserve color across PRINT fragments and page clears,
   support escaped percent signs, and keep malformed controls literal. Add

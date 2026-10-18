@@ -30,6 +30,11 @@ void append_dialogue(DialoguePage& page, std::string_view text, bool clear,
     std::size_t columns, std::size_t rows, const std::function<void()>& next_page);
 // SSI selected-PC indices are zero-based; loading a PC does not select it.
 std::uint8_t party_name_color(const ExplorationSession& session, std::size_t member);
+struct ChoiceLabel { std::size_t choice, column, row, length; };
+// A bounded viewport over an ECL menu, preserving original choice indices.
+std::vector<ChoiceLabel> layout_choice_menu(std::span<const std::string> choices, std::size_t selected,
+    std::size_t columns, std::size_t rows, bool vertical);
+std::optional<std::size_t> choice_shortcut(std::span<const std::string> choices, unsigned char key);
 struct WallHit {
     double distance{}; // Ray parameter; unnormalized camera rays avoid fisheye distortion.
     std::uint8_t wall{};

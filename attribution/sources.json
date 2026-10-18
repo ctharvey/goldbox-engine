@@ -123,7 +123,8 @@
         "src/main/java/engine/text/GoldboxStringPartFactory.java",
         "src/main/java/shared/FontColor.java",
         "src/main/java/engine/text/TextColor.java",
-        "src/main/java/ui/shared/text/StoryText.java"
+        "src/main/java/ui/shared/text/StoryText.java",
+        "src/main/java/ui/shared/Menu.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,

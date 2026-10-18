@@ -35,6 +35,20 @@ window starts in normal green. Unknown or incomplete controls remain literal.
 This is a shared SSI presentation adapter, with no title checks or VM/save changes;
 enhanced mode and the plain-text accumulator retain their existing behavior.
 
+Original ECL menus retain the VM's orientation: horizontal choices use the
+profile's command row with Left/Right selection; vertical choices use the
+dialogue region below their prompt with Up/Down selection. Both accept Enter or
+Space and immediate first-letter/digit activation, ignoring Ctrl/Alt/GUI chords.
+Duplicate initials select the first matching original choice; arrow navigation
+can reach every choice. Labels show a white initial and green remaining letters,
+with the selected label white. No selection arrow is inserted into ECL labels.
+Long menus scroll to keep the selection visible, and oversized labels are clipped
+to the region. Vertical prompts support inline colors and wrapped lines, reserving
+at least one row for a choice; an oversized prompt fails explicitly. The menu
+prompt does not replace stored story text. Artwork and the party remain visible.
+Engine startup/creation menus keep their existing panel layout, and enhanced
+menus retain Up/Down and Enter. These do not reproduce the exact native screens.
+
 This is an initial display implementation, not full visual parity. Armor class
 shows `?` because equipment is unfinished; the clock is omitted. Startup, creation
 menus and statistics sheets still use the engine's interaction flow. Typewriter
@@ -49,6 +63,10 @@ original text reveal timing or character-status indicators. Inline colors have
 synthetic coverage for all selectors, escaped/malformed controls, color changes
 inside words, continuation and clears, plus an original-mode ECL/SDL smoke test.
 They have not yet been compared against a color-changing DOS scene.
+Synthetic menu tests exercise both orientations, shortcuts, wraparound, Space
+confirmation, viewport bounds and unchanged party position through the real SDL
+loop. Native ECL selection styling, duplicate-initial behavior, mouse activation
+and overflowing labels still require a corresponding DOS reference comparison.
 
 Install SDL3 >=3.2 (for example, vcpkg `sdl3` on Windows), then configure:
 

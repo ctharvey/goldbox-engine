@@ -27,6 +27,16 @@ across text clears. The C++ per-glyph color state and parser are independently
 implemented; no Java code was copied or translated. Tests use synthetic strings,
 not extracted game dialogue. Original color-changing scenes remain unverified.
 
+`ui/classic/ClassicMode.java`, `AbstractRenderer.java`,
+`AbstractStateRenderer.java` and `ui/shared/Menu.java` at the same revision were
+consulted for horizontal/vertical ECL placement, first-letter input, Space/Enter
+confirmation and arrow navigation. `data/palette/Palette.java` was consulted
+for reference highlighting; its inversion was not adopted. The bounded C++ menu
+viewport and SDL input handling are independently implemented. Private creation
+captures show white selection/initials and green text; native ECL selection and
+overflow styling still need direct comparison. No Java or reference pixels were
+copied into the implementation or tests.
+
 ## Campaign opening and reference adapter (2026-10-18)
 
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` remains a
