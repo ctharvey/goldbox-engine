@@ -139,15 +139,19 @@ public:
         restore(json,identity);
     }
     // Returns 0=quit, 1=initialize exploration, 2=load engine save, 3=manage party.
-    int startup(std::span<const formats::IndexedImage> screens, const std::string& error, bool show_titles = true) {
-        std::size_t screen = show_titles && error.empty() ? 0 : screens.size()-1;
+    int startup(std::span<const formats::IndexedImage> screens, const std::string& error, bool show_titles,
+        std::uint32_t period_ms) {
+        const auto menu_screen = period_ms ? screens.size() : screens.size()-1;
+        std::size_t screen = show_titles && error.empty() ? 0 : menu_screen;
         std::size_t selection = 0;
         std::size_t uploaded = screens.size();
+        Uint64 screen_clock = SDL_GetTicks();
         std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> title(nullptr,SDL_DestroyTexture);
-        std::vector<std::string> options{"START EXPLORATION", "LOAD ENGINE SAVE", "QUIT"};
-        if (session.character_rules) options.insert(options.begin(),"CREATE / MANAGE PARTY");
+        std::vector<std::string> options{"BEGIN EXPLORATION [B]", "LOAD ENGINE SAVE [L]", "EXIT [E]"};
+        if (session.character_rules) options.insert(options.begin(),"CREATE / MANAGE PARTY [C]");
         while (running) {
-            if (uploaded != screen) {
+            const bool menu = screen == menu_screen;
+            if (uploaded != screen && (!menu || !period_ms)) {
                 title.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,320,200));
                 if (!title) throw std::runtime_error(SDL_GetError());
                 checked(SDL_SetTextureScaleMode(title.get(),SDL_SCALEMODE_NEAREST));
@@ -156,11 +160,11 @@ public:
                 for (const auto pixel : screens[screen].pixels) rgba.push_back(palette[pixel]);
                 checked(SDL_UpdateTexture(title.get(),nullptr,rgba.data(),320*4));
                 uploaded = screen;
+                screen_clock = SDL_GetTicks();
             }
             color(0,0,0); checked(SDL_RenderClear(renderer));
             const SDL_FRect target{0,0,960,600};
-            checked(SDL_RenderTexture(renderer,title.get(),nullptr,&target));
-            const bool menu = screen+1 == screens.size();
+            if (!menu || !period_ms) checked(SDL_RenderTexture(renderer,title.get(),nullptr,&target));
             if (menu) {
                 color(0,0,0); rectangle(240,448,480,152);
                 color(207,176,112); label(264,464,"GOLDBOX ENGINE - EXPLORATION PREVIEW");
@@ -170,11 +174,21 @@ public:
                 }
             }
             color(220,220,220);
-            label(24,608,menu ? "UP / DOWN, ENTER TO SELECT - ESC TO QUIT - F10 RESTART" : "ENTER / SPACE TO CONTINUE - ESC TO QUIT - F10 RESTART");
+            label(24,608,menu ? "UP / DOWN, ENTER OR LETTER TO SELECT - ESC TO QUIT - F10 RESTART" :
+                period_ms ? "ANY KEY TO CONTINUE - ESC TO QUIT - F10 RESTART" :
+                "ENTER / SPACE TO CONTINUE - ESC TO QUIT - F10 RESTART");
             if (!error.empty()) { color(255,160,140); label(24,624,error.substr(0,114)); }
             checked(SDL_RenderPresent(renderer));
             SDL_Event event;
-            checked(SDL_WaitEvent(&event));
+            if (!menu && period_ms) {
+                const auto elapsed = SDL_GetTicks()-screen_clock;
+                if (elapsed >= period_ms) { ++screen; continue; }
+                SDL_ClearError();
+                if (!SDL_WaitEventTimeout(&event,static_cast<Sint32>(period_ms-elapsed))) {
+                    if (*SDL_GetError()) throw std::runtime_error(SDL_GetError());
+                    continue;
+                }
+            } else checked(SDL_WaitEvent(&event));
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) return 0;
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
@@ -182,8 +196,12 @@ public:
             if (key == SDLK_F8 && audio && preview_audio) { audio->play(*preview_audio); continue; }
             if (key == SDLK_F10) { restart_requested = true; return 0; }
             if (!menu) {
-                if (key == SDLK_RETURN || key == SDLK_SPACE) ++screen;
+                if (period_ms || key == SDLK_RETURN || key == SDLK_SPACE) ++screen;
             } else {
+                if (key == SDLK_C && session.character_rules) return 3;
+                if (key == SDLK_B) return 1;
+                if (key == SDLK_L) return 2;
+                if (key == SDLK_E) return 0;
                 if (key == SDLK_UP) selection = (selection+options.size()-1)%options.size();
                 if (key == SDLK_DOWN) selection = (selection+1)%options.size();
                 if (key == SDLK_RETURN) {
@@ -597,8 +615,9 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
     const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
     std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
-    std::function<formats::SpeakerClip(std::uint16_t)> sounds) {
+    std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms) {
     if (graphics) require_wall_bindings(session,*graphics);
+    if (startup_title_period_ms > 60000) throw std::runtime_error("Invalid startup title period");
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
     for (const auto& screen : startup_screens) {
         if (screen.width != 320 || screen.height != 200 || screen.pixels.size() != 320*200 ||
@@ -631,7 +650,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
             std::string error;
             bool show_titles = true;
             while (true) {
-                const auto action = window_host->startup(startup_screens,error,show_titles);
+                const auto action = window_host->startup(startup_screens,error,show_titles,startup_title_period_ms);
                 show_titles = false;
                 if (window_host->restart_requested) break;
                 if (!action) return 0;

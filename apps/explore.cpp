@@ -444,7 +444,7 @@ int main(int argc, char** argv) {
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
             profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,
             images && images->portraits ? &*profile.portrait : nullptr,wall_archives ? &*wall_archives : nullptr,
-            startup_screens,preview_audio ? &*preview_audio : nullptr,sounds);
+            startup_screens,preview_audio ? &*preview_audio : nullptr,sounds,profile.startup_title_period_ms);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

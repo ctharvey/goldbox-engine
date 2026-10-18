@@ -101,6 +101,14 @@ party or startup implementation was copied/ported. The independent C++ shell
 uses explicit input advances and an exploration-only menu. It does not adopt
 upstream timed title switching or claim a complete original New Game flow.
 
+The 2026-10-17 timing change also consulted `ClassicMode.showNextTitle` at that
+same revision, whose five-second schedule corroborates the independent original
+Pool trace. The bounded SDL deadline and profile setting are independently
+implemented; no Java scheduler or menu implementation was copied. Original
+credits and exact party-menu layout remain unfinished. Startup sound research
+uses private original-code traces and a calibrated DOSBox recording; no original
+audio or text is included in the repository.
+
 ## ECL picture/sprite host (2026-10-16)
 
 SSI Engine `VirtualMachine.java`, `Engine.java`, `ClassicMode.java`,

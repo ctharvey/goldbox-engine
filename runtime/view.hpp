@@ -22,7 +22,7 @@ WallHit cast_wall(const formats::GeoMap& map, int row, int column, double dx, do
 std::uint8_t font_glyph(unsigned char ascii);
 formats::IndexedImage compose_font_atlas(std::span<const formats::IndexedImage> tiles);
 // Explicit EGA17 records in adapter order, centered on 320x200 independently of header offsets.
-// The final screen is the startup menu backdrop. No game/filename heuristics.
+// The presentation selects title timing and the menu backdrop; no game/filename heuristics.
 std::vector<formats::IndexedImage> load_startup_screens(const formats::DaxArchive& archive,
     std::span<const std::uint8_t> records);
 // Native 88x88 perspective view using preprojected wall pieces. Palette index
@@ -37,5 +37,6 @@ int run_exploration_window(ExplorationSession& session, std::string_view source_
     const WallArchives* wall_archives = nullptr,
     std::span<const formats::IndexedImage> startup_screens = {},
     const formats::SpeakerClip* preview_audio = nullptr,
-    std::function<formats::SpeakerClip(std::uint16_t)> sounds = {});
+    std::function<formats::SpeakerClip(std::uint16_t)> sounds = {},
+    std::uint32_t startup_title_period_ms = 0);
 } // namespace goldbox

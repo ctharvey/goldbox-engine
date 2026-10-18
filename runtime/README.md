@@ -70,7 +70,11 @@ are raw word tokens, not memory reads. Byte-address and text variants are not
 supported. No native machine code is executed by the engine.
 
 Automatic controls for silence/enable/stop, overlapping effect scheduling,
-Tandy sound and startup music remain unfinished.
+Tandy sound and note/music decoding remain unfinished. The installed Steam
+edition's observed startup is silent: a private sound-enabled DOSBox recording
+and isolated title-routine trace found no startup audio. A synthetic speaker
+tone confirmed that the recording path worked. This does not establish music
+behavior in other editions or later game scenes.
 There is no invented startup jingle. Synthetic tests cover decoding, duration,
 priority, truncation/unsupported input, exact sample counts and dummy-device
 playback. Private original-code traces check the effect decoder and call routing.
@@ -197,8 +201,12 @@ movement, an ECL menu/state write, save/load and exit. Public fixtures are synth
 
 With `--window`, insert `--startup /private/TITLE.DAX` alongside the other
 resource options. The profile must explicitly list `startupTitleRecords` in
-presentation order (1..64 byte-sized IDs). Pool selects `[1,2]` from pinned
-SSI Engine configuration; the last screen is the menu backdrop. No archive,
+presentation order (1..64 byte-sized IDs). Pool selects `[1,2]` and a
+`startupTitlePeriodMs` of 5000, corroborated against its original title routine.
+Each title advances after five seconds or a key; both appear before a separate
+menu. With an omitted/zero period, the legacy input-only presentation keeps the
+last title as the menu backdrop. Positive periods require title records and are
+bounded to 60000ms. No archive,
 map, ECL or resource-group association is guessed. Existing launches without
 `--startup` still open exploration directly.
 
@@ -206,10 +214,15 @@ Title records use the existing strict EGA17 decoder, one image per record,
 centered on a 320x200 black canvas. The title adapter ignores EGA header
 offsets for placement, matching the researched title renderer; the decoder
 still preserves them. Unsupported composite
-or multi-frame title records fail explicitly. Enter/Space advances screens;
-the last screen offers Start exploration, Load engine save, and Quit using
-Up/Down and Enter. Escape or closing the window quits. Titles wait for input;
-original timed title transitions and exact menu layout are not reproduced.
+or multi-frame title records fail explicitly. The menu offers party management
+when configured, Begin exploration, Load engine save, and Exit. Use Up/Down and
+Enter or the displayed C/B/L/E shortcuts. A key that skips a title is consumed
+there. F10 replays the titles; returning from party management or an error goes
+straight to the menu. Escape or closing the window quits. The event loop sleeps
+until input or the current title deadline; window events do not restart that
+deadline. Original credit pages, animated title effects, borders and exact menu
+layout remain unimplemented. Native character/save import menu items are not
+offered as though they worked.
 
 Start exploration executes the explicitly paired map/ECL initialization before
 accepting movement. Successful initialization uses the existing image/wall/menu

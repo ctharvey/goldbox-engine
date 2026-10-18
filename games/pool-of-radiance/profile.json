@@ -9,6 +9,7 @@
   "areaDialect": "ssi-area-map3-v1",
   "picturePeriodMs": 400,
   "startupTitleRecords": [1, 2],
+  "startupTitlePeriodMs": 5000,
   "speakerAudio": {"segmentOffset": 35552, "effectTable": 1375, "previewEntry": 8, "tickDivisor": 5041, "effectCount": 20},
   "soundCall": {"function": 47619, "selectorAddress": 990, "cases": [
     {"selector": 8, "sound": 10}, {"selector": 10, "sound": 11}]},

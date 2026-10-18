@@ -43,7 +43,7 @@ struct GameProfile {
     std::optional<Portrait> portrait;
     std::string area_dialect{"disabled"};
     std::uint32_t picture_period_ms{};
-    std::vector<std::uint8_t> startup_title_records; // Ordered screens; last is the menu backdrop.
+    std::vector<std::uint8_t> startup_title_records; // Ordered screens; presentation controls the final backdrop.
     std::optional<CreationRules> character_rules{};
     std::optional<PartyMemoryLayout> party_memory{};
     std::optional<HighWordLcg32> random{};
@@ -55,6 +55,8 @@ struct GameProfile {
     };
     std::optional<SpeakerAudio> speaker_audio{};
     std::optional<EclSoundCall> sound_call{};
+    // Zero preserves the legacy final-title menu; timed titles precede a separate menu.
+    std::uint32_t startup_title_period_ms{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

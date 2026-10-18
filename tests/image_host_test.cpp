@@ -296,7 +296,7 @@ int main(int argc, char** argv) {
     std::vector<std::uint16_t> played_sounds;
     const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true,
         const ImageArchives* portrait_images = nullptr, const GameProfile::Portrait* portrait_config = nullptr,
-        const SpeakerClip* audio = nullptr) {
+        const SpeakerClip* audio = nullptr, std::uint32_t title_period_ms = 0) {
         if (audio) assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));
         SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
         for (const auto code : keys) {
@@ -310,10 +310,34 @@ int main(int argc, char** argv) {
         if (audio) sounds = [&](std::uint16_t id) { played_sounds.push_back(id); return *audio; };
         assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,portrait_images,nullptr,{},
             portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{},
-            audio,sounds) == 0);
+            audio,sounds,title_period_ms) == 0);
         SDL_Quit();
     };
     const auto initial_startup = serialize_exploration(session,"startup-synthetic");
+    // Timed presentation gives both titles their own screen. Skip keys do not
+    // become menu commands; restarts reset the title sequence and pending state.
+    startup_window({SDLK_B,SDLK_B,SDLK_E},true,nullptr,nullptr,nullptr,5000);
+    assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
+    startup_window({SDLK_A,SDLK_SPACE,SDLK_B,SDLK_ESCAPE},true,nullptr,nullptr,nullptr,5000);
+    assert(session.state.memory[0x4a00] == 42);
+    session.state.memory[0x4a00] = 0;
+    startup_window({SDLK_RETURN,SDLK_F10,SDLK_RETURN,SDLK_RETURN,SDLK_E},true,nullptr,nullptr,nullptr,5000);
+    assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
+    // Exercise the actual timeout path with synthetic SDL input, independently
+    // of original resources. A generous delayed command follows two 1ms titles.
+    SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
+    const auto delayed_begin = SDL_AddTimer(200,[](void*,SDL_TimerID,Uint32) -> Uint32 {
+        SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = SDLK_B;
+        SDL_PushEvent(&event);
+        event.key.key = SDLK_ESCAPE; SDL_PushEvent(&event);
+        return 0;
+    },nullptr);
+    assert(delayed_begin);
+    assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,nullptr,nullptr,{},
+        nullptr,nullptr,screens,nullptr,{},1) == 0);
+    SDL_RemoveTimer(delayed_begin); SDL_Quit();
+    assert(session.state.memory[0x4a00] == 42);
+    session.state.memory[0x4a00] = 0;
     const SpeakerClip audio{1193181,5000,{{1000,true},{0,false}}};
     startup_window({SDLK_F8,SDLK_F8,SDLK_F10,SDLK_ESCAPE},true,nullptr,nullptr,&audio);
     startup_window({SDLK_F8,SDLK_F10,SDLK_ESCAPE},false,nullptr,nullptr,&audio);
@@ -349,6 +373,9 @@ int main(int argc, char** argv) {
     session.state.memory[0x4a00] = 99;
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.state.memory[0x4a00] == 42); // Load uses saved state.
+    session.state.memory[0x4a00] = 99;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_L,SDLK_ESCAPE},true,nullptr,nullptr,nullptr,5000);
+    assert(session.state.memory[0x4a00] == 42); // Letter shortcut loads without replaying the titles.
     const auto read_startup_save = [&] {
         std::ifstream input(startup_save);
         return std::string{std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
@@ -384,6 +411,8 @@ int main(int argc, char** argv) {
     session.initial_random.emplace(0x12345678,134775813,1);
     session.state.random = session.initial_random;
     session.character_rules = creation;
+    startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_B,SDLK_E},true,nullptr,nullptr,nullptr,5000);
+    assert(session.party.empty() && session.state.memory[0x4a00] == 0); // Error returns directly to menu.
     startup_window({SDLK_RETURN,SDLK_DOWN,SDLK_RETURN,SDLK_ESCAPE});
     assert(session.party.empty() && session.state.memory[0x4a00] == 0); // Cannot begin with an empty party.
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE,SDLK_ESCAPE});

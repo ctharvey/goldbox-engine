@@ -16,7 +16,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
-        "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall"}, "game profile");
+        "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
+        "startupTitlePeriodMs"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -84,6 +85,12 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
             if (id < 0 || id > 255) throw std::runtime_error("Invalid startup title record");
             profile.startup_title_records.push_back(static_cast<std::uint8_t>(id));
         }
+    }
+    if (const auto* value = root.if_contains("startupTitlePeriodMs")) {
+        const auto period = j::integer(*value,"startupTitlePeriodMs");
+        if (period < 0 || period > 60000 || (period && profile.startup_title_records.empty()))
+            throw std::runtime_error("Invalid startup title period or missing title records");
+        profile.startup_title_period_ms = static_cast<std::uint32_t>(period);
     }
     if (const auto* value = root.if_contains("characterCreationRules")) {
         const auto path = std::filesystem::path(j::string(*value,"characterCreationRules"));

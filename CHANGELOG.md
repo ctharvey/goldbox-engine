@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Add profile-controlled five-second startup titles, key skipping, a separate
+  menu and C/B/L/E shortcuts. Preserve legacy presentation when timing is absent.
+  Verify the installed Steam startup's observed silence with a calibrated
+  private recording and trace title waits against the original routine.
+
 - Route verified ECL audio calls through a profile-configured virtual selector
   and effect IDs. Add bounded speaker sweeps, loops and modulation; preserve explicit
   errors for unsupported native calls, sound controls and music.

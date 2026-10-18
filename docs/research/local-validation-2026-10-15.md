@@ -1179,3 +1179,61 @@ counter offsets 38 and 40 were separately observed; other loop fields fail.
 All 19 private effect comparisons passed again after the final bounds change,
 and the default desktop audio-device check passed. Hygiene and attribution
 checks passed. No original game installation was modified.
+
+## Startup sound and title timing (2026-10-17)
+
+Read-only research used the same pinned Steam START.EXE and GAME.OVR hashes
+listed above. A private copy ran under DOSBox 0.74-3 with sound enabled, fixed
+10000 CPU cycles, the SDL disk audio backend and a 45-second wall-clock limit.
+The capture contained 4,431,872 signed sample values, all zero. A separate
+synthetic COM program produced a PIT speaker tone through the same DOSBox/audio
+configuration: 1,606 nonzero values in 40,960 captured values. The earlier dual
+comparison configuration had `nosound=true` and cannot establish silence.
+These observations support preserving silence for this installation's observed
+startup, not a claim that all editions or later scenes lack music. No recorded
+audio, executable code, original text or image payload is redistributed.
+
+The known resident startup call at image 0x11d selects overlay 0x19, entry 0x627
+(GAME.OVR base 0xd4). It loads TITLE records 1 and 2 in order. The first wait
+multiplies five by 100; the second adds 500 to the clock. The resident clock at
+0x7ccf computes hundredths from DOS time fields. Both waits poll for a key.
+The routine then enters its credit sequence at overlay offset 0x206; the second
+title is not an indefinite menu backdrop in this path.
+
+A bounded private Unicorn probe executed the original title control flow with
+mocked clock, keyboard, string and graphics helpers. Three cases covered no key,
+a key during the first title, and a key during the second title. Each reached
+the credit entry after loading [1,2]; the selected key shortened only its title's
+wait. The routine made no direct sound request. Graphics helper internals,
+credit pages and subsequent menus were not executed by this probe; it does not
+prove full startup parity or recorded frame timing. Existing SSI Engine
+`ClassicMode.showNextTitle` at revision
+`51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` independently uses a five-second
+schedule. It remains research-only; no Java scheduler was copied.
+
+The engine now selects a bounded title period from the game profile. Pool uses
+5000ms and presents both titles before a separate menu. Missing/zero timing
+retains the old final-title menu behavior for other callers. Any ordinary key
+can skip one timed title; repeat key events are ignored. Menu commands C/B/L/E
+are consumed only at the menu. Returning from party management or an error does
+not replay titles; F10 does. Title deadlines use elapsed time and bounded SDL
+waits rather than a polling loop. The menu continues to identify engine-save
+loading and exploration accurately. Original credit pages, animated effects,
+border artwork, exact menu layout and native character/save import remain
+unfinished; this is not a complete original startup reproduction.
+
+Validation passed the three focused startup/profile/renderer suites and then
+all 27 public CTest suites. The separate private RNG integration suite skipped
+without its configuration. Synthetic SDL regressions exercise automatic title
+timeouts, per-title skipping, consumed skip keys, F10 replay, a load shortcut
+and direct menu recovery after an empty-party error. Profile rejection checks
+remain active in release builds. The installed TITLE.DAX records 1 and 2 also
+passed the bounded 320x200 decoding check. Hygiene and attribution checks passed.
+All builds used the shared lock, two workers and fixed timeouts. No owned game
+or build processes were left running.
+
+Tool friction: the live desktop helper rejected key actions after detecting
+concurrent user input, so interactive screenshots were not used as a timing
+oracle. The isolated recording and native control-flow probe supplied that
+evidence. WSL sandbox access-denied responses were resolved by approved bounded
+calls; no build parallelism was increased.

@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
         pool.character_rules->party_limit != 6) return 1;
     if (pool.picture_period_ms != 400 || curse.picture_period_ms != 0) return 1;
     if (pool.startup_title_records != std::vector<std::uint8_t>{1,2} || !curse.startup_title_records.empty()) return 1;
+    if (pool.startup_title_period_ms != 5000 || curse.startup_title_period_ms != 0) return 1;
     assert(pool.id != curse.id);
     assert(pool.archive_format == "dax-v1");
     assert(pool.archive_format == curse.archive_format);
@@ -107,6 +108,16 @@ int main(int argc, char** argv) {
         if (!rejected) return 1;
     }
     auto timing_prefix = prefix;
+    timing_prefix.replace(timing_prefix.find("colorBackdrop"),13,"startupTitlePeriodMs");
+    for (const std::string value : {"-1","60001","1.5","true","\"5000\"","5000"}) {
+        { std::ofstream o(path); o << timing_prefix << value << '}'; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        if (!rejected) return 1; // A positive period also requires title records.
+    }
+    timing_prefix = prefix;
     timing_prefix.replace(timing_prefix.find("colorBackdrop"),13,"picturePeriodMs");
     for (const std::string value : {"-1","60001","1.5","true","\"400\""}) {
         { std::ofstream o(path); o << timing_prefix << value << '}'; }
