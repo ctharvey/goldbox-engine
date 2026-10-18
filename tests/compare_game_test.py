@@ -904,6 +904,108 @@ def test_posix_leader_not_reaped(fixture):
     check(reaped, "kill_tree did not reap the leader")
 
 
+def test_interrupted_kill_is_retried(fixture):
+    # N1: an interrupt that lands before the kill takes effect must be retried for
+    # real (the old retry returned early because `killed` was set on entry), and a
+    # kill that never completed must keep the session lock held.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    import compare_process
+    seen = []
+    original_kill = compare_game.OwnedProcess.kill_tree
+
+    def recording(self):
+        if self not in seen:
+            seen.append(self)
+        original_kill(self)
+
+    class Gate:
+        """Raises KeyboardInterrupt at the first (or every) kill syscall."""
+        always = False
+        hits = 0
+
+    gate = Gate()
+    if os.name == "nt":
+        real_kernel = compare_process._KERNEL32
+
+        class Proxy:
+            def __getattr__(self, name):
+                return getattr(real_kernel, name)
+
+            def TerminateJobObject(self, *args):
+                if gate.always or gate.hits == 0:
+                    gate.hits += 1
+                    raise KeyboardInterrupt
+                return real_kernel.TerminateJobObject(*args)
+
+        def arm():
+            compare_process._KERNEL32 = Proxy()
+
+        def disarm():
+            compare_process._KERNEL32 = real_kernel
+    else:
+        real_killpg = os.killpg
+
+        def interrupting(group, sig):
+            if sig != 0 and (gate.always or gate.hits == 0):
+                gate.hits += 1
+                raise KeyboardInterrupt
+            return real_killpg(group, sig)
+
+        def arm():
+            os.killpg = interrupting
+
+        def disarm():
+            os.killpg = real_killpg
+
+    held = []
+    real_lock = compare_game.SessionLock
+
+    class RecordingLock(real_lock):
+        def acquire(self):
+            result = super().acquire()
+            held.append(self)
+            return result
+
+    compare_game.SessionLock = RecordingLock
+    compare_game.OwnedProcess.kill_tree = recording
+    try:
+        for label, always in (("single", False), ("double", True)):
+            del seen[:]
+            gate.always, gate.hits = always, 0
+            config = compare_game.parse_config(
+                fixture.config("hang", name=f"interrupt-{label}.json", timeout=2))
+            arm()
+            message = ""
+            try:
+                compare_game.run_session(config)
+            except compare_game.ControlledError as error:
+                message = str(error)
+            except KeyboardInterrupt:
+                message = "KeyboardInterrupt"
+            finally:
+                disarm()
+            if label == "single":
+                check(all(owned.process.poll() is not None for owned in seen) and len(seen) == 2,
+                      f"single: the retried kill did not stop every tree ({len(seen)} trees)")
+                real_lock(config["privateRoot"]).acquire().release()
+            else:
+                check("interrupted twice" in message, f"double: unexpected message {message!r}")
+                try:
+                    real_lock(config["privateRoot"]).acquire().release()
+                except compare_game.ControlledError:
+                    pass
+                else:
+                    check(False, "double: lock released while a kill never completed")
+                for owned in seen:  # Clean up what the injected interrupts left alive.
+                    original_kill(owned)
+                held[-1].release()
+    finally:
+        disarm()
+        compare_game.OwnedProcess.kill_tree = original_kill
+        compare_game.SessionLock = real_lock
+
+
 def test_reference_input_cancel(fixture):
     # F11: once the controller gives up on a dispatch, no further key may start.
     import threading
@@ -1009,6 +1111,7 @@ def main():
         test_reader_errors_are_failures(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
+        test_interrupted_kill_is_retried(fixture)
         test_reference_input_cancel(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])

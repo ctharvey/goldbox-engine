@@ -123,15 +123,20 @@ def run_session(config, console=None):
         for owned in (engine, reference):
             if owned is None:
                 continue
+            finished = False
             for attempt in (1, 2):
                 try:
                     owned.kill_tree()
+                    finished = True
                     break
                 except KeyboardInterrupt as error:
                     interrupted = interrupted or error
                 except Exception as error:
                     cleanup_errors.append(str(error))
+                    finished = True
                     break
+            if not finished:  # Ownership is ambiguous: keep the lock held.
+                cleanup_errors.append("cleanup was interrupted twice; owned members may still be alive")
         for waiter in (stdout_reader, stderr_reader, *ref_drains):
             try:
                 _wait_bounded(waiter)

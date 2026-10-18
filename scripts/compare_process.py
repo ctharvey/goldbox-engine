@@ -360,30 +360,40 @@ class OwnedProcess:
 
     def kill_tree(self):
         """Kill the owned tree and verify members are gone; the caller must
-        treat a raised ControlledError as failed, non-successful cleanup."""
+        treat a raised ControlledError as failed, non-successful cleanup.
+        An interrupt leaves `killed` False so a retry really re-runs the kill;
+        a verification failure is final and is reported once."""
         if self.killed:
             return
+        try:
+            self._kill_tree()
+        except Exception:
+            self.killed = True
+            raise
         self.killed = True
+
+    def _kill_tree(self):
         if os.name == "nt":
             kernel32 = _KERNEL32
             errors = []
-            if not kernel32.TerminateJobObject(ctypes.wintypes.HANDLE(self.job), 1):
+            job = self.job  # None when an earlier, interrupted attempt already released it.
+            if job is not None and not kernel32.TerminateJobObject(ctypes.wintypes.HANDLE(job), 1):
                 errors.append(f"TerminateJobObject failed (error {ctypes.get_last_error()})")
             try:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 errors.append("owned leader still alive after TerminateJobObject")
-            remaining = -1
-            for _ in range(10):
-                remaining = _job_process_count(self.job)
+            remaining = -1 if job is not None else 0
+            for _ in range(10 if job is not None else 0):
+                remaining = _job_process_count(job)
                 if remaining == 0:
                     break
                 time.sleep(0.1)
             if remaining != 0:
                 errors.append(f"owned job members may still be alive ({remaining!r})")
-            if not kernel32.CloseHandle(ctypes.wintypes.HANDLE(self.job)):
+            self.job = None  # Cleared before the close: a retry must never close it twice.
+            if job is not None and not kernel32.CloseHandle(ctypes.wintypes.HANDLE(job)):
                 errors.append(f"CloseHandle failed (error {ctypes.get_last_error()})")
-            self.job = None
             self._close_stdin()
             if errors:
                 raise ControlledError("cleanup verification failed: " + "; ".join(errors))
