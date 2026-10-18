@@ -59,6 +59,9 @@ USAGE = "usage: compare_game.py <session-config.json> [--script <scenario.json>]
 
 def run_session(config, console=None):
     lock = SessionLock(config["privateRoot"]).acquire()
+    # POSIX: children inherit the flock's open file description, so a SIGKILLed
+    # controller cannot free the lock while an owned process still runs.
+    inherited = (lock.fd,) if os.name != "nt" else ()
     engine = reference = None
     stdout_reader = stderr_reader = None
     ref_drains = []
@@ -68,7 +71,8 @@ def run_session(config, console=None):
         if config["engine"].get("backend") == "wsl":
             engine = WslEngine.launch(config["engine"], config["timeout"])
         else:
-            engine = OwnedProcess.launch(config["engine"]["argv"], config["engine"]["cwd"])
+            engine = OwnedProcess.launch(config["engine"]["argv"], config["engine"]["cwd"],
+                                         pass_fds=inherited)
         engine_queue = _EventQueue()
         stdout_reader = EngineStdoutReader(engine.process.stdout, engine_queue,
             engine.filter_event if isinstance(engine, WslEngine) else None)
@@ -81,7 +85,8 @@ def run_session(config, console=None):
         if config["reference"].get("input") is not None:
             reference_env = dict(os.environ, SDL_VIDEODRIVER="windib")
         reference = OwnedProcess.launch(config["reference"]["argv"],
-                                        config["reference"]["cwd"], env=reference_env)
+                                        config["reference"]["cwd"], env=reference_env,
+                                        pass_fds=inherited)
         ref_drains = [_BoundedDrain(reference.process.stdout, "reference stdout",
                                     REFERENCE_OUTPUT_LIMIT),
                       _BoundedDrain(reference.process.stderr, "reference stderr",
@@ -182,9 +187,9 @@ def _raise_interrupt(signum, frame):
 
 
 def _install_termination_handlers():
-    """Turn SIGTERM/SIGHUP (POSIX) and SIGBREAK (Windows) into the Ctrl-C path so
+    """Turn SIGTERM/SIGHUP/SIGQUIT (POSIX) and SIGBREAK (Windows) into the Ctrl-C path so
     run_session's finally kills the owned trees; returns the previous handlers."""
-    names = ("SIGBREAK",) if os.name == "nt" else ("SIGTERM", "SIGHUP")
+    names = ("SIGBREAK",) if os.name == "nt" else ("SIGTERM", "SIGHUP", "SIGQUIT")
     previous = {}
     for name in names:
         number = getattr(signal, name, None)

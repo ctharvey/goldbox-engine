@@ -254,10 +254,10 @@ class OwnedProcess:
         self.killed = False
 
     @classmethod
-    def launch(cls, argv, cwd, env=None):
+    def launch(cls, argv, cwd, env=None, pass_fds=()):
         if os.name == "nt":
             return cls._launch_windows(argv, cwd, env=env)
-        return cls._launch_posix(argv, cwd, env=env)
+        return cls._launch_posix(argv, cwd, env=env, pass_fds=pass_fds)
 
     @classmethod
     def _launch_windows(cls, argv, cwd, allow_wsl=False, env=None):
@@ -343,11 +343,12 @@ class OwnedProcess:
         return cls(job, process, None)
 
     @classmethod
-    def _launch_posix(cls, argv, cwd, env=None):
+    def _launch_posix(cls, argv, cwd, env=None, pass_fds=()):
         try:
             process = _PeekPopen(
                 argv, cwd=str(cwd), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, start_new_session=True, env=env)
+                stderr=subprocess.PIPE, start_new_session=True, env=env,
+                pass_fds=pass_fds)
         except OSError as error:
             raise ControlledError(f"cannot launch {argv[0]!r}: {error}") from error
         return cls(None, process, process.pid)

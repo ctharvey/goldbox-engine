@@ -879,6 +879,73 @@ def test_termination_signals(fixture):
                 process.wait(timeout=5)
 
 
+def test_posix_lock_outlives_killed_controller(fixture):
+    # F-A3: SIGKILL (or OOM) gives the controller no cleanup. The children run in
+    # their own sessions, so the lock must stay held by them until they die.
+    # SIGQUIT must take the normal cleanup path.
+    if os.name == "nt":
+        print("test_posix_lock_outlives_killed_controller: POSIX only; skipped")
+        return
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    lock_path = os.path.realpath(fixture.private / "goldbox-compare.lock")
+
+    def holders():
+        found = []
+        for entry in os.listdir("/proc"):
+            if not entry.isdecimal() or int(entry) == os.getpid():
+                continue
+            try:
+                for fd in os.listdir(f"/proc/{entry}/fd"):
+                    if os.path.realpath(f"/proc/{entry}/fd/{fd}") == lock_path:
+                        found.append(int(entry))
+                        break
+            except OSError:
+                continue
+        return found
+
+    for label, number, expect_clean in (("SIGQUIT", signal.SIGQUIT, True),
+                                        ("SIGKILL", signal.SIGKILL, False)):
+        config = fixture.config("hang", name=f"lock-{label}.json", timeout=30)
+        process = subprocess.Popen(
+            [sys.executable, "-u", str(CONTROLLER), str(config)], stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        survivors = []
+        try:
+            deadline = time.monotonic() + 15
+            ready = False
+            while time.monotonic() < deadline and not ready:
+                ready = "[engine ready]" in process.stdout.readline()
+            check(ready, f"{label}: controller never reached ready")
+            process.send_signal(number)
+            process.wait(timeout=15)
+            survivors = [pid for pid in holders() if pid != process.pid]
+            if expect_clean:
+                check(not survivors, f"{label}: cleanup left lock holders {survivors}")
+                compare_game.SessionLock(fixture.private).acquire().release()
+            else:
+                check(len(survivors) >= 2, f"{label}: children do not hold the lock: {survivors}")
+                try:
+                    compare_game.SessionLock(fixture.private).acquire().release()
+                except compare_game.ControlledError:
+                    pass
+                else:
+                    check(False, f"{label}: lock free while owned children still run")
+        finally:
+            for pid in survivors:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+        deadline = time.monotonic() + 10
+        while holders() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        compare_game.SessionLock(fixture.private).acquire().release()
+
+
 def test_posix_leader_not_reaped(fixture):
     # F4: poll() on a POSIX leader must not reap it; a reaped leader frees the
     # pgid for reuse before killpg runs. Only meaningful on POSIX.
@@ -1141,6 +1208,7 @@ def main():
         test_reader_errors_are_failures(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
+        test_posix_lock_outlives_killed_controller(fixture)
         test_interrupted_kill_is_retried(fixture)
         test_streamdown_does_not_reap_leader(fixture)
         test_reference_input_cancel(fixture)
