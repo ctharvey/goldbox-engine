@@ -353,13 +353,14 @@ int main(int argc, char** argv) {
             std::cout << "Optional --font <8X8D.DAX> <record-id> selects SSI-order monochrome text glyphs.\n";
             std::cout << "Optional --portraits <HEAD.DAX> <BODY.DAX> enables profile-based portraits with --images.\n";
             std::cout << "Optional --startup <TITLE.DAX> opens profile-selected titles and the startup menu.\n";
-            std::cout << "Optional --audio <START.EXE> enables profile-selected speaker effects; F8 auditions one.\n";
+            std::cout << "Optional --audio <START.EXE> enables profile-selected effects and edition-matched startup music; F8 auditions an effect.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
 #ifdef GOLDBOX_RENDERER
         if (images) images->picture_period_ms = profile.picture_period_ms;
         std::optional<goldbox::formats::SpeakerClip> preview_audio;
+        std::optional<goldbox::formats::TandyClip> startup_music;
         std::function<goldbox::formats::SpeakerClip(std::uint16_t)> sounds;
         if (audio_file) {
             if (!profile.speaker_audio) throw std::runtime_error("Profile has no speaker audio adapter");
@@ -370,14 +371,24 @@ int main(int argc, char** argv) {
             input.seekg(0);
             if (!input.read(reinterpret_cast<char*>(executable.data()),executable.size()))
                 throw std::runtime_error("Failed reading audio executable");
-            const auto resident = goldbox::formats::unpack_exepack(executable);
-            const auto& layout = *profile.speaker_audio;
+            const auto* music = profile.tandy_music &&
+                profile.tandy_music->fingerprint == std::to_string(checksum(executable)) ? &*profile.tandy_music : nullptr;
+            auto layout = *profile.speaker_audio;
+            if (music) {
+                layout.segment_offset = music->file_segment_offset;
+                layout.effect_table = music->effect_table;
+                layout.effect_count = music->effect_count;
+                layout.tick_divisor = music->tick_divisor;
+            }
+            const auto resident = music ? std::move(executable) : goldbox::formats::unpack_exepack(executable);
             if (layout.segment_offset >= resident.size()) throw std::runtime_error("Audio segment is missing");
             const auto segment = std::span<const std::uint8_t>(resident).subspan(layout.segment_offset);
             preview_audio = goldbox::formats::decode_ssi_speaker(segment.first(std::min<std::size_t>(segment.size(),65536)),
                 layout.effect_table,layout.preview_entry,layout.tick_divisor);
             auto data = std::make_shared<std::vector<std::uint8_t>>(segment.begin(),
                 segment.begin()+std::min<std::size_t>(segment.size(),65536));
+            if (music) startup_music = goldbox::formats::decode_ssi_tandy(*data,music->table,music->entry,
+                music->durations,music->frequencies,music->tick_divisor);
             sounds = [data,layout](std::uint16_t id) {
                 if (id < 2 || id > layout.effect_count)
                     throw std::runtime_error("Unsupported SSI sound ID/control");
@@ -444,7 +455,8 @@ int main(int argc, char** argv) {
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
             profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,
             images && images->portraits ? &*profile.portrait : nullptr,wall_archives ? &*wall_archives : nullptr,
-            startup_screens,preview_audio ? &*preview_audio : nullptr,sounds,profile.startup_title_period_ms);
+            startup_screens,preview_audio ? &*preview_audio : nullptr,sounds,profile.startup_title_period_ms,
+            startup_music && !startup_screens.empty() ? &*startup_music : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {

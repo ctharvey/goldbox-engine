@@ -37,6 +37,7 @@ public:
     std::optional<ImagePresentation> images;
     AudioPlayer* audio{};
     const formats::SpeakerClip* preview_audio{};
+    const formats::TandyClip* startup_music{};
     std::function<formats::SpeakerClip(std::uint16_t)> sounds;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> font_texture{nullptr,SDL_DestroyTexture};
@@ -143,6 +144,8 @@ public:
         std::uint32_t period_ms) {
         const auto menu_screen = period_ms ? screens.size() : screens.size()-1;
         std::size_t screen = show_titles && error.empty() ? 0 : menu_screen;
+        bool music_playing = startup_music && screen != menu_screen;
+        if (music_playing) audio->play(*startup_music);
         std::size_t selection = 0;
         std::size_t uploaded = screens.size();
         Uint64 screen_clock = SDL_GetTicks();
@@ -151,6 +154,7 @@ public:
         if (session.character_rules) options.insert(options.begin(),"CREATE / MANAGE PARTY [C]");
         while (running) {
             const bool menu = screen == menu_screen;
+            if (menu && music_playing) { audio->stop(); music_playing = false; }
             if (uploaded != screen && (!menu || !period_ms)) {
                 title.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,320,200));
                 if (!title) throw std::runtime_error(SDL_GetError());
@@ -615,7 +619,8 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
     const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
     std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
-    std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms) {
+    std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms,
+    const formats::TandyClip* startup_music) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_title_period_ms > 60000) throw std::runtime_error("Invalid startup title period");
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
@@ -627,7 +632,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     SDL_SetMainReady();
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
-    AudioPlayer audio(preview_audio || bool(sounds));
+    AudioPlayer audio(preview_audio || bool(sounds) || startup_music);
     SDL_Window* raw_window{};
     SDL_Renderer* raw_renderer{};
     checked(SDL_CreateWindowAndRenderer("Goldbox Engine - exploration preview",960,640,
@@ -640,6 +645,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
         auto host = std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
         host->audio = &audio;
         host->preview_audio = preview_audio;
+        host->startup_music = startup_music;
         host->sounds = sounds;
         return host;
     };

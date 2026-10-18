@@ -11,6 +11,9 @@
   "startupTitleRecords": [1, 2],
   "startupTitlePeriodMs": 5000,
   "speakerAudio": {"segmentOffset": 35552, "effectTable": 1375, "previewEntry": 8, "tickDivisor": 5041, "effectCount": 20},
+  "tandyMusic": {"fingerprint": "11213555104201169956", "fileSegmentOffset": 11168,
+    "effectTable": 1035, "effectCount": 12, "table": 1195, "entry": 12,
+    "durations": 186, "frequencies": 1011, "tickDivisor": 5041},
   "soundCall": {"function": 47619, "selectorAddress": 990, "cases": [
     {"selector": 8, "sound": 10}, {"selector": 10, "sound": 11}]},
   "colorBackdrop": {"skyColorAddresses": [18941, 18942]},

@@ -296,8 +296,8 @@ int main(int argc, char** argv) {
     std::vector<std::uint16_t> played_sounds;
     const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true,
         const ImageArchives* portrait_images = nullptr, const GameProfile::Portrait* portrait_config = nullptr,
-        const SpeakerClip* audio = nullptr, std::uint32_t title_period_ms = 0) {
-        if (audio) assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));
+        const SpeakerClip* audio = nullptr, std::uint32_t title_period_ms = 0, const TandyClip* music = nullptr) {
+        if (audio || music) assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));
         SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
         for (const auto code : keys) {
             SDL_Event event{};
@@ -310,10 +310,15 @@ int main(int argc, char** argv) {
         if (audio) sounds = [&](std::uint16_t id) { played_sounds.push_back(id); return *audio; };
         assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,portrait_images,nullptr,{},
             portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{},
-            audio,sounds,title_period_ms) == 0);
+            audio,sounds,title_period_ms,music) == 0);
         SDL_Quit();
     };
     const auto initial_startup = serialize_exploration(session,"startup-synthetic");
+    TandyClip title_music{5000,{}};
+    title_music.frames.push_back({TandyTone{100,2},TandyTone{200,3},TandyTone{300,4}});
+    title_music.frames.emplace_back();
+    startup_window({SDLK_F10,SDLK_SPACE,SDLK_SPACE,SDLK_E},true,nullptr,nullptr,nullptr,5000,&title_music);
+    assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
     // Timed presentation gives both titles their own screen. Skip keys do not
     // become menu commands; restarts reset the title sequence and pending state.
     startup_window({SDLK_B,SDLK_B,SDLK_E},true,nullptr,nullptr,nullptr,5000);
@@ -334,7 +339,7 @@ int main(int argc, char** argv) {
     },nullptr);
     assert(delayed_begin);
     assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,nullptr,nullptr,{},
-        nullptr,nullptr,screens,nullptr,{},1) == 0);
+        nullptr,nullptr,screens,nullptr,{},1,&title_music) == 0);
     SDL_RemoveTimer(delayed_begin); SDL_Quit();
     assert(session.state.memory[0x4a00] == 42);
     session.state.memory[0x4a00] = 0;

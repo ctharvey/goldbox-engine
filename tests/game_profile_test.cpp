@@ -24,6 +24,9 @@ int main(int argc, char** argv) {
     if (pool.picture_period_ms != 400 || curse.picture_period_ms != 0) return 1;
     if (pool.startup_title_records != std::vector<std::uint8_t>{1,2} || !curse.startup_title_records.empty()) return 1;
     if (pool.startup_title_period_ms != 5000 || curse.startup_title_period_ms != 0) return 1;
+    if (!pool.tandy_music || curse.tandy_music || pool.tandy_music->fingerprint != "11213555104201169956" ||
+        pool.tandy_music->file_segment_offset != 11168 || pool.tandy_music->entry != 12 ||
+        pool.tandy_music->frequencies != 1011 || pool.tandy_music->durations != 186) return 1;
     assert(pool.id != curse.id);
     assert(pool.archive_format == "dax-v1");
     assert(pool.archive_format == curse.archive_format);
@@ -70,6 +73,21 @@ int main(int argc, char** argv) {
     auto audio_prefix = prefix;
     audio_prefix.replace(audio_prefix.find("colorBackdrop"),13,"speakerAudio");
     auto call_prefix = prefix;
+    const std::string valid_music = R"({"fingerprint":"11213555104201169956","fileSegmentOffset":11168,"effectTable":1035,"effectCount":12,"table":1195,"entry":12,"durations":186,"frequencies":1011,"tickDivisor":5041})";
+    const auto music_prefix = audio_prefix +
+        R"({"segmentOffset":0,"effectTable":0,"previewEntry":0,"tickDivisor":1},"tandyMusic":)";
+    for (const auto& [before,after] : std::vector<std::pair<std::string,std::string>>{
+        {"11213555104201169956","18446744073709551616"},{"11168","2097152"},
+        {"1035","65535"},{"1195","65535"},{"186","65535"},{"1011","65535"},{"5041","0"}}) {
+        auto value = valid_music;
+        value.replace(value.find(before),before.size(),after);
+        { std::ofstream o(path); o << music_prefix << value << '}'; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        if (!rejected) return 1;
+    }
     call_prefix.replace(call_prefix.find("colorBackdrop"),13,"soundCall");
     for (const std::string value : {
         R"({"function":1,"selectorAddress":65535,"cases":[]})",

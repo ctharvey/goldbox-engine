@@ -10,6 +10,12 @@
 namespace goldbox {
 class AudioPlayer {
     std::unique_ptr<SDL_AudioStream,decltype(&SDL_DestroyAudioStream)> stream_{nullptr,SDL_DestroyAudioStream};
+    void submit(std::span<const float> pcm) {
+        if (!stream_) throw std::runtime_error("Audio device is not configured");
+        stop(); // Replacement prevents repeated keys/restarts from accumulating audio.
+        if (!SDL_PutAudioStreamData(stream_.get(),pcm.data(),static_cast<int>(pcm.size()*sizeof(float))))
+            throw std::runtime_error(SDL_GetError());
+    }
 public:
     explicit AudioPlayer(bool enabled) {
         if (!enabled) return;
@@ -22,11 +28,8 @@ public:
         if (stream_ && !SDL_ClearAudioStream(stream_.get())) throw std::runtime_error(SDL_GetError());
     }
     void play(const formats::SpeakerClip& clip) {
-        if (!stream_) throw std::runtime_error("Audio device is not configured");
-        const auto pcm = formats::render_speaker(clip);
-        stop(); // Replacement is bounded; repeated keys cannot build a long queue.
-        if (!SDL_PutAudioStreamData(stream_.get(),pcm.data(),static_cast<int>(pcm.size()*sizeof(float))))
-            throw std::runtime_error(SDL_GetError());
+        submit(formats::render_speaker(clip));
     }
+    void play(const formats::TandyClip& clip) { submit(formats::render_tandy(clip)); }
 };
 } // namespace goldbox

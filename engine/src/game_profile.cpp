@@ -17,7 +17,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
-        "startupTitlePeriodMs"}, "game profile");
+        "startupTitlePeriodMs", "tandyMusic"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -241,6 +241,31 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         profile.speaker_audio = GameProfile::SpeakerAudio{static_cast<std::uint32_t>(segment),
             static_cast<std::uint16_t>(table),static_cast<std::uint16_t>(entry),static_cast<std::uint16_t>(tick),
             static_cast<std::uint16_t>(count)};
+    }
+    if (const auto* value = root.if_contains("tandyMusic")) {
+        const auto& music = j::object(*value,"tandyMusic");
+        j::fields_only(music,{"fingerprint","fileSegmentOffset","effectTable","effectCount",
+            "table","entry","durations","frequencies","tickDivisor"},"tandyMusic");
+        const auto number = [&](const char* name, std::int64_t maximum) {
+            const auto n = j::integer(j::field(music,name,"tandyMusic"),name);
+            if (n < 0 || n > maximum) throw std::runtime_error("Invalid Tandy music layout");
+            return n;
+        };
+        const auto fingerprint = j::string(j::field(music,"fingerprint","tandyMusic"),"fingerprint");
+        const auto offset = number("fileSegmentOffset",2*1024*1024-1);
+        const auto effect = number("effectTable",65535), count = number("effectCount",8192);
+        const auto table = number("table",65535), entry = number("entry",8191);
+        const auto durations = number("durations",65535), frequencies = number("frequencies",65535);
+        const auto tick = number("tickDivisor",65535);
+        if (!std::regex_match(fingerprint,std::regex("[0-9]{1,20}")) ||
+            (fingerprint.size() == 20 && fingerprint > "18446744073709551615") || !tick || !count ||
+            effect+count*8 > 65536 || table+(entry+1)*8 > 65536 || durations+19 > 65536 ||
+            frequencies+24 > 65536 || !profile.speaker_audio || profile.speaker_audio->preview_entry >= count)
+            throw std::runtime_error("Invalid Tandy music tables/fingerprint");
+        profile.tandy_music = GameProfile::TandyMusic{fingerprint,static_cast<std::uint32_t>(offset),
+            static_cast<std::uint16_t>(effect),static_cast<std::uint16_t>(count),
+            static_cast<std::uint16_t>(table),static_cast<std::uint16_t>(entry),
+            static_cast<std::uint16_t>(durations),static_cast<std::uint16_t>(frequencies),static_cast<std::uint16_t>(tick)};
     }
     if (const auto* value = root.if_contains("soundCall")) {
         const auto& call = j::object(*value,"soundCall");

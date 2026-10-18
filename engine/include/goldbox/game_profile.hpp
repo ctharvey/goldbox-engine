@@ -54,6 +54,12 @@ struct GameProfile {
         std::uint16_t effect_count{};
     };
     std::optional<SpeakerAudio> speaker_audio{};
+    struct TandyMusic {
+        std::string fingerprint; // FNV-1a64 edition selector, not a security checksum.
+        std::uint32_t file_segment_offset{};
+        std::uint16_t effect_table{}, effect_count{}, table{}, entry{}, durations{}, frequencies{}, tick_divisor{};
+    };
+    std::optional<TandyMusic> tandy_music{};
     std::optional<EclSoundCall> sound_call{};
     // Zero preserves the legacy final-title menu; timed titles precede a separate menu.
     std::uint32_t startup_title_period_ms{};

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-18
+
+- Connect edition-matched Tandy music to startup through the existing --audio
+  option. Keep edition fingerprints and audio tables in the game profile.
+  Stop music at the menu, replace queued playback on F10 restart, and preserve
+  the installed v1.3's silent startup. Verify both paths with bounded scripted
+  engine runs and captured audio; recorded-original parity remains unverified.
+
 ## 2026-10-17
 
 - Add a bounded SSI Tandy tone-score decoder and deterministic three-voice PCM

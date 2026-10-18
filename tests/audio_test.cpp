@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
 #ifdef GOLDBOX_RENDERER
     SDL_SetMainReady();
     assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));
-    { goldbox::AudioPlayer player(true); player.play(clip); player.play(clip); player.stop(); }
+    { goldbox::AudioPlayer player(true); player.play(clip); player.play(music); player.play(music); player.stop(); }
     SDL_Quit();
 #endif
     if (argc == 3 || argc == 4) {

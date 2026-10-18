@@ -1294,3 +1294,42 @@ The bounded build and all 27 public CTest suites passed; the separate original
 RNG integration test skipped without configuration. Hygiene and attribution
 checks passed. No downloaded code was executed, no proprietary input/output was
 added to the repository, and no owned build or game process remains running.
+
+## Edition-selected startup playback (2026-10-18)
+
+The existing `--audio <file>` window option now selects the recovered early
+executable by its profile-provided FNV-1a64 fingerprint `11213555104201169956`.
+This is a non-cryptographic edition selector, not a safety or authenticity check;
+the SHA-256 and quarantine checks above remain separate. The optional `tandyMusic`
+profile object supplies the raw file segment offset (11168, including MZ header),
+effect and score tables, note tables, entry and timing. Other files keep the
+existing EXEPACK speaker path. Unsupported unpacked editions fail explicitly.
+The core has no Pool title, filename or executable-address heuristics.
+
+Selecting the early file with `--startup` plays its Tandy score during the title
+sequence. Entering the menu stops it; returning from party management or a menu
+error does not replay titles/music. F10 clears the audio queue and replays the
+startup from the beginning. F8 remains an explicit speaker-effect audition and
+replaces queued music. Effects continue using the matching edition's speaker
+table. The installed Steam v1.3 file never receives invented startup music.
+Users can keep the early executable as a non-executable `.data` file outside
+the installation and select it explicitly; no installation replacement is needed.
+This audio selection does not establish compatibility for other early-edition
+campaign/ECL data. Noise synthesis and recorded-original waveform parity remain
+outside the supported tone-preview subset.
+
+Synthetic regressions cover Tandy submission/replacement on SDL's dummy audio
+device, timed title playback, F10 replay, unmodified game state, absent music
+configuration and invalid profile bounds/fingerprints. All 27 public suites
+passed again; the separately configured original RNG integration suite skipped.
+
+A private wrapper called the actual explore CLI main function, using installed
+TITLE/GEO/ECL data and each audio file in turn. Scripted SDL keys restarted after
+two seconds, skipped both titles after two more, and exited after one second at
+the menu. Both runs returned zero using the default desktop audio device, then
+both returned zero again with SDL's disk backend. The early-source capture had
+1,254,312 nonzero bytes in 1,736,704 bytes, with its final 65,536 bytes silent;
+the v1.3 capture had zero nonzero bytes in 1,794,048 bytes. This verifies engine
+output and menu stopping, not parity with a recording of the original player.
+All probes had fixed timeouts and the shared compile lock. Only our engine code
+ran; downloaded programs and original installation files were untouched.
