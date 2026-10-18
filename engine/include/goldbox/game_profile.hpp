@@ -48,6 +48,11 @@ struct GameProfile {
     std::optional<PartyMemoryLayout> party_memory{};
     std::optional<HighWordLcg32> random{};
     EclRandomDialect random_dialect{EclRandomDialect::disabled};
+    struct SpeakerAudio {
+        std::uint32_t segment_offset{};
+        std::uint16_t effect_table{}, preview_entry{}, tick_divisor{};
+    };
+    std::optional<SpeakerAudio> speaker_audio{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

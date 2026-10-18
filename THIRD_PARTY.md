@@ -1,5 +1,26 @@
 # Third-party licensing and provenance
 
+## First speaker audio slice (2026-10-17)
+
+SDL3 3.2.28 (existing zlib dependency) supplies audio devices, conversion and
+stream queues through `runtime/audio.hpp`. No SDL implementation was copied.
+SSI Engine's two SOUND_EVENT handlers at the recorded revision are empty and
+provide no playback code to reuse. Gold Box Explorer's inspected tree has no
+sound/music adapter. Neither project's audio implementation was incorporated.
+
+David Fifield's Rust EXEPACK tool, reviewed via `viiri/exepack` revision
+`a42f2c8fb1018feeb2c32fc7f7b1f01240d824c4`, offers a complete compressor and
+executable reconstructor. COPYING waives copyright under CC0-1.0. We need only
+bounded resident data extraction, not a Rust runtime or reconstructed executable.
+No Rust or decompression-stub source was copied/translated. The small B0/B2
+extractor independently implements behavior already observed in the installed
+EXEPACK stub. It neither applies relocations nor writes executable output.
+
+The SSI constant-tone subset and shared speaker synthesis are independent
+interoperability code. Executable layout facts live in the game profile; no
+original sound programs, note data, memory images or waveforms are distributed.
+An external Unicorn probe remains private and is not a playback dependency.
+
 ## RNG debug laboratory (2026-10-17)
 
 The optional external analysis tool is Unicorn Engine 2.1.4, revision

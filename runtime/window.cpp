@@ -2,6 +2,7 @@
 // Attribution-ID: sdl3
 // Uses unmodified, separately installed SDL3; no upstream implementation copied.
 #include "view.hpp"
+#include "audio.hpp"
 #include <SDL3/SDL.h>
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL_main.h>
@@ -34,6 +35,8 @@ public:
     std::optional<formats::WallGraphics> selected_graphics;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     std::optional<ImagePresentation> images;
+    AudioPlayer* audio{};
+    const formats::SpeakerClip* preview_audio{};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> font_texture{nullptr,SDL_DestroyTexture};
     bool running{true};
@@ -175,6 +178,7 @@ public:
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) return 0;
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
             const auto key = event.key.key;
+            if (key == SDLK_F8 && audio && preview_audio) { audio->play(*preview_audio); continue; }
             if (key == SDLK_F10) { restart_requested = true; return 0; }
             if (!menu) {
                 if (key == SDLK_RETURN || key == SDLK_SPACE) ++screen;
@@ -587,7 +591,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images,
     const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
     const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
-    std::span<const formats::IndexedImage> startup_screens) {
+    std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
     for (const auto& screen : startup_screens) {
@@ -598,6 +602,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     SDL_SetMainReady();
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
+    AudioPlayer audio(preview_audio);
     SDL_Window* raw_window{};
     SDL_Renderer* raw_renderer{};
     checked(SDL_CreateWindowAndRenderer("Goldbox Engine - exploration preview",960,640,
@@ -607,7 +612,10 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
     checked(SDL_SetRenderLogicalPresentation(raw_renderer,960,640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
     const auto create_host = [&] {
-        return std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
+        auto host = std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
+        host->audio = &audio;
+        host->preview_audio = preview_audio;
+        return host;
     };
     const auto initial_session = session;
     while (true) {
@@ -659,6 +667,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
             const auto key = event.key.key;
             if (key == SDLK_ESCAPE) break;
+            if (key == SDLK_F8 && preview_audio) { audio.play(*preview_audio); continue; }
             if (key == SDLK_F10) { host.restart_requested = true; break; }
             try {
                 if (key == SDLK_LEFT || key == SDLK_A || key == SDLK_RIGHT || key == SDLK_D) {
@@ -691,6 +700,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
         }
         if (!host.restart_requested) return 0;
         window_host.reset();
+        audio.stop();
         session = initial_session;
     }
 }

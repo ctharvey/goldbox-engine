@@ -1081,3 +1081,51 @@ Use initially captured an occluding window; explicitly activating the returned
 DOSBox window corrected it. Unicode text entry did not reach DOSBox's name
 prompt; a key event did. After the reference deadline, a further input reported
 no foreground process; no retry was sent to a stale window.
+
+## First PC-speaker audio slice (2026-10-17)
+
+Read-only analysis used the same authorized Steam START.EXE, SHA-256
+`d825df2b174675c9088ba1489488bdeebe66ad2a22943f17d3a198e60b6a07bd`.
+The resident EXEPACK image was extracted privately without changing the installed
+executable. No proprietary sound programs or PCM are included in public tests.
+
+The observed sound driver initializes a 5041-count timer interval. Its resident
+data segment begins at image offset `0x8ae0`; the four-channel effect pointer
+table begins at segment offset `0x55f`. A bounded private Unicorn probe executed
+the original initializer at image offset `0xa222` and PC-speaker tick routine at
+`0x9f57`. Sampled entries 1..19 terminated after 9..601 ticks. Entry 20 uses
+additional control commands; no music interpretation is claimed.
+
+The first public adapter intentionally supports constant-tone FF stores to
+duration, pitch and speaker gate, with four-channel priority. It does not scan
+for instructions and rejects other fields/commands. Layout and the selected
+preview entry 8 live in the Pool profile, not title checks in the player.
+The independent C++ decoder matched every pitch/gate frame of entry 8 against
+the native trace: 10 timer frames and 2027 synthesized samples at 48 kHz. This
+checks register-level timing, not physical speaker filtering or recorded-audio
+parity. The original driver also latches pitch before interpreting the next
+command; that ordering is covered by a synthetic regression.
+
+An explicit private original-resource test successfully opened the default
+desktop audio device and submitted the decoded effect. Public tests use SDL's
+dummy audio device, and scripted window tests audition twice and restart from
+startup/exploration without changing serialized game state. F8 is a preview
+control; no automatic ECL/gameplay sound trigger is claimed. Startup music,
+Tandy synthesis, sweeps, loops and modulation remain unfinished. No startup
+music was invented, and absence of separate audio files does not prove this
+edition has no embedded music.
+
+Local SDL had been built with audio disabled. Its pinned 3.2.28 dependency was
+rebuilt with audio and PulseAudio enabled, under the shared lock with two
+workers and fixed timeouts. WSL PulseAudio development headers were installed.
+CI now also enables audio, using a dummy device for reproducible tests.
+The first dependency configure timed out on the Windows filesystem; moving its
+temporary build to Linux storage resolved that. A final install argument picked
+up a Windows carriage return; a separate bounded install completed successfully.
+
+Validation: focused audio/profile/window tests passed, followed by all 27 public
+CTest suites (the separate private RNG integration suite skipped without its
+configuration). Repository hygiene and attribution checks passed. An additional
+two-second CLI smoke test loaded the original sound executable alongside a
+synthetic map/ECL pair and reached the window loop; timeout closed that owned
+process without writing a save. This did not exercise automatic sound events.

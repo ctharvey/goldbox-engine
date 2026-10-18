@@ -294,7 +294,9 @@ int main(int argc, char** argv) {
     session = {}; session.dialect = dialect; session.opcodes = ops;
     session.ecl_record = program({9,0,42,1,0,0x4a,0});
     const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true,
-        const ImageArchives* portrait_images = nullptr, const GameProfile::Portrait* portrait_config = nullptr) {
+        const ImageArchives* portrait_images = nullptr, const GameProfile::Portrait* portrait_config = nullptr,
+        const SpeakerClip* audio = nullptr) {
+        if (audio) assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));
         SDL_SetMainReady(); assert(SDL_Init(SDL_INIT_VIDEO));
         for (const auto code : keys) {
             SDL_Event event{};
@@ -304,10 +306,14 @@ int main(int argc, char** argv) {
             assert(SDL_PushEvent(&event));
         }
         assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,portrait_images,nullptr,{},
-            portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{}) == 0);
+            portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{},audio) == 0);
         SDL_Quit();
     };
     const auto initial_startup = serialize_exploration(session,"startup-synthetic");
+    const SpeakerClip audio{1193181,5000,{{1000,true},{0,false}}};
+    startup_window({SDLK_F8,SDLK_F8,SDLK_F10,SDLK_ESCAPE},true,nullptr,nullptr,&audio);
+    startup_window({SDLK_F8,SDLK_F10,SDLK_ESCAPE},false,nullptr,nullptr,&audio);
+    assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
     startup_window({SDLK_F10,SDLK_F10,SDLK_ESCAPE});
     startup_window({SDLK_RETURN,SDLK_F10,SDLK_ESCAPE});
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RIGHT,SDLK_F10,SDLK_ESCAPE});

@@ -2,6 +2,11 @@
 
 ## 2026-10-17
 
+- Add opt-in original speaker-effect decoding and an SDL3 F8 audition in startup
+  and exploration. Keep executable offsets in the game profile, use bounded
+  read-only EXEPACK extraction, and reject unsupported sound commands explicitly.
+  Automatic game sound triggers and startup music remain unfinished.
+
 - Clarify the harness's operator checkpoint and RNG limits. Regress that
   reference-only code-wheel/startup inputs never become engine actions, consume
   action IDs, or bypass the shared-input staging guard.

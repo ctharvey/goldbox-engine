@@ -38,9 +38,31 @@ described below. Neither mode is a verified original-game UI.
 It starts at (0,0), north, with empty state unless a matching engine save is
 loaded. The map overview reveals all cells. Text defaults to SDL's limited
 ASCII debug font, with bounded wrapping/history and a scrolling menu selection.
-RmlUi, production fonts, audio and QuickJS-NG
+RmlUi, production fonts, complete game audio and QuickJS-NG
 remain future work. Unsupported ECL/combat reports a diagnostic; changes made
 before a VM failure retain the existing partial-progress semantics.
+
+### Speaker-effect preview
+
+With `--window`, add `--audio /private/START.EXE` before the six resource/save
+arguments to opt into the profile's original speaker-effect preview. F8 auditions
+it on the title/menu screens or in exploration. Other title/creation keys keep
+their existing behavior. Audio is off unless explicitly selected; an unavailable
+device reports an error only when audio was requested. Repeated F8 replaces the
+previous sound, F10 clears it, and closing the window releases the stream/device.
+
+The Pool profile supplies resident segment/table/timer offsets and entry 8.
+The adapter reads the user-owned EXEPACK executable in memory without executing
+or modifying it. This initial subset accepts constant pitches, gate changes and
+durations; sweeps, loops, modulation and music commands fail explicitly. Pitch
+and gate are decoded per original timer tick into a shared mono synthesizer,
+then played through SDL3. This does not reproduce analog speaker filtering.
+
+F8 is an audition, not a verified original gameplay trigger. Automatic ECL sound
+events, simultaneous effects, Tandy sound and startup music remain unfinished.
+There is no invented startup jingle. Synthetic tests cover decoding, duration,
+priority, truncation/unsupported input, exact sample counts and dummy-device
+playback. A private original-code trace independently checks the selected effect.
 
 To use original wall artwork instead of procedural walls, insert this before
 the six profile/map/ECL/save arguments, after `--window`:

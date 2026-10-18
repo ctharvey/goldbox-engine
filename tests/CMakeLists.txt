@@ -1,4 +1,12 @@
 add_executable(goldbox_tests journal_test.cpp)
+add_executable(goldbox_audio_tests audio_test.cpp)
+target_link_libraries(goldbox_audio_tests PRIVATE goldbox_formats)
+if(GOLDBOX_BUILD_RENDERER)
+    target_include_directories(goldbox_audio_tests PRIVATE ${PROJECT_SOURCE_DIR}/runtime)
+    target_link_libraries(goldbox_audio_tests PRIVATE SDL3::SDL3)
+    target_compile_definitions(goldbox_audio_tests PRIVATE GOLDBOX_RENDERER)
+endif()
+add_test(NAME goldbox_audio_tests COMMAND goldbox_audio_tests)
 add_executable(goldbox_party_tests party_test.cpp)
 target_link_libraries(goldbox_party_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_party_tests COMMAND goldbox_party_tests

@@ -16,7 +16,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
-        "characterCreationRules", "partyMemory", "random", "characterCreationDice"}, "game profile");
+        "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -215,6 +215,22 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         }
         validate_party_memory_layout(layout,*profile.character_rules);
         profile.party_memory = std::move(layout);
+    }
+    if (const auto* value = root.if_contains("speakerAudio")) {
+        const auto& audio = j::object(*value,"speakerAudio");
+        j::fields_only(audio,{"segmentOffset","effectTable","previewEntry","tickDivisor"},"speakerAudio");
+        const auto number = [&](const char* name, std::int64_t maximum) {
+            const auto n = j::integer(j::field(audio,name,"speakerAudio"),name);
+            if (n < 0 || n > maximum) throw std::runtime_error("Invalid speaker audio layout");
+            return n;
+        };
+        const auto segment = number("segmentOffset",1024*1024-65536);
+        const auto table = number("effectTable",65535);
+        const auto entry = number("previewEntry",8191);
+        const auto tick = number("tickDivisor",65535);
+        if (!tick || table+entry*8+8 > 65536) throw std::runtime_error("Invalid speaker audio timing/table");
+        profile.speaker_audio = GameProfile::SpeakerAudio{static_cast<std::uint32_t>(segment),
+            static_cast<std::uint16_t>(table),static_cast<std::uint16_t>(entry),static_cast<std::uint16_t>(tick)};
     }
     return profile;
 }

@@ -4,6 +4,7 @@
 #include "goldbox/formats/graphics.hpp"
 #include "goldbox/image_presentation.hpp"
 #include "goldbox/game_profile.hpp"
+#include "goldbox/formats/audio.hpp"
 #include <filesystem>
 
 namespace goldbox {
@@ -34,5 +35,6 @@ int run_exploration_window(ExplorationSession& session, std::string_view source_
     const ImageArchives* images = nullptr, const GameProfile::ColorBackdrop* backdrop = nullptr,
     std::span<const formats::IndexedImage> font = {}, const GameProfile::Portrait* portrait = nullptr,
     const WallArchives* wall_archives = nullptr,
-    std::span<const formats::IndexedImage> startup_screens = {});
+    std::span<const formats::IndexedImage> startup_screens = {},
+    const formats::SpeakerClip* preview_audio = nullptr);
 } // namespace goldbox

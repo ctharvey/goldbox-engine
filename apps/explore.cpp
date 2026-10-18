@@ -290,9 +290,17 @@ int main(int argc, char** argv) {
         std::optional<goldbox::PortraitArchives> portraits;
         std::vector<goldbox::formats::IndexedImage> font;
         std::optional<goldbox::formats::DaxArchive> startup_archive;
+        std::optional<std::filesystem::path> audio_file;
         while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" ||
             std::string_view(argv[1]) == "--images" || std::string_view(argv[1]) == "--font" ||
-            std::string_view(argv[1]) == "--portraits" || std::string_view(argv[1]) == "--startup")) {
+            std::string_view(argv[1]) == "--portraits" || std::string_view(argv[1]) == "--startup" ||
+            std::string_view(argv[1]) == "--audio")) {
+            if (std::string_view(argv[1]) == "--audio") {
+                if (argc < 3 || audio_file) throw std::runtime_error("--audio requires one executable");
+                audio_file = argv[2];
+                argc -= 2; argv += 2;
+                continue;
+            }
             if (std::string_view(argv[1]) == "--startup") {
                 if (argc < 3 || startup_archive) throw std::runtime_error("--startup requires one title archive");
                 startup_archive.emplace(goldbox::formats::DaxArchive::from_file(argv[2]));
@@ -345,11 +353,29 @@ int main(int argc, char** argv) {
             std::cout << "Optional --font <8X8D.DAX> <record-id> selects SSI-order monochrome text glyphs.\n";
             std::cout << "Optional --portraits <HEAD.DAX> <BODY.DAX> enables profile-based portraits with --images.\n";
             std::cout << "Optional --startup <TITLE.DAX> opens profile-selected titles and the startup menu.\n";
+            std::cout << "Optional --audio <START.EXE> enables the profile's F8 speaker-effect preview.\n";
             return argc == 1 ? 0 : 1;
         }
         const auto profile = goldbox::read_game_profile(argv[1]);
 #ifdef GOLDBOX_RENDERER
         if (images) images->picture_period_ms = profile.picture_period_ms;
+        std::optional<goldbox::formats::SpeakerClip> preview_audio;
+        if (audio_file) {
+            if (!profile.speaker_audio) throw std::runtime_error("Profile has no speaker audio adapter");
+            std::ifstream input(*audio_file,std::ios::binary | std::ios::ate);
+            if (!input || input.tellg() < 0 || input.tellg() > 2*1024*1024)
+                throw std::runtime_error("Invalid audio executable size");
+            std::vector<std::uint8_t> executable(static_cast<std::size_t>(input.tellg()));
+            input.seekg(0);
+            if (!input.read(reinterpret_cast<char*>(executable.data()),executable.size()))
+                throw std::runtime_error("Failed reading audio executable");
+            const auto resident = goldbox::formats::unpack_exepack(executable);
+            const auto& layout = *profile.speaker_audio;
+            if (layout.segment_offset >= resident.size()) throw std::runtime_error("Audio segment is missing");
+            const auto segment = std::span<const std::uint8_t>(resident).subspan(layout.segment_offset);
+            preview_audio = goldbox::formats::decode_ssi_speaker(segment.first(std::min<std::size_t>(segment.size(),65536)),
+                layout.effect_table,layout.preview_entry,layout.tick_divisor);
+        }
         const auto startup_screens = startup_archive ?
             goldbox::load_startup_screens(*startup_archive,profile.startup_title_records) :
             std::vector<goldbox::formats::IndexedImage>{};
@@ -409,7 +435,7 @@ int main(int argc, char** argv) {
             graphics ? &*graphics : nullptr, images ? &*images : nullptr,
             profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,
             images && images->portraits ? &*profile.portrait : nullptr,wall_archives ? &*wall_archives : nullptr,
-            startup_screens);
+            startup_screens,preview_audio ? &*preview_audio : nullptr);
 #endif
         TerminalHost host;
         const auto trigger = [&](goldbox::formats::EclEventKind kind) {
