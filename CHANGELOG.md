@@ -2,6 +2,9 @@
 
 ## 2026-10-18
 
+- Move choice menus into the overview panel and wrap their labels so character
+  portraits and opening cutscene artwork remain visible during input prompts.
+
 - Add profile-selected campaign Begin with created-party/RNG retention, initial
   map/program resolution, ADD, host DELAY, position refresh and timed sprite-to-
   portrait presentation. Bind active ECL programs in engine saves and bound

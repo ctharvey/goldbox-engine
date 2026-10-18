@@ -6,6 +6,8 @@ map overview, coordinates/facing, event text, and keyboard-driven menus. Geometr
 checks walls on both sides of an edge and treats map bounds as solid, matching
 movement. All nonzero wall IDs remain blocking; door flags are not interactive.
 The renderer has no title checks and does not change decoder/VM state semantics.
+Choice menus use the right-hand overview panel, with two-line labels, leaving
+portraits and cutscene artwork visible. Dialogue stays below the artwork.
 
 Install SDL3 >=3.2 (for example, vcpkg `sdl3` on Windows), then configure:
 

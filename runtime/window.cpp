@@ -594,12 +594,17 @@ public:
         const auto first = lines.size() > 7 ? lines.size() - 7 : 0;
         for (std::size_t i = first; i < lines.size(); ++i) label(24,492 + float(i-first)*16,lines[i]);
         if (!choices.empty()) {
-            color(22,29,37); rectangle(50,118,548,280);
-            color(207,176,112); label(66,134,"CHOOSE / UP + DOWN, ENTER / F10 RESTART");
+            // Use the overview panel so choices never obscure portraits or event artwork.
+            color(22,29,37); rectangle(648,72,288,360);
+            color(207,176,112); label(664,88,"CHOOSE / F10 RESTART");
+            label(664,104,"UP + DOWN, ENTER");
             const auto start = selected >= 8 ? selected - 7 : 0;
             for (std::size_t i = start; i < choices.size() && i < start + 8; ++i) {
                 color(i == selected ? 233 : 160,i == selected ? 194 : 171,i == selected ? 104 : 180);
-                label(66,162+float(i-start)*26,(i == selected ? "> " : "  ") + choices[i].substr(0,62));
+                const auto option = (i == selected ? "> " : "  ") + choices[i].substr(0,62);
+                const float y = 132+float(i-start)*36;
+                label(664,y,option.substr(0,32));
+                if (option.size() > 32) label(664,y+16,option.substr(32));
             }
         }
         checked(SDL_RenderPresent(renderer));

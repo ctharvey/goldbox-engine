@@ -99,6 +99,9 @@ rows. Input tiles must be 8x8 with exactly 64 binary palette pixels (0 or 15),
 and the strip must have 64..256 tiles. Zero becomes transparent; white pixels
 receive the current UI tint. The renderer retains its existing layout and text
 limits. See `--font` in the runtime README; no font artwork is redistributed.
+Four imported letter masks (256 pixels) matched a saved local DOS screenshot
+exactly, including detached strokes in the source font. This narrow check does
+not verify every glyph or all scaling behavior.
 
 SSI Engine's pinned Pool properties, `MonocromeSymbols.java`,
 `GoldboxString.java`, `CustomGoldboxString.java`, `AbstractRenderer.java` and
