@@ -13,6 +13,17 @@
 #include <iostream>
 
 using namespace goldbox;
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+static unsigned render_presents{}, font_color_changes{};
+extern "C" bool __real_SDL_RenderPresent(SDL_Renderer*);
+extern "C" bool __real_SDL_SetTextureColorMod(SDL_Texture*, Uint8, Uint8, Uint8);
+extern "C" bool __wrap_SDL_RenderPresent(SDL_Renderer* renderer) {
+    ++render_presents; return __real_SDL_RenderPresent(renderer);
+}
+extern "C" bool __wrap_SDL_SetTextureColorMod(SDL_Texture* texture, Uint8 r, Uint8 g, Uint8 b) {
+    ++font_color_changes; return __real_SDL_SetTextureColorMod(texture,r,g,b);
+}
+#endif
 namespace {
 void near(double actual, double expected) { assert(std::abs(actual-expected) < 0.00001); }
 void key(SDL_Keycode code) {
@@ -205,6 +216,10 @@ int main(int argc, char** argv) {
     near(hit.distance,0.5);
     assert(hit.wall == 7 && hit.east_west);
     assert(!session.move(Direction::east));
+    auto doorway = session;
+    doorway.map.cells[3*16+5].door_flags = 1u << 6;
+    assert(cast_wall(doorway.map,3,4,1,0).wall == 7); // Visible doorway is not a solid collision edge.
+    assert(doorway.move(Direction::east) && doorway.column == 5);
     for (const auto ray : {std::pair{0.0,0.0},std::pair{std::numeric_limits<double>::infinity(),1.0}}) {
         bool failed = false;
         try { (void)cast_wall(session.map,3,4,ray.first,ray.second); }
@@ -373,6 +388,53 @@ int main(int argc, char** argv) {
     check_menu(true,{SDLK_UP,SDLK_RETURN},1);
     check_menu(true,{SDLK_B},1);
     check_menu(true,{SDLK_RIGHT,SDLK_RETURN},0);
+
+    // An input-event flood must not cause a frame for every irrelevant event.
+    // Linux/WSL link wrappers count calls while still invoking the real SDL.
+    auto responsive = session;
+    responsive.facing = Direction::north;
+    responsive.ecl_record.resize(20);
+    responsive.ecl_record.insert(responsive.ecl_record.end(),{0x11,0x81,0,0x4b,0});
+    responsive.state.strings[0x4b00] = std::string(200,'X');
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_I);
+    for (int i = 0; i < 500; ++i) {
+        SDL_Event event{}; event.type = SDL_EVENT_MOUSE_MOTION;
+        assert(SDL_PushEvent(&event));
+    }
+    key(SDLK_LEFT); key(SDLK_ESCAPE);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    render_presents = font_color_changes = 0;
+#endif
+    assert(run_exploration_window(responsive,"renderer-responsive",save,nullptr,nullptr,nullptr,font,
+        nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+    assert(responsive.facing == Direction::west);
+    assert(responsive.row == session.row && responsive.column == session.column);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    assert(render_presents >= 2 && render_presents <= 4);
+    assert(font_color_changes > 0 && font_color_changes <= 100);
+#endif
+    SDL_Quit();
+
+    auto responsive_menu = original_session;
+    responsive_menu.state.memory[0x4a03] = 99;
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_SPACE);
+    for (int i = 0; i < 500; ++i) {
+        SDL_Event event{}; event.type = SDL_EVENT_MOUSE_MOTION;
+        assert(SDL_PushEvent(&event));
+    }
+    key(SDLK_B); key(SDLK_ESCAPE);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    render_presents = font_color_changes = 0;
+#endif
+    assert(run_exploration_window(responsive_menu,"renderer-menu-responsive",save,nullptr,nullptr,nullptr,font,
+        nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+    assert(responsive_menu.state.memory[0x4a03] == 1);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    assert(render_presents >= 2 && render_presents <= 5);
+#endif
+    SDL_Quit();
 
     // Begin must use the campaign adapter, rather than the launch preview's ECL.
     // Restart then exercises the same created party and startup route again.

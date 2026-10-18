@@ -185,17 +185,15 @@ void ExplorationSession::load_area(std::array<std::uint8_t,3> values) {
 
 bool ExplorationSession::move(Direction direction) {
     const auto& cell = map.cell(row, column);
-    const std::uint8_t walls[]{cell.north, cell.east, cell.south, cell.west};
     const auto index = static_cast<std::size_t>(direction);
     if (index > 3) throw std::runtime_error("Invalid exploration direction");
     facing = direction;
-    if (walls[index] != 0) return false;
+    if (cell.blocks_movement(index)) return false;
     const int next_row = row + (direction == Direction::north ? -1 : direction == Direction::south ? 1 : 0);
     const int next_column = column + (direction == Direction::west ? -1 : direction == Direction::east ? 1 : 0);
     if (next_row < 0 || next_row >= 16 || next_column < 0 || next_column >= 16) return false;
     const auto& next = map.cell(static_cast<std::size_t>(next_row), static_cast<std::size_t>(next_column));
-    const std::uint8_t opposite[]{next.south, next.west, next.north, next.east};
-    if (opposite[index] != 0) return false;
+    if (next.blocks_movement((index+2)%4)) return false;
     row = static_cast<std::uint8_t>(next_row);
     column = static_cast<std::uint8_t>(next_column);
     return true;

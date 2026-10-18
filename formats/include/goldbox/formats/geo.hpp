@@ -34,6 +34,18 @@ struct GeoCell {
     std::uint8_t raw_event{};
     std::uint8_t door_flags{};
 
+    // Shared GEO16 adapter: N/E/S/W occupy consecutive two-bit fields.
+    // State 1 permits traversal despite a wall graphic; states 2/3 stay closed.
+    [[nodiscard]] std::uint8_t door_state(std::size_t direction) const {
+        if (direction > 3) throw std::out_of_range("Invalid GEO edge direction");
+        return static_cast<std::uint8_t>((door_flags >> (direction*2)) & 3u);
+    }
+    [[nodiscard]] bool blocks_movement(std::size_t direction) const {
+        const auto state = door_state(direction);
+        const std::uint8_t walls[]{north,east,south,west};
+        return walls[direction] != 0 && state != 1;
+    }
+
     [[nodiscard]] std::uint8_t event_selector() const noexcept {
         return static_cast<std::uint8_t>(raw_event & 0x7fu);
     }

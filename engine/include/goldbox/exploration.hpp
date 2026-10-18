@@ -53,7 +53,8 @@ struct ExplorationSession {
     std::optional<std::array<std::uint8_t,2>> campaign_start{};
     std::uint32_t script_delay_ms{};
 
-    // Conservative pilot: nonzero walls block movement; doors are not modeled.
+    // Both GEO16 edges must permit traversal; boundaries remain solid.
+    // Door state 1 is passable. Opening/bashing states 2/3 is not modeled.
     bool move(Direction direction);
     void load_area(std::array<std::uint8_t,3> values);
     EclExecution trigger(formats::EclEventKind kind, EclHost& host, EclLimits limits = {});

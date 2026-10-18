@@ -1,5 +1,16 @@
 # Third-party licensing and provenance
 
+## Door traversal (2026-10-18)
+
+SSI Engine `data/dungeon/DungeonMap.java` and
+`engine/input/DungeonMovementHandler.java` at
+`51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` were consulted for N/E/S/W two-bit
+door fields, state-1 traversal and the distinction from closed states 2/3.
+These remain research-only references. The GEO16 accessor and C++ collision
+checks are independently implemented. The upstream placeholder auto-opening of
+closed doors is not adopted; locks, bashing and map-edge exits remain unfinished.
+No original map data or Java implementation is distributed.
+
 ## Original display adapter (2026-10-18)
 
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`, particularly

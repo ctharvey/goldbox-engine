@@ -1,7 +1,7 @@
 # GEO 16×16 decoder pilot (M2)
 
 **Status:** implemented with synthetic tests and layout checks on 29 local Pool
-of Radiance GEO records. Wall/door semantics and full game compatibility remain
+of Radiance GEO records. Closed/locked-door behavior and full game compatibility remain
 unverified. A separate bounded resolver handles supported selector routes;
 unknown game-state dependencies remain unresolved.
 
@@ -25,10 +25,23 @@ The specialized 16×16 decoder requires **at least 1026 bytes**. It does not yet
 | `2..257` | 256 | North wall nibble (`byte >> 4`) and east wall nibble (`byte & 15`) |
 | `258..513` | 256 | South wall nibble and west wall nibble |
 | `514..769` | 256 | Raw event bytes; low 7 bits are an event selector, high bit preserved without assumed meaning |
-| `770..1025` | 256 | Raw door flags; orientation/locking semantics not yet interpreted |
+| `770..1025` | 256 | Two-bit door states, from low bits to high: north, east, south, west |
 | `1026+` | variable | Unknown trailing data, length recorded but not interpreted |
 
 Each plane is indexed by `row * 16 + column`. `GeoMap::cell(row, col)` checks both coordinates and throws on invalid access. `GeoEventReference` reports `(GEO record ID, row, column, raw event, event selector)` for **every nonzero raw event byte**. This intentionally includes `0x80` (selector zero with a high bit) without claiming it is an executable event.
+
+`GeoCell::door_state(direction)` validates a zero-based N/E/S/W direction.
+For a nonzero wall graphic, state 1 allows passage; state 0 is solid and states
+2/3 remain closed. Flags on absent wall graphics do not create an obstacle.
+`ExplorationSession::move` checks both edge faces and bounds; it does not mutate
+archives or door flags. Visual door graphics remain visible. The state-1 rule
+was researched in SSI Engine's pinned `DungeonMap.java`; opening, bashing,
+lock checks and transitions through boundary doors are not implemented.
+Read-only validation with the rebuilt C++ movement code against the installed
+Pool starting map (`GEO3.DAX`, record 0) passed 120 interior door edges and
+blocked 361 solid edges plus one boundary door. No map cells or extracted
+content are included here. This checks collision against original resources,
+not original executable behavior, event timing or closed-door gameplay parity.
 
 ## GEO → ECL association
 
@@ -56,7 +69,9 @@ Outputs per-record map dimensions, count of nonzero raw event bytes, count of hi
 - `tests/geo_test.cpp` synthesizes a complete 1026-byte 16×16 record and a separately encoded DAX archive; checks wall nibble order, four planes, every corner, high-bit semantics, out-of-range coordinates, trailing data, and truncations.
 - Verifies GEO extraction from DAX, explicit ECL pairing, failure on missing ECL record, and failure when an ECL record's compressed bytes are invalid.
 - No SSI assets in test fixtures. The tests enforce `assert` even in Release builds.
-- Record layouts, variant trailers, doorway semantics, event dispatch addresses, and game compatibility remain unverified until local game-file checks.
+- Variant trailers, closed/locked doorway behavior and full game compatibility
+  remain unverified. Synthetic tests cover every direction and door state,
+  opposing-wall conflicts and boundaries; native opening/bashing still needs comparison.
 
 ## Next gates
 

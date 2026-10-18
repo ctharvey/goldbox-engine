@@ -3,9 +3,21 @@
 Optional SDL3 window over the existing `ExplorationSession` and ECL host interface.
 It draws a first-person view using independent grid-edge ray casting, a revealed
 map overview, coordinates/facing, event text, and keyboard-driven menus. Geometry
-checks walls on both sides of an edge and treats map bounds as solid, matching
-movement. All nonzero wall IDs remain blocking; door flags are not interactive.
+checks visual walls on both sides of an edge and treats map bounds as solid.
+GEO16 door state 1 permits movement through its wall graphic when both sides
+allow passage; states 0, 2 and 3 on nonzero walls remain blocking. Doorway artwork
+still occludes the view, as in the source map; collision and visual occlusion
+are distinct. Opening/bashing closed doors and map-boundary exits are unfinished.
 The renderer has no title checks and does not change decoder/VM state semantics.
+Exploration and choice menus redraw when input changes their presentation, an
+animation advances, or the window is exposed/resized. Mouse motion, key releases
+and ignored repeat events do not force another frame. Adjacent dialogue glyphs
+with the same color share a font-color change. Linux/WSL tests count actual SDL
+calls during synthetic event floods while still calling the real SDL functions.
+In a separate dummy-driver reproduction with 500 mouse-motion events and 200
+same-color dialogue glyphs, present calls fell from 503 to 3 and font-color
+changes from 102,915 to 27. These counts measure avoided work, not live WSLg
+frame latency; responsiveness still needs confirmation in the running game.
 In enhanced mode, choice menus use the right-hand overview panel, with two-line labels, leaving
 portraits and cutscene artwork visible. Dialogue stays below the artwork.
 

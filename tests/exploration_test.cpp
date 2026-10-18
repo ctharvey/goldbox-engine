@@ -24,6 +24,38 @@ void rejects(const std::function<void()>& fn) {
 } // namespace
 
 int main() {
+    // Every GEO16 direction permits an ordinary door, in both directions,
+    // while closed states, inconsistent opposing walls and boundaries stay solid.
+    for (unsigned direction = 0; direction < 4; ++direction) {
+        ExplorationSession doors;
+        doors.row = doors.column = 8;
+        const int dy[]{-1,0,1,0}, dx[]{0,1,0,-1};
+        const auto target = std::size_t((8+dy[direction])*16+8+dx[direction]);
+        const auto reverse = (direction+2)%4;
+        auto set_wall = [](GeoCell& cell, unsigned d) {
+            std::uint8_t* walls[]{&cell.north,&cell.east,&cell.south,&cell.west};
+            *walls[d] = 7;
+        };
+        auto& source = doors.map.cells[8*16+8];
+        auto& destination = doors.map.cells[target];
+        set_wall(source,direction); set_wall(destination,reverse);
+        for (unsigned state = 0; state < 4; ++state) {
+            source.door_flags = state << (direction*2);
+            destination.door_flags = state << (reverse*2);
+            doors.row = doors.column = 8;
+            assert(doors.move(static_cast<Direction>(direction)) == (state == 1));
+            if (state == 1) {
+                assert(doors.row == 8+dy[direction] && doors.column == 8+dx[direction]);
+                assert(doors.move(static_cast<Direction>(reverse)));
+            }
+            assert(doors.row == 8 && doors.column == 8);
+        }
+        source.door_flags = 1u << (direction*2); destination.door_flags = 0;
+        assert(!doors.move(static_cast<Direction>(direction)));
+    }
+    ExplorationSession boundary;
+    boundary.map.cells[0].north = 1; boundary.map.cells[0].door_flags = 1;
+    assert(!boundary.move(Direction::north));
     {
         const auto script = [](std::initializer_list<std::uint8_t> body) {
             std::vector<std::uint8_t> bytes;

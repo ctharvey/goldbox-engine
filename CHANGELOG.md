@@ -2,6 +2,12 @@
 
 ## 2026-10-18
 
+- Fix GEO16 ordinary-door traversal: honor directional state 1 on both sides
+  of an edge while preserving solid walls, closed states and map boundaries.
+  Avoid redrawing exploration/menus for irrelevant events, and render same-color
+  dialogue in runs instead of changing font color per glyph. Add Linux/WSL SDL
+  call-count regressions for input floods and synthetic four-direction door tests.
+
 - Honor ECL menu orientation in original mode: horizontal choices occupy the
   command row; vertical choices and their prompt use the dialogue region, keeping
   portraits and the party panel visible. Add native-axis arrows, Space/Enter

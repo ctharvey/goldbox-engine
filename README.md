@@ -107,7 +107,9 @@ timeout 60 ./build/apps/goldbox_explore games/pool-of-radiance/profile.json \
 Commands are `north`, `east`, `south`, `west`, `search`, `rest`, `init`, `save`,
 `load`, and `quit`; menus accept their displayed numeric index. The pilot starts
 at `(0,0)` with empty state and does not simulate full campaign initialization.
-Nonzero walls block movement; doors and map transitions are not modeled. Saves
+GEO16 door state 1 permits traversal through a nonzero wall graphic; solid walls,
+closed door states 2/3 and map boundaries remain blocking. Door opening/bashing
+and map-edge exits are not modeled. Saves
 refuse overwrite and reject changed source pairs on load. Choose a fresh save
 path for each run and keep saves, reports and captured game text outside this
 repository. `timeout` is a WSL/Linux example; native Windows callers must also

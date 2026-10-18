@@ -87,6 +87,16 @@ int main() {
     assert(tile.south == 12 && tile.west == 13);
     assert(tile.raw_event == 0x85 && tile.event_selector() == 5);
     assert(tile.event_high_bit() && tile.door_flags == 0xA5);
+    GeoCell doors{2,3,4,5,0,0xe4};
+    assert(doors.door_state(0) == 0 && doors.door_state(1) == 1 &&
+        doors.door_state(2) == 2 && doors.door_state(3) == 3);
+    assert(doors.blocks_movement(0) && !doors.blocks_movement(1) &&
+        doors.blocks_movement(2) && doors.blocks_movement(3));
+    doors = {};
+    doors.door_flags = 0xff; // Flags on an absent wall must not manufacture an obstacle.
+    for (std::size_t direction = 0; direction < 4; ++direction) assert(!doors.blocks_movement(direction));
+    rejects([&] { (void)doors.door_state(4); });
+    rejects([&] { (void)doors.blocks_movement(999); });
     assert(map.cell(0, 0).event_selector() == 127);
     assert(map.cell(15, 15).event_selector() == 0);
     assert(map.cell(15, 15).event_high_bit());

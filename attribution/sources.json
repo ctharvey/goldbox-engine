@@ -45,7 +45,7 @@
         "formats/src/geo.cpp"
       ],
       "purpose": "16x16 GEO map, wall, door and raw event plane decoder",
-      "modifications": "Ported map-cell plane indexing to bounded C++20 structures; removed System.Drawing, hardcoded map names and Windows UI coupling; added explicit ECL record pairing and synthetic tests.",
+      "modifications": "Ported map-cell plane indexing to bounded C++20 structures; removed System.Drawing, hardcoded map names and Windows UI coupling; added explicit ECL record pairing and synthetic tests. Added independently implemented directional door-state accessors and collision predicates, researched separately from SSI Engine; no upstream door code copied.",
       "reviewed": "2026-10-12"
     },
     {
@@ -124,7 +124,8 @@
         "src/main/java/shared/FontColor.java",
         "src/main/java/engine/text/TextColor.java",
         "src/main/java/ui/shared/text/StoryText.java",
-        "src/main/java/ui/shared/Menu.java"
+        "src/main/java/ui/shared/Menu.java",
+        "src/main/java/engine/input/DungeonMovementHandler.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,

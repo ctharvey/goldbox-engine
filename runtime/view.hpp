@@ -40,8 +40,9 @@ struct WallHit {
     std::uint8_t wall{};
     bool east_west{};
 };
-// Cell-center ray through GEO edges. Map bounds and either side of a wall block,
-// exactly as in ExplorationSession::move. Throws on invalid origin/direction.
+// Cell-center ray through GEO edges. Map bounds and either wall face block the ray.
+// Door graphics still occlude the view even when their edge permits traversal.
+// Throws on invalid origin/direction.
 WallHit cast_wall(const formats::GeoMap& map, int row, int column, double dx, double dy);
 // SSI's 64 printable glyphs: @.._ map to 0..31, space..? to 32..63.
 // Lowercase UI text folds to uppercase; unsupported bytes use '?'.

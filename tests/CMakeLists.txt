@@ -87,6 +87,11 @@ add_test(NAME goldbox_party_memory_tests COMMAND goldbox_party_memory_tests
 if(GOLDBOX_BUILD_RENDERER)
     add_executable(goldbox_renderer_tests renderer_test.cpp)
     target_link_libraries(goldbox_renderer_tests PRIVATE goldbox_runtime SDL3::SDL3)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_compile_definitions(goldbox_renderer_tests PRIVATE GOLDBOX_RENDER_CALL_TESTS=1)
+        target_link_options(goldbox_renderer_tests PRIVATE
+            "-Wl,--wrap=SDL_RenderPresent" "-Wl,--wrap=SDL_SetTextureColorMod")
+    endif()
     add_test(NAME goldbox_renderer_tests COMMAND goldbox_renderer_tests ${CMAKE_CURRENT_BINARY_DIR}/renderer-save.json)
     set_tests_properties(goldbox_renderer_tests PROPERTIES TIMEOUT 20
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
