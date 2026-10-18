@@ -51,8 +51,10 @@ struct GameProfile {
     struct SpeakerAudio {
         std::uint32_t segment_offset{};
         std::uint16_t effect_table{}, preview_entry{}, tick_divisor{};
+        std::uint16_t effect_count{};
     };
     std::optional<SpeakerAudio> speaker_audio{};
+    std::optional<EclSoundCall> sound_call{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

@@ -47,40 +47,62 @@ std::vector<std::uint8_t> unpack_exepack(std::span<const std::uint8_t> exe) {
 SpeakerClip decode_ssi_speaker(std::span<const std::uint8_t> bytes,
     std::uint16_t table, std::uint16_t entry, std::uint16_t tick_divisor) {
     if (bytes.size() > 65536 || !tick_divisor) throw std::runtime_error("Invalid speaker segment/timing");
-    struct Channel { std::size_t pc{}; std::uint16_t duration{}, divisor{}, output{}, gate{}; };
+    struct Channel { std::size_t pc{}; std::array<std::uint16_t,24> state{}; };
     std::array<Channel,4> channels{};
     for (std::size_t i = 0; i < channels.size(); ++i) {
         channels[i].pc = word(bytes,std::size_t(table)+std::size_t(entry)*8+i*2);
-        channels[i].duration = channels[i].pc ? 1 : 0;
+        channels[i].state[0] = channels[i].pc ? 1 : 0;
     }
     SpeakerClip clip{1193181,tick_divisor,{}};
     std::size_t commands = 0;
     for (std::size_t tick = 0; tick < 2400; ++tick) {
         for (auto& channel : channels) {
-            if (!channel.duration) continue;
-            channel.output = channel.divisor;
-            if (--channel.duration) continue;
+            auto& state = channel.state;
+            if (!state[0]) continue;
+            state[5] += state[6];
+            state[2] += state[3];
+            std::int32_t modulation = 0;
+            auto phase = std::uint16_t(state[15]+state[16]);
+            if (phase) {
+                if (phase >= state[18]) phase -= state[18];
+                state[15] = phase;
+                const auto address = std::uint16_t((std::int16_t(phase) >> 4)+state[14]);
+                if (address >= bytes.size()) throw std::runtime_error("Speaker modulation outside segment");
+                const auto sample = std::int16_t(std::uint16_t(bytes[address]) << 8);
+                modulation = (std::int32_t(sample)*std::int16_t(state[17])) >> 16;
+            }
+            state[4] = std::uint16_t(state[2]+modulation);
+            if (--state[0]) continue;
             while (true) {
                 if (++commands > 4096) throw std::runtime_error("Speaker command limit exceeded");
                 if (channel.pc >= bytes.size() || bytes.size()-channel.pc < 4)
                     throw std::runtime_error("Truncated speaker command");
-                if (bytes[channel.pc++] != 255) throw std::runtime_error("Unsupported speaker command");
+                const auto command = bytes[channel.pc++];
                 const auto field = bytes[channel.pc++];
                 const auto value = word(bytes,channel.pc);
                 channel.pc += 2;
-                if (field == 0) { channel.duration = value; break; }
-                if (field == 4) channel.divisor = value;
-                else if (field == 8) channel.output = value;
-                else if (field == 10) channel.gate = value;
-                else throw std::runtime_error("Unsupported speaker state field");
+                if (field % 2 || field > 46) throw std::runtime_error("Invalid speaker state field");
+                if (command == 254) {
+                    if (field != 38 && field != 40) throw std::runtime_error("Unsupported speaker loop field");
+                    auto& counter = state[field/2];
+                    if (counter && !--counter) continue;
+                    channel.pc = value;
+                    continue;
+                }
+                if (command != 255) throw std::runtime_error("Unsupported speaker command");
+                if (field != 0 && field != 4 && field != 6 && field != 8 && field != 10 && field != 12 &&
+                    field != 28 && field != 30 && field != 32 && field != 34 && field != 36 &&
+                    field != 38 && field != 40) throw std::runtime_error("Unsupported speaker state field");
+                state[field/2] = value;
+                if (!field) break;
             }
         }
         SpeakerFrame frame{};
         bool active = false, selected = false;
         for (const auto& channel : channels) {
-            active |= channel.duration != 0;
-            if (!selected && channel.duration && channel.gate) {
-                frame = {channel.output,(channel.gate & 3) == 3};
+            active |= channel.state[0] != 0;
+            if (!selected && channel.state[0] && channel.state[5]) {
+                frame = {channel.state[4],(channel.state[5] & 3) == 3};
                 selected = true;
             }
         }

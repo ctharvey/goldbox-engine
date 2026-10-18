@@ -16,6 +16,9 @@ int main(int argc, char** argv) {
     if (!pool.speaker_audio || curse.speaker_audio || pool.speaker_audio->segment_offset != 0x8ae0 ||
         pool.speaker_audio->effect_table != 0x55f || pool.speaker_audio->preview_entry != 8 ||
         pool.speaker_audio->tick_divisor != 5041) return 1;
+    if (pool.speaker_audio->effect_count != 20 || !pool.sound_call || curse.sound_call ||
+        pool.sound_call->function != 0xba03 || pool.sound_call->selector_address != 0x03de ||
+        pool.sound_call->cases.size() != 2) return 1;
     if (!pool.character_rules || curse.character_rules || pool.character_rules->id != pool.rules_profile ||
         pool.character_rules->party_limit != 6) return 1;
     if (pool.picture_period_ms != 400 || curse.picture_period_ms != 0) return 1;
@@ -65,6 +68,20 @@ int main(int argc, char** argv) {
     auto portrait_prefix = prefix;
     auto audio_prefix = prefix;
     audio_prefix.replace(audio_prefix.find("colorBackdrop"),13,"speakerAudio");
+    auto call_prefix = prefix;
+    call_prefix.replace(call_prefix.find("colorBackdrop"),13,"soundCall");
+    for (const std::string value : {
+        R"({"function":1,"selectorAddress":65535,"cases":[]})",
+        R"({"function":1,"selectorAddress":1,"cases":[{"selector":1,"sound":2,"extra":0}]})",
+        R"({"function":1,"selectorAddress":1,"cases":[{"selector":1,"sound":256}]})",
+        R"({"function":1,"selectorAddress":1,"cases":[{"selector":1,"sound":2},{"selector":1,"sound":3}]})"}) {
+        { std::ofstream o(path); o << call_prefix << value << '}'; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        if (!rejected) return 1;
+    }
     for (const std::string value : {
         R"({"segmentOffset":0,"effectTable":0,"previewEntry":0,"tickDivisor":0})",
         R"({"segmentOffset":-1,"effectTable":0,"previewEntry":0,"tickDivisor":1})",

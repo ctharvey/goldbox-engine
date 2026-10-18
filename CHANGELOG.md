@@ -2,6 +2,10 @@
 
 ## 2026-10-17
 
+- Route verified ECL audio calls through a profile-configured virtual selector
+  and effect IDs. Add bounded speaker sweeps, loops and modulation; preserve explicit
+  errors for unsupported native calls, sound controls and music.
+
 - Add opt-in original speaker-effect decoding and an SDL3 F8 audition in startup
   and exploration. Keep executable offsets in the game profile, use bounded
   read-only EXEPACK extraction, and reject unsupported sound commands explicitly.

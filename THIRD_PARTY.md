@@ -21,6 +21,12 @@ interoperability code. Executable layout facts live in the game profile; no
 original sound programs, note data, memory images or waveforms are distributed.
 An external Unicorn probe remains private and is not a playback dependency.
 
+The subsequent ECL audio-call route, signed sweeps, counter loops and modulation
+are independently implemented from bounded execution of the installed original.
+SSI Engine's recorded `VirtualMachine.java` CALL cases were consulted, but no
+Java call routing, sound interpreter or scheduler was copied. Later-game
+SOUND_EVENT opcode names were not applied to Pool without native evidence.
+
 ## RNG debug laboratory (2026-10-17)
 
 The optional external analysis tool is Unicorn Engine 2.1.4, revision

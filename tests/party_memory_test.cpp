@@ -49,6 +49,13 @@ int main(int argc, char** argv) {
     const auto run = [&](std::initializer_list<std::uint8_t> bytes) {
         session.ecl_record = program(bytes); return session.trigger(EclEventKind::move,host);
     };
+    session.sound_call = EclSoundCall{0xba03,0x6b00,{{8,10}}};
+    assert(!run({9,0,8,1,0,0x6b,0}).exited);
+    assert(session.state.memory[0x6b00] == 0 && session.party[0].name == "Ada");
+    session.sound_call->selector_address = 0x6aff;
+    assert(!run({9,0,8,1,0xff,0x6a,0}).exited);
+    assert(session.state.memory[0x6aff] == 0);
+    session.sound_call.reset();
     session.state.memory[0x6e3e] = 255;
     assert(run({9,1,0x3e,0x6e,1,0,0x4a,0x0a,0,1,0x11,0x81,0,0x6b,
         9,1,0x10,0x6b,1,1,0x4a,9,3,0x10,0x6b,3,2,0x4a,

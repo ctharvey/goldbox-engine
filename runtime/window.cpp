@@ -37,6 +37,7 @@ public:
     std::optional<ImagePresentation> images;
     AudioPlayer* audio{};
     const formats::SpeakerClip* preview_audio{};
+    std::function<formats::SpeakerClip(std::uint16_t)> sounds;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> font_texture{nullptr,SDL_DestroyTexture};
     bool running{true};
@@ -200,6 +201,10 @@ public:
             images->portrait(session.state.memory[portrait_config->head_id_address],id,portrait_config->layout);
         else images->picture(id);
         update_image();
+    }
+    void sound(std::uint16_t id) override {
+        if (!audio || !sounds) throw std::runtime_error("Sound resources unavailable; select --audio");
+        audio->play(sounds(id));
     }
     void sprite_start(EclSpriteRequest request) override {
         if (!images) throw std::runtime_error("No image archives selected");
@@ -591,7 +596,8 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     const std::filesystem::path& save, const formats::WallGraphics* graphics, const ImageArchives* images,
     const GameProfile::ColorBackdrop* backdrop, std::span<const formats::IndexedImage> font,
     const GameProfile::Portrait* portrait, const WallArchives* wall_archives,
-    std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio) {
+    std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
+    std::function<formats::SpeakerClip(std::uint16_t)> sounds) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
     for (const auto& screen : startup_screens) {
@@ -602,7 +608,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     SDL_SetMainReady();
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
-    AudioPlayer audio(preview_audio);
+    AudioPlayer audio(preview_audio || bool(sounds));
     SDL_Window* raw_window{};
     SDL_Renderer* raw_renderer{};
     checked(SDL_CreateWindowAndRenderer("Goldbox Engine - exploration preview",960,640,
@@ -615,6 +621,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
         auto host = std::make_unique<WindowHost>(session,raw_renderer,graphics,images,backdrop,font,portrait,wall_archives);
         host->audio = &audio;
         host->preview_audio = preview_audio;
+        host->sounds = sounds;
         return host;
     };
     const auto initial_session = session;

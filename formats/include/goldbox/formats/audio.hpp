@@ -18,8 +18,9 @@ struct SpeakerClip {
 // Bounded EXEPACK B0/B2 resident-image extraction, without running game code.
 // Relocations are not applied: this adapter reads resident data, not code pointers.
 std::vector<std::uint8_t> unpack_exepack(std::span<const std::uint8_t> executable);
-// SSI constant-tone subset: four priority channels, FF stores to duration,
-// divisor and gate. Other commands/fields fail explicitly; no opcode scanning.
+// SSI effect subset: four priority channels, duration/pitch/gate stores,
+// signed sweeps, modulation and bounded counter loops. Notes/music and other
+// state fields fail explicitly; no opcode scanning.
 SpeakerClip decode_ssi_speaker(std::span<const std::uint8_t> segment,
     std::uint16_t table, std::uint16_t entry, std::uint16_t tick_divisor);
 // Shared, deterministic mono synthesis. This is not analog speaker/filter emulation.

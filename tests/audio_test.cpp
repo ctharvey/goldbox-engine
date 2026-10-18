@@ -42,8 +42,8 @@ int main(int argc, char** argv) {
     assert(pcm.back() == 0.0f);
     assert(std::all_of(pcm.begin(),pcm.end(),[](float v) { return std::isfinite(v) && std::abs(v) <= 0.12f; }));
     auto bad = data;
-    bad[32] = 254; rejects([&] { decode_ssi_speaker(bad,0,0,5000); });
-    bad = data; bad[33] = 6; rejects([&] { decode_ssi_speaker(bad,0,0,5000); });
+    bad[32] = 253; rejects([&] { decode_ssi_speaker(bad,0,0,5000); });
+    bad = data; bad[33] = 14; rejects([&] { decode_ssi_speaker(bad,0,0,5000); });
     bad = data; bad[42] = 255; bad[43] = 255;
     rejects([&] { decode_ssi_speaker(bad,0,0,5000); });
     rejects([&] { decode_ssi_speaker(data,155,0,5000); });
@@ -51,6 +51,26 @@ int main(int argc, char** argv) {
     rejects([&] { decode_ssi_speaker(bad,0,0,5000); });
     rejects([&] { decode_ssi_speaker(data,0,0,0); });
     rejects([&] { render_speaker(clip,0); });
+    std::vector<std::uint8_t> sweep(256);
+    sweep[0] = 32;
+    const std::vector<std::uint8_t> loop{
+        255,4,0,16, 255,6,240,255, 255,10,3,0, 255,38,2,0,
+        255,0,2,0, 254,38,48,0, 255,0,0,0};
+    std::copy(loop.begin(),loop.end(),sweep.begin()+32);
+    const auto repeated = decode_ssi_speaker(sweep,0,0,5000);
+    assert((repeated.frames == std::vector<SpeakerFrame>{{0,true},{4080,true},{4064,true},{4048,true},{0,false}}));
+    sweep[32] = 254; sweep[33] = 38; sweep[34] = 32; sweep[35] = 0;
+    rejects([&] { decode_ssi_speaker(sweep,0,0,5000); }); // Zero counter jumps indefinitely, bounded.
+    sweep[33] = 2;
+    rejects([&] { decode_ssi_speaker(sweep,0,0,5000); }); // Script-pointer fields are not loop counters.
+    const std::vector<std::uint8_t> vibrato{
+        255,4,232,3, 255,10,3,0, 255,28,200,0, 255,32,16,0,
+        255,34,254,255, 255,36,32,0, 255,0,3,0, 255,0,0,0};
+    std::fill(sweep.begin()+32,sweep.end(),0);
+    std::copy(vibrato.begin(),vibrato.end(),sweep.begin()+32);
+    sweep[201] = 128;
+    const auto modulated = decode_ssi_speaker(sweep,0,0,5000);
+    assert((modulated.frames == std::vector<SpeakerFrame>{{0,true},{1001,true},{1000,true},{0,false}}));
     // Synthetic EXEPACK final literal run, followed by one fill run.
     std::vector<std::uint8_t> exe(98);
     const auto ew = [&](std::size_t p, std::uint16_t v) { exe[p] = v; exe[p+1] = v >> 8; };
@@ -72,15 +92,17 @@ int main(int argc, char** argv) {
 #ifdef GOLDBOX_RENDERER
     SDL_SetMainReady();
     assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));
-    { goldbox::AudioPlayer player(&clip); player.play(clip); player.play(clip); player.stop(); }
+    { goldbox::AudioPlayer player(true); player.play(clip); player.play(clip); player.stop(); }
     SDL_Quit();
 #endif
-    if (argc == 3) {
+    if (argc == 3 || argc == 4) {
         std::ifstream input(argv[1],std::ios::binary);
         assert(input);
         const std::vector<std::uint8_t> executable{std::istreambuf_iterator<char>(input),{}};
         const auto resident = unpack_exepack(executable);
-        const auto original = decode_ssi_speaker(std::span(resident).subspan(0x8ae0),0x55f,8,5041);
+        const auto entry = argc == 4 ? std::stoul(argv[3]) : 8;
+        assert(entry < 20);
+        const auto original = decode_ssi_speaker(std::span(resident).subspan(0x8ae0),0x55f,entry,5041);
         std::ifstream expected(argv[2]);
         assert(expected);
         for (const auto frame : original.frames) {
@@ -94,10 +116,12 @@ int main(int argc, char** argv) {
                   << "; PCM samples: " << render_speaker(original).size() << '\n';
 #ifdef GOLDBOX_RENDERER
         // Private, explicit original-resource run also checks a real output device.
-        assert(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER"));
-        { goldbox::AudioPlayer player(&original); player.play(original); SDL_Delay(150); }
-        SDL_Quit();
-        std::cout << "Original effect submitted to default audio device\n";
+        if (argc == 3) {
+            assert(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER"));
+            { goldbox::AudioPlayer player(true); player.play(original); SDL_Delay(150); }
+            SDL_Quit();
+            std::cout << "Original effect submitted to default audio device\n";
+        }
 #endif
     }
     std::cout << "Audio tests passed\n";

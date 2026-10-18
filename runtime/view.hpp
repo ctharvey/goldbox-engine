@@ -36,5 +36,6 @@ int run_exploration_window(ExplorationSession& session, std::string_view source_
     std::span<const formats::IndexedImage> font = {}, const GameProfile::Portrait* portrait = nullptr,
     const WallArchives* wall_archives = nullptr,
     std::span<const formats::IndexedImage> startup_screens = {},
-    const formats::SpeakerClip* preview_audio = nullptr);
+    const formats::SpeakerClip* preview_audio = nullptr,
+    std::function<formats::SpeakerClip(std::uint16_t)> sounds = {});
 } // namespace goldbox

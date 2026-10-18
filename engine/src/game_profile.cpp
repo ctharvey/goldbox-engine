@@ -16,7 +16,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     j::fields_only(root, {"schemaVersion", "id", "title", "formatFamily", "archiveFormat",
         "eventDialect", "rulesProfile", "validationStatus", "resourcePatterns", "eventDispatch", "imageDialect",
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
-        "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio"}, "game profile");
+        "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -218,7 +218,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     }
     if (const auto* value = root.if_contains("speakerAudio")) {
         const auto& audio = j::object(*value,"speakerAudio");
-        j::fields_only(audio,{"segmentOffset","effectTable","previewEntry","tickDivisor"},"speakerAudio");
+        j::fields_only(audio,{"segmentOffset","effectTable","previewEntry","tickDivisor","effectCount"},"speakerAudio");
         const auto number = [&](const char* name, std::int64_t maximum) {
             const auto n = j::integer(j::field(audio,name,"speakerAudio"),name);
             if (n < 0 || n > maximum) throw std::runtime_error("Invalid speaker audio layout");
@@ -228,9 +228,34 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         const auto table = number("effectTable",65535);
         const auto entry = number("previewEntry",8191);
         const auto tick = number("tickDivisor",65535);
-        if (!tick || table+entry*8+8 > 65536) throw std::runtime_error("Invalid speaker audio timing/table");
+        const auto count = audio.if_contains("effectCount") ? number("effectCount",8192) : entry+1;
+        if (!tick || !count || entry >= count || table+count*8 > 65536)
+            throw std::runtime_error("Invalid speaker audio timing/table");
         profile.speaker_audio = GameProfile::SpeakerAudio{static_cast<std::uint32_t>(segment),
-            static_cast<std::uint16_t>(table),static_cast<std::uint16_t>(entry),static_cast<std::uint16_t>(tick)};
+            static_cast<std::uint16_t>(table),static_cast<std::uint16_t>(entry),static_cast<std::uint16_t>(tick),
+            static_cast<std::uint16_t>(count)};
+    }
+    if (const auto* value = root.if_contains("soundCall")) {
+        const auto& call = j::object(*value,"soundCall");
+        j::fields_only(call,{"function","selectorAddress","cases"},"soundCall");
+        const auto number = [&](const auto& object, const char* name, std::int64_t maximum) {
+            const auto n = j::integer(j::field(object,name,"soundCall"),name);
+            if (n < 0 || n > maximum) throw std::runtime_error("Invalid sound-call configuration");
+            return static_cast<std::uint16_t>(n);
+        };
+        EclSoundCall config{number(call,"function",65535),number(call,"selectorAddress",65534),{}};
+        const auto& cases = j::array(j::field(call,"cases","soundCall"),"soundCall.cases");
+        if (cases.empty() || cases.size() > 16) throw std::runtime_error("Invalid sound-call case count");
+        for (const auto& item : cases) {
+            const auto& route = j::object(item,"soundCall.case");
+            j::fields_only(route,{"selector","sound"},"soundCall.case");
+            EclSoundCall::Case entry{number(route,"selector",65535),number(route,"sound",255)};
+            for (const auto& previous : config.cases)
+                if (previous.selector == entry.selector)
+                    throw std::runtime_error("Conflicting sound-call cases");
+            config.cases.push_back(entry);
+        }
+        profile.sound_call = std::move(config);
     }
     return profile;
 }

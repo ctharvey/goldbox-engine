@@ -1129,3 +1129,53 @@ configuration). Repository hygiene and attribution checks passed. An additional
 two-second CLI smoke test loaded the original sound executable alongside a
 synthetic map/ECL pair and reached the window loop; timeout closed that owned
 process without writing a save. This did not exercise automatic sound events.
+
+## Expanded effects and ECL sound routing (2026-10-17)
+
+The independent decoder now matches all sampled effect table entries 1..19:
+2,363 original timer frames, including signed pitch sweeps, modulation lookup
+and FE counter loops. The public fixtures remain synthetic; every original
+program, lookup table and expected pitch/gate sequence stays in private storage.
+Limits on ticks, commands, sample count and segment reads still apply. Music/note
+commands, unsupported envelope fields and sound controls are not inferred.
+
+Pool's native ECL dispatcher was traced to its CALL handler (overlay 0x1f,
+entry offset 0x2ccf). CALL operand 0xba03 requests a sound only for selector
+values 8 or 10; the inspected original sound IDs are 10 and 11. Later-game
+SOUND_EVENT opcode labels were not used as evidence for this release.
+
+The selector is a virtual native word register at ECL address 0x03de. It maps
+internally to DS:0x84cc. A write to virtual address 0x84cc does not update that
+register: that false correspondence was caught by a native WRITE probe before
+acceptance. Full original WRITE-plus-CALL execution matched 18 selector cases,
+including 264 and 266, which must not alias 8 and 10. A further native probe
+confirmed that a byte WRITE clears the previous high byte of this word register.
+The engine preserves this special write behavior through its session adapter.
+Partial/interior register writes fail explicitly.
+
+The CALL token is the raw word operand, not a read from RAM at that address.
+Native probes corroborated word operand forms 1, 2 and 3. Other forms remain
+unsupported. The byte-address form advances differently in the original and
+was deliberately excluded rather than silently interpreted as a word.
+
+The Pool profile supplies the virtual selector, call token, effect IDs and
+sound-bank bounds. The renderer receives a resolver and the VM invokes a host
+interface; neither selects behavior by game title. Saves retain selector state
+through the existing memory representation. Missing audio, unknown native calls,
+invalid sound IDs and unsupported controls report diagnostics. Selectors without
+a configured sound route reproduce the verified no-op behavior. The existing
+partial-progress semantics still apply if a host request fails.
+
+This verifies an isolated original CALL path and original effects, not successful
+execution of every instruction in an imported map event. Music, Tandy output,
+overlapping effect scheduling and full recorded-audio parity remain unfinished.
+
+Final validation passed all 27 public CTest suites; the separate private RNG
+integration test skipped without configuration. Added regressions cover full
+WRITE-plus-CALL flows, raw call tokens, selector persistence, high-byte clearing,
+invalid profiles/operands, automatic window playback and restart, and protection
+of character memory when a malformed selector binding overlaps it. Native loop
+counter offsets 38 and 40 were separately observed; other loop fields fail.
+All 19 private effect comparisons passed again after the final bounds change,
+and the default desktop audio-device check passed. Hygiene and attribution
+checks passed. No original game installation was modified.

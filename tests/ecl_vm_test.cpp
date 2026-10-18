@@ -15,6 +15,8 @@ struct Host : EclHost {
     std::size_t choice{1};
     bool cleared{};
     int combats{};
+    std::vector<std::uint16_t> calls;
+    void native_call(std::uint16_t value) override { calls.push_back(value); }
     void text(std::string_view value, bool clear) override { output.emplace_back(value); cleared = clear; }
     std::size_t menu(std::span<const std::string> choices, std::string_view, bool) override {
         assert(choices.size() == 2); return choice;
@@ -38,6 +40,16 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 int main() {
     EclState state;
     Host host;
+    for (const auto type : {1,2,3}) {
+        const auto call = program({0x2d,static_cast<std::uint8_t>(type),3,0xba,0});
+        assert(run(call,state,host).exited);
+        assert(host.calls.back() == 0xba03); // Raw word token, never a memory dereference.
+    }
+    assert(host.calls.size() == 3);
+    assert(!run(program({0x2d,0x80,1,4,0}),state,host).exited);
+    assert(!run(program({0x2d,5,3,0xba,0}),state,host).exited);
+    assert(!run(program({0x2d,1,3}),state,host).exited);
+    assert(host.calls.size() == 3);
     // Write a quest flag, compare it, skip a text output, call a subroutine,
     // output independently authored six-bit A, then return and exit.
     const auto bytes = program({

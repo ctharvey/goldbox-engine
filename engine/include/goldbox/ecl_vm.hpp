@@ -23,6 +23,11 @@ enum class EclPartyDialect { disabled, load_character };
 struct EclSpriteRequest {
     std::uint8_t sprite{}, distance{}, replacement_picture{};
 };
+struct EclSoundCall {
+    struct Case { std::uint16_t selector{}, sound{}; };
+    std::uint16_t function{}, selector_address{};
+    std::vector<Case> cases;
+};
 
 class EclHost {
 public:
@@ -31,6 +36,8 @@ public:
     // The host supplies deterministic choices; no OS input inside the VM.
     virtual std::size_t menu(std::span<const std::string> choices, std::string_view prompt, bool vertical);
     virtual void combat(EclState& state);
+    virtual void native_call(std::uint16_t function);
+    virtual void sound(std::uint16_t id);
     virtual void picture(std::uint8_t id);
     virtual void sprite_start(EclSpriteRequest request);
     virtual void sprite_advance();

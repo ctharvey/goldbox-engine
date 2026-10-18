@@ -77,6 +77,20 @@ public:
     bool write_memory(std::uint16_t address, std::uint32_t value, std::size_t width) override {
         if (session.party_memory && party_memory_intersects(*session.party_memory,address,width))
             throw std::runtime_error("Script writes to party memory are unsupported");
+        if (session.sound_call) {
+            const auto selector = session.sound_call->selector_address;
+            if (selector == 65535) throw std::runtime_error("Sound-call word outside memory");
+            if (address == selector) {
+                if (session.party_memory && party_memory_intersects(*session.party_memory,address,2))
+                    throw std::runtime_error("Sound selector overlaps party memory");
+                // A virtual native word register: even byte destinations store AX.
+                session.state.memory[address] = static_cast<std::uint8_t>(value);
+                session.state.memory[address+1] = static_cast<std::uint8_t>(value >> 8);
+                return true;
+            }
+            if (address == selector+1 || (width == 2 && address+1 == selector))
+                throw std::runtime_error("Partial sound selector writes unsupported");
+        }
         return delegate.write_memory(address,value,width);
     }
     std::optional<std::string> string_at(std::uint16_t address) override {
@@ -96,6 +110,20 @@ public:
         return delegate.menu(choices,prompt,vertical);
     }
     void combat(EclState& state) override { delegate.combat(state); }
+    void native_call(std::uint16_t function) override {
+        if (!session.sound_call || function != session.sound_call->function) {
+            delegate.native_call(function);
+            return;
+        }
+        const auto read = [&](std::uint16_t address) {
+            if (address == 65535) throw std::runtime_error("Sound-call word outside memory");
+            return std::uint16_t(session.state.memory[address] | (session.state.memory[address+1] << 8));
+        };
+        const auto selector = read(session.sound_call->selector_address);
+        for (const auto& route : session.sound_call->cases)
+            if (selector == route.selector) { delegate.sound(route.sound); return; }
+        // Verified dialect behavior: other selector values do not request a sound.
+    }
     void picture(std::uint8_t id) override { delegate.picture(id); }
     void sprite_start(EclSpriteRequest r) override { delegate.sprite_start(r); }
     void sprite_advance() override { delegate.sprite_advance(); }

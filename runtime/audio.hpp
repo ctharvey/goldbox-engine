@@ -11,8 +11,8 @@ namespace goldbox {
 class AudioPlayer {
     std::unique_ptr<SDL_AudioStream,decltype(&SDL_DestroyAudioStream)> stream_{nullptr,SDL_DestroyAudioStream};
 public:
-    explicit AudioPlayer(const formats::SpeakerClip* clip) {
-        if (!clip) return;
+    explicit AudioPlayer(bool enabled) {
+        if (!enabled) return;
         if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) throw std::runtime_error(SDL_GetError());
         const SDL_AudioSpec spec{SDL_AUDIO_F32,1,48000};
         stream_.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,nullptr,nullptr));

@@ -293,6 +293,7 @@ int main(int argc, char** argv) {
     assert(!std::filesystem::exists(startup_save));
     session = {}; session.dialect = dialect; session.opcodes = ops;
     session.ecl_record = program({9,0,42,1,0,0x4a,0});
+    std::vector<std::uint16_t> played_sounds;
     const auto startup_window = [&](std::initializer_list<SDL_Keycode> keys, bool startup = true,
         const ImageArchives* portrait_images = nullptr, const GameProfile::Portrait* portrait_config = nullptr,
         const SpeakerClip* audio = nullptr) {
@@ -305,8 +306,11 @@ int main(int argc, char** argv) {
             } else { event.type = SDL_EVENT_KEY_DOWN; event.key.key = code; }
             assert(SDL_PushEvent(&event));
         }
+        std::function<SpeakerClip(std::uint16_t)> sounds;
+        if (audio) sounds = [&](std::uint16_t id) { played_sounds.push_back(id); return *audio; };
         assert(run_exploration_window(session,"startup-synthetic",startup_save,nullptr,portrait_images,nullptr,{},
-            portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{},audio) == 0);
+            portrait_config,nullptr,startup ? std::span<const IndexedImage>(screens) : std::span<const IndexedImage>{},
+            audio,sounds) == 0);
         SDL_Quit();
     };
     const auto initial_startup = serialize_exploration(session,"startup-synthetic");
@@ -314,6 +318,13 @@ int main(int argc, char** argv) {
     startup_window({SDLK_F8,SDLK_F8,SDLK_F10,SDLK_ESCAPE},true,nullptr,nullptr,&audio);
     startup_window({SDLK_F8,SDLK_F10,SDLK_ESCAPE},false,nullptr,nullptr,&audio);
     assert(serialize_exploration(session,"startup-synthetic") == initial_startup);
+    const auto before_audio_call = session;
+    session.ecl_record = program({9,0,8,1,0xde,3,0x2d,1,3,0xba,0});
+    session.sound_call = EclSoundCall{0xba03,0x03de,{{8,10},{10,11}}};
+    startup_window({SDLK_I,SDLK_F10,SDLK_ESCAPE},false,nullptr,nullptr,&audio);
+    assert(played_sounds == std::vector<std::uint16_t>{10});
+    assert(session.state.memory[0x03de] == 0 && session.state.memory[0x03df] == 0);
+    session = before_audio_call;
     startup_window({SDLK_F10,SDLK_F10,SDLK_ESCAPE});
     startup_window({SDLK_RETURN,SDLK_F10,SDLK_ESCAPE});
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RIGHT,SDLK_F10,SDLK_ESCAPE});

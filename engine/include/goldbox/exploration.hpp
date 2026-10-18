@@ -37,6 +37,7 @@ struct ExplorationSession {
     // Immutable initial configuration used to validate saved RNG parameters.
     std::optional<HighWordLcg32> initial_random{};
     EclRandomDialect random_dialect{EclRandomDialect::disabled};
+    std::optional<EclSoundCall> sound_call{};
 
     // Conservative pilot: nonzero walls block movement; doors are not modeled.
     bool move(Direction direction);

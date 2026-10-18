@@ -12,6 +12,8 @@ using namespace goldbox::formats;
 namespace {
 struct Host : EclHost {
     std::string output;
+    std::vector<std::uint16_t> sounds;
+    void sound(std::uint16_t id) override { sounds.push_back(id); }
     void text(std::string_view value, bool) override { output += value; }
 };
 void rejects(const std::function<void()>& fn) {
@@ -22,6 +24,48 @@ void rejects(const std::function<void()>& fn) {
 } // namespace
 
 int main() {
+    {
+        ExplorationSession audio;
+        audio.dialect = {"ssi-five-entry-v1",0x9900,0xc04f};
+        audio.opcodes = minimal_vm_opcodes();
+        for (int i = 0; i < 5; ++i) audio.ecl_record.insert(audio.ecl_record.end(),{1,1,20,0x99});
+        audio.ecl_record.insert(audio.ecl_record.end(),{0x2d,1,3,0xba,0});
+        audio.sound_call = EclSoundCall{0xba03,0x03de,{{8,10},{10,11}}};
+        Host sink;
+        for (const std::uint16_t selector : {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,264,266}) {
+            auto script = std::vector<std::uint8_t>(audio.ecl_record.begin(),audio.ecl_record.begin()+20);
+            script.insert(script.end(),{9,2,static_cast<std::uint8_t>(selector),
+                static_cast<std::uint8_t>(selector >> 8),1,0xde,3,0x2d,1,3,0xba,0});
+            audio.ecl_record = script;
+            sink.sounds.clear();
+            assert(audio.trigger(EclEventKind::move,sink).exited);
+            assert(audio.state.memory[0x03de] == (selector & 255));
+            assert(audio.state.memory[0x03df] == (selector >> 8));
+            assert(sink.sounds == (selector == 8 ? std::vector<std::uint16_t>{10} :
+                selector == 10 ? std::vector<std::uint16_t>{11} : std::vector<std::uint16_t>{}));
+        }
+        // A byte WRITE clears the previous high byte of this native word register.
+        audio.ecl_record.resize(20);
+        audio.ecl_record.insert(audio.ecl_record.end(),{9,0,8,1,0xde,3,0x2d,1,3,0xba,0});
+        assert(audio.trigger(EclEventKind::move,sink).exited && sink.sounds.back() == 10);
+        assert(audio.state.memory[0x03df] == 0);
+        const auto saved = serialize_exploration(audio,"synthetic-audio");
+        audio.state.memory[0x03de] = 0;
+        restore_exploration(audio,saved,"synthetic-audio");
+        assert(audio.state.memory[0x03de] == 8);
+        audio.ecl_record.resize(20);
+        audio.ecl_record.insert(audio.ecl_record.end(),{0x2d,1,3,0xba,0});
+        audio.sound_call->function = 0xba04;
+        assert(!audio.trigger(EclEventKind::move,sink).exited);
+        audio.sound_call->function = 0xba03;
+        audio.sound_call->selector_address = 65535;
+        assert(!audio.trigger(EclEventKind::move,sink).exited);
+        audio.sound_call->selector_address = 0x03de;
+        audio.ecl_record.resize(20);
+        audio.ecl_record.insert(audio.ecl_record.end(),{9,0,0,1,0xdf,3,0});
+        assert(!audio.trigger(EclEventKind::move,sink).exited);
+
+    }
     ExplorationSession session;
     session.map = decode_geo16_record(std::vector<std::uint8_t>(1026), 7);
     session.map.cells[1].raw_event = 0x81;
