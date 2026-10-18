@@ -1103,6 +1103,58 @@ def test_streamdown_does_not_reap_leader(fixture):
         owned.kill_tree()
 
 
+def test_scenario_duplicate_keys(fixture):
+    # B1: json.loads keeps the last duplicate key, so a scenario could run commands
+    # or checks other than the ones a reviewer read first.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    from compare_script import ScriptInput
+    expect = ('[{"type":"ready","checks":{}},'
+              '{"type":"complete","checks":{"/id":1,"/status":"ok"}}]')
+    texts = {
+        "commands": '{"schemaVersion":1,"commands":["north","quit"],"commands":["quit"],'
+                    f'"expect":{expect}}}',
+        "nested": '{"schemaVersion":1,"commands":["quit"],"expect":'
+                  '[{"type":"ready","checks":{}},{"type":"complete",'
+                  '"checks":{"/id":1,"/status":"bad","/status":"ok"}}]}',
+    }
+    for label, text in texts.items():
+        path = fixture.private / f"dup-{label}.json"
+        path.write_text(text, encoding="utf-8")
+        try:
+            ScriptInput.from_file(path)
+        except compare_game.ControlledError as error:
+            check("repeats keys" in str(error), f"{label}: unexpected error {error}")
+        else:
+            check(False, f"{label}: duplicate keys were accepted")
+
+
+def test_menu_wait_pumps_engine_events(fixture):
+    # B2: while a menu awaits a choice, an engine exit or stray event must end the
+    # session promptly instead of waiting out the whole deadline.
+    import queue
+    import types
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    import compare_session
+    session = object.__new__(compare_session.Session)
+    session.deadline = time.monotonic() + 30
+    session.config = {"timeout": 30}
+    session.pending_menu = (4, 1, ["Alpha", "Beta"])
+    session.console = types.SimpleNamespace(queue=queue.Queue(), failure=None)
+    session.engine = types.SimpleNamespace(process=types.SimpleNamespace(poll=lambda: 7))
+    session.engine_queue = types.SimpleNamespace(queue=queue.Queue(), failure=None)
+    session.engine_queue.queue.put(("eof",))
+    started = time.monotonic()
+    try:
+        session._serve_menu_choice()
+    except compare_game.ControlledError as error:
+        check("engine exited" in str(error), f"unexpected error {error}")
+    else:
+        check(False, "a dead engine went unnoticed while a menu awaited input")
+    check(time.monotonic() - started < 5, "menu wait did not notice the dead engine promptly")
+
+
 def test_reference_input_cancel(fixture):
     # F11: once the controller gives up on a dispatch, no further key may start.
     import threading
@@ -1211,6 +1263,8 @@ def main():
         test_posix_lock_outlives_killed_controller(fixture)
         test_interrupted_kill_is_retried(fixture)
         test_streamdown_does_not_reap_leader(fixture)
+        test_scenario_duplicate_keys(fixture)
+        test_menu_wait_pumps_engine_events(fixture)
         test_reference_input_cancel(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])

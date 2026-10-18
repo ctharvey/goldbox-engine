@@ -439,6 +439,7 @@ class Session:
         action_id, menu_id, choices = self.pending_menu
         if self.console.failure is not None:
             raise self.console.failure
+        self._pump_idle_events()
         try:
             item = self.console.queue.get(timeout=min(remaining, EVENT_WAIT_SLICE))
         except queue.Empty:
