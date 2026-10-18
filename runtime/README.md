@@ -27,18 +27,28 @@ longer than the region are split safely. Engine notices replace the dialogue,
 and enhanced-mode control hints are omitted. Party names use the configured
 selected-member memory binding, independently of the loaded character: white
 for selected, bright cyan otherwise, with green numeric fields.
+Original dialogue interprets SSI `%0` through `%F` as inline EGA colors, with
+`%0` selecting normal bright green and `%%` displaying a percent sign. Controls
+take no character cells. Each displayed glyph retains its color through word
+wrapping and paging; the current color survives PRINT and PRINT_CLEAR. A fresh
+window starts in normal green. Unknown or incomplete controls remain literal.
+This is a shared SSI presentation adapter, with no title checks or VM/save changes;
+enhanced mode and the plain-text accumulator retain their existing behavior.
 
 This is an initial display implementation, not full visual parity. Armor class
 shows `?` because equipment is unfinished; the clock is omitted. Startup, creation
 menus and statistics sheets still use the engine's interaction flow. Typewriter
-timing, text-color changes, exact command styling and monitor aspect correction
+timing, recorded-original color parity, exact command styling and monitor aspect correction
 remain unverified. The configured border tiles matched a private DOS capture in
 all 14,400 compared pixels. Original assets and reference screenshots stay private.
 The word-boundary behavior was compared with private DOS opening captures and
 manually exercised through creation paging and the installed campaign opening.
 Synthetic tests cover PRINT continuation, page boundaries, blank lines, oversized
 words and party selection. This does not establish full paragraph pixel parity,
-original text reveal timing or character-status indicators.
+original text reveal timing or character-status indicators. Inline colors have
+synthetic coverage for all selectors, escaped/malformed controls, color changes
+inside words, continuation and clears, plus an original-mode ECL/SDL smoke test.
+They have not yet been compared against a color-changing DOS scene.
 
 Install SDL3 >=3.2 (for example, vcpkg `sdl3` on Windows), then configure:
 

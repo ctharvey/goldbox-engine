@@ -18,6 +18,16 @@ formats::IndexedImage compose_original_frame(const GameProfile::OriginalDisplay&
 // presents a completed page before it is cleared; no decoder or game state changes.
 void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool clear,
     std::size_t columns, std::size_t rows, const std::function<void()>& next_page);
+// SSI inline colors are presentation state, separate from VM memory and saves.
+struct DialoguePage {
+    std::deque<std::string> lines;
+    std::deque<std::vector<std::uint8_t>> ink;
+    std::uint8_t color{10};
+};
+// Decode %0..%F colors (%0 is normal bright green), and %% as a literal percent.
+// The current color survives PRINT_CLEAR and paging; malformed controls stay literal.
+void append_dialogue(DialoguePage& page, std::string_view text, bool clear,
+    std::size_t columns, std::size_t rows, const std::function<void()>& next_page);
 // SSI selected-PC indices are zero-based; loading a PC does not select it.
 std::uint8_t party_name_color(const ExplorationSession& session, std::size_t member);
 struct WallHit {

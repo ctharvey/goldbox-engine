@@ -2,6 +2,12 @@
 
 ## 2026-10-18
 
+- Render SSI inline dialogue colors in original mode without counting control
+  codes as visible text. Preserve color across PRINT fragments and page clears,
+  support escaped percent signs, and keep malformed controls literal. Add
+  synthetic color/wrapping/page regressions and an ECL-to-SDL integration check;
+  recorded-original color and reveal-timing parity remain unverified.
+
 - Wrap original-mode dialogue at word boundaries, preserve the cursor across
   consecutive PRINT fragments, and pause before clearing a full page. Keep
   engine notices separate from ECL dialogue. Highlight the selected party member

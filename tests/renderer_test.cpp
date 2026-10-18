@@ -51,6 +51,49 @@ int main(int argc, char** argv) {
         catch (const std::runtime_error&) { rejected = true; }
         assert(rejected);
     }
+    DialoguePage styled;
+    std::vector<DialoguePage> colored_pages;
+    const auto colored_page = [&] { colored_pages.push_back(styled); };
+    append_dialogue(styled,"%FHELLO %CWORLD",true,8,2,colored_page);
+    assert((styled.lines == std::deque<std::string>{"HELLO","WORLD"}));
+    assert(styled.ink[0] == std::vector<std::uint8_t>(5,15));
+    assert(styled.ink[1] == std::vector<std::uint8_t>(5,12));
+    append_dialogue(styled," %BAGAIN",false,8,2,colored_page);
+    assert(colored_pages.size() == 1 && colored_pages[0].ink[1] == std::vector<std::uint8_t>(5,12));
+    assert(styled.lines == std::deque<std::string>{"AGAIN"});
+    assert(styled.ink[0] == std::vector<std::uint8_t>(5,11));
+    append_dialogue(styled,"STILL",true,8,2,colored_page); // CLEAR retains the last text color.
+    assert(styled.ink[0] == std::vector<std::uint8_t>(5,11));
+    append_dialogue(styled,"%0G%% %Z %",true,12,2,colored_page);
+    assert(styled.lines == std::deque<std::string>{"G% %Z %"});
+    assert(styled.ink[0] == std::vector<std::uint8_t>(7,10));
+    append_dialogue(styled,"%1AB%2CD%3EF%4GH%5IJ",true,4,2,colored_page);
+    assert((colored_pages.back().lines == std::deque<std::string>{"ABCD","EFGH"}));
+    assert((colored_pages.back().ink[0] == std::vector<std::uint8_t>{1,1,2,2}));
+    assert((colored_pages.back().ink[1] == std::vector<std::uint8_t>{3,3,4,4}));
+    assert(styled.lines == std::deque<std::string>{"IJ"});
+    assert(styled.ink[0] == std::vector<std::uint8_t>(2,5));
+    append_dialogue(styled,"%A\n\n%FX",true,8,3,colored_page);
+    assert((styled.lines == std::deque<std::string>{"","","X"}));
+    assert(styled.ink[0].empty() && styled.ink[1].empty() && styled.ink[2][0] == 15);
+    append_dialogue(styled,"%6",true,8,2,colored_page);
+    assert(styled.lines.empty() && styled.ink.empty() && styled.color == 6);
+    append_dialogue(styled,"NEXT",false,8,2,colored_page);
+    assert(styled.ink[0] == std::vector<std::uint8_t>(4,6));
+    for (std::size_t i = 0; i < 16; ++i) {
+        const auto control = std::string("%")+"0123456789ABCDEF"[i]+"X";
+        append_dialogue(styled,control,true,8,2,colored_page);
+        assert(styled.lines == std::deque<std::string>{"X"});
+        assert(styled.ink[0][0] == (i ? i : 10));
+    }
+    append_dialogue(dialogue,"%FPLAIN",true,12,2,page); // Plain helper does not interpret SSI codes.
+    assert(dialogue == std::deque<std::string>{"%FPLAIN"});
+    DialoguePage malformed;
+    malformed.lines.push_back("X");
+    bool bad_colors = false;
+    try { append_dialogue(malformed,"Y",false,8,2,colored_page); }
+    catch (const std::runtime_error&) { bad_colors = true; }
+    assert(bad_colors);
     ExplorationSession selection;
     selection.party.resize(2);
     selection.loaded_character = 1;
@@ -259,11 +302,15 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     // The same ECL menu and state mutation work with original presentation.
+    auto original_session = session;
+    original_session.ecl_record.insert(original_session.ecl_record.begin()+20,{0x11,0x81,0,0x4b});
+    original_session.state.strings[0x4b00] = "%FWHITE %CRED %0GREEN %% %Z";
     assert(SDL_Init(SDL_INIT_VIDEO));
     key(SDLK_SPACE); key(SDLK_DOWN); key(SDLK_RETURN); key(SDLK_ESCAPE);
-    assert(run_exploration_window(session,"renderer-original",save,&graphics,nullptr,&backdrop,font,
+    assert(run_exploration_window(original_session,"renderer-original",save,&graphics,nullptr,&backdrop,font,
         nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
-    assert(session.state.memory[0x4a03] == 1);
+    assert(original_session.state.memory[0x4a03] == 1);
+    assert(original_session.state.strings[0x4b00] == "%FWHITE %CRED %0GREEN %% %Z");
     SDL_Quit();
 
     // Begin must use the campaign adapter, rather than the launch preview's ECL.

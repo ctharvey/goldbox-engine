@@ -121,7 +121,9 @@
         "src/main/java/ui/classic/StoryRenderer.java",
         "src/main/java/ui/classic/AbstractStateRenderer.java",
         "src/main/java/engine/text/GoldboxStringPartFactory.java",
-        "src/main/java/shared/FontColor.java"
+        "src/main/java/shared/FontColor.java",
+        "src/main/java/engine/text/TextColor.java",
+        "src/main/java/ui/shared/text/StoryText.java"
       ],
       "license": "GPL-3.0 (root license; verify individual source rights before adoption)",
       "licenseFile": null,

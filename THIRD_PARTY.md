@@ -20,6 +20,13 @@ independently implemented and tested with synthetic text and state. Private DOS
 opening captures corroborate word wrapping; reveal timing and full UI parity
 remain unverified.
 
+`engine/text/TextColor.java`, `shared/FontColor.java` and
+`ui/shared/text/StoryText.java` at that same revision were also consulted for
+inline percent-color controls, normal-green selector zero and color retention
+across text clears. The C++ per-glyph color state and parser are independently
+implemented; no Java code was copied or translated. Tests use synthetic strings,
+not extracted game dialogue. Original color-changing scenes remain unverified.
+
 ## Campaign opening and reference adapter (2026-10-18)
 
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b` remains a

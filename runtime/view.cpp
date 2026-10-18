@@ -12,20 +12,32 @@ std::uint8_t party_name_color(const ExplorationSession& session, std::size_t mem
     const std::size_t selected = address ? session.state.memory[*address] : 0;
     return selected == member ? 15 : 11;
 }
-void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool clear,
+namespace {
+void append_page(std::deque<std::string>& lines, std::deque<std::vector<std::uint8_t>>* ink,
+    std::string_view text, std::span<const std::uint8_t> colors, bool clear,
     std::size_t columns, std::size_t rows, const std::function<void()>& next_page) {
     if (!columns || columns > 80 || !rows || rows > 60)
         throw std::runtime_error("Invalid dialogue page dimensions");
-    if (clear) lines.clear();
+    if (clear) { lines.clear(); if (ink) ink->clear(); }
     if (lines.size() > rows || std::any_of(lines.begin(),lines.end(),
         [columns](const auto& line) { return line.size() > columns; }))
         throw std::runtime_error("Dialogue page does not fit its region");
+    if (ink) {
+        if (ink->size() != lines.size() || colors.size() != text.size())
+            throw std::runtime_error("Dialogue color state does not fit its text");
+        for (std::size_t i = 0; i < lines.size(); ++i)
+            if ((*ink)[i].size() != lines[i].size())
+                throw std::runtime_error("Dialogue color row does not fit its text");
+    }
     if (text.empty()) return;
-    if (lines.empty()) lines.emplace_back();
+    const auto add_line = [&] { lines.emplace_back(); if (ink) ink->emplace_back(); };
+    if (lines.empty()) add_line();
     const auto newline = [&] {
-        while (!lines.back().empty() && lines.back().back() == ' ') lines.back().pop_back();
-        if (lines.size() == rows) { next_page(); lines.clear(); }
-        lines.emplace_back();
+        while (!lines.back().empty() && lines.back().back() == ' ') {
+            lines.back().pop_back(); if (ink) ink->back().pop_back();
+        }
+        if (lines.size() == rows) { next_page(); lines.clear(); if (ink) ink->clear(); }
+        add_line();
     };
     for (std::size_t at = 0; at < text.size();) {
         if (text[at] == '\n') { newline(); ++at; continue; }
@@ -36,7 +48,10 @@ void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool
         if (spaces) {
             if (!lines.back().empty()) {
                 if (length > columns-lines.back().size()) newline();
-                else lines.back().append(length,' ');
+                else {
+                    lines.back().append(length,' ');
+                    if (ink) ink->back().insert(ink->back().end(),colors.begin()+at,colors.begin()+end);
+                }
             }
         } else {
             if (length <= columns && length > columns-lines.back().size()) newline();
@@ -44,6 +59,7 @@ void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool
                 if (lines.back().size() == columns) newline();
                 const auto count = std::min(end-at,columns-lines.back().size());
                 for (std::size_t i = 0; i < count; ++i) {
+                    if (ink) ink->back().push_back(colors[at]);
                     const unsigned char ch = text[at++];
                     lines.back() += ch >= 32 && ch < 127 ? char(ch) : '?';
                 }
@@ -51,6 +67,34 @@ void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool
         }
         at = end;
     }
+}
+} // namespace
+void append_dialogue(std::deque<std::string>& lines, std::string_view text, bool clear,
+    std::size_t columns, std::size_t rows, const std::function<void()>& next_page) {
+    append_page(lines,nullptr,text,{},clear,columns,rows,next_page);
+}
+void append_dialogue(DialoguePage& page, std::string_view text, bool clear,
+    std::size_t columns, std::size_t rows, const std::function<void()>& next_page) {
+    if (page.color > 15) throw std::runtime_error("Invalid dialogue color");
+    std::string visible;
+    std::vector<std::uint8_t> colors;
+    auto color = page.color;
+    for (std::size_t at = 0; at < text.size(); ++at) {
+        if (text[at] == '%' && at+1 < text.size()) {
+            const auto code = text[at+1];
+            if ((code >= '0' && code <= '9') || (code >= 'A' && code <= 'F')) {
+                const auto index = code <= '9' ? code-'0' : code-'A'+10;
+                color = index ? index : 10;
+                ++at;
+                continue;
+            }
+            if (code == '%') ++at;
+        }
+        visible += text[at];
+        colors.push_back(color);
+    }
+    append_page(page.lines,&page.ink,visible,colors,clear,columns,rows,next_page);
+    page.color = color;
 }
 formats::IndexedImage compose_original_frame(const GameProfile::OriginalDisplay& layout,
     std::span<const formats::IndexedImage> symbols) {

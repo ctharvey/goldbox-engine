@@ -45,6 +45,7 @@ public:
     bool running{true};
     bool restart_requested{};
     std::deque<std::string> lines;
+    DialoguePage dialogue;
     std::vector<std::string> choices;
     std::size_t selected{};
     const OriginalPresentation* original{};
@@ -321,7 +322,7 @@ public:
     }
     void text(std::string_view value, bool clear) override {
         if (original) {
-            append_dialogue(lines,value,clear,original->layout.dialogue[2]/8,original->layout.dialogue[3]/8,[&] {
+            append_dialogue(dialogue,value,clear,original->layout.dialogue[2]/8,original->layout.dialogue[3]/8,[&] {
                 const std::array<std::string,1> next{"PRESS RETURN TO CONTINUE"};
                 (void)choose(next,"",false);
             });
@@ -610,9 +611,15 @@ public:
         const SDL_Rect text_clip{text[0],text[1],text[2],text[3]};
         checked(SDL_SetRenderClipRect(renderer,&text_clip));
         const std::size_t count = text[3]/8;
-        const auto first = lines.size() > count ? lines.size()-count : 0;
-        for (std::size_t i = first; i < lines.size(); ++i)
-            label(text[0],text[1]+float(i-first)*8,lines[i]);
+        const auto first = dialogue.lines.size() > count ? dialogue.lines.size()-count : 0;
+        for (std::size_t i = first; i < dialogue.lines.size(); ++i) {
+            const auto& line = dialogue.lines[i];
+            for (std::size_t x = 0; x < line.size(); ++x) {
+                const auto ink = palette[dialogue.ink[i][x]];
+                color(ink[0],ink[1],ink[2]);
+                label(text[0]+float(x)*8,text[1]+float(i-first)*8,line.substr(x,1));
+            }
+        }
         checked(SDL_SetRenderClipRect(renderer,nullptr));
         const auto& commands = layout.commands;
         color(255,255,255);
