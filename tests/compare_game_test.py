@@ -1006,6 +1006,36 @@ def test_interrupted_kill_is_retried(fixture):
         compare_game.SessionLock = real_lock
 
 
+def test_streamdown_does_not_reap_leader(fixture):
+    # F-A2: waiting for the engine to exit must not reap a POSIX group leader;
+    # a reaped leader frees its pgid for reuse before kill_tree's killpg.
+    if os.name == "nt":
+        print("test_streamdown_does_not_reap_leader: POSIX only; skipped")
+        return
+    import queue
+    import types
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    import compare_session
+    owned = compare_game.OwnedProcess.launch([sys.executable, "-c", "pass"], fixture.private)
+    try:
+        session = object.__new__(compare_session.Session)
+        session.engine = owned
+        session.deadline = time.monotonic() + 10
+        session._check_housekeeping = lambda: None
+        session.engine_queue = types.SimpleNamespace(
+            queue=queue.Queue(), reader=None, failure=None)
+        session.engine_queue.queue.put(("eof",))
+        session._finish_streamdown()
+        try:
+            os.waitid(os.P_PID, owned.process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        except ChildProcessError:
+            check(False, "_finish_streamdown reaped the group leader before killpg")
+        os.killpg(owned.posix_group, 0)  # the pgid must still be ours
+    finally:
+        owned.kill_tree()
+
+
 def test_reference_input_cancel(fixture):
     # F11: once the controller gives up on a dispatch, no further key may start.
     import threading
@@ -1112,6 +1142,7 @@ def main():
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
         test_interrupted_kill_is_retried(fixture)
+        test_streamdown_does_not_reap_leader(fixture)
         test_reference_input_cancel(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])

@@ -191,17 +191,16 @@ class Session:
         budget = min(max(remainder, 0.5), ENGINE_QUIT_DRAIN_SECONDS)
         drain_deadline = time.monotonic() + budget  # one budget for exit and EOF together
         while True:
-            # Sliced so the WSL lease keeps being renewed while the engine exits.
-            try:
-                self.engine.process.wait(
-                    timeout=max(min(EVENT_WAIT_SLICE, drain_deadline - time.monotonic()), 0.0))
+            # poll(), not wait(): on POSIX only the non-reaping poll() keeps the
+            # leader's pgid from being reused before kill_tree's killpg. The loop
+            # also keeps the WSL lease renewed while the engine exits.
+            code = self.engine.process.poll()
+            if code is not None:
                 break
-            except subprocess.TimeoutExpired as error:
-                if time.monotonic() >= drain_deadline:
-                    raise ControlledError(
-                        "engine did not exit after acknowledging quit") from error
-                self._check_housekeeping()
-        code = self.engine.process.returncode
+            if time.monotonic() >= drain_deadline:
+                raise ControlledError("engine did not exit after acknowledging quit")
+            self._check_housekeeping()
+            time.sleep(max(min(0.02, drain_deadline - time.monotonic()), 0.0))
         if code != 0:
             raise ControlledError(
                 f"engine exited with code {code} after acknowledging quit")
