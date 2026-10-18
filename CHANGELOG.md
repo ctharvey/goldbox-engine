@@ -16,6 +16,13 @@
   Startup integration and recorded-audio parity remain unfinished; no music
   payload or original instrument table is distributed.
 
+- Harden the comparison controller after a second audit: tolerate WSL clock
+  drift in lease renewal, retry an interrupted kill and keep the session lock
+  held until cleanup completes, stop reaping the POSIX leader before killpg,
+  handle SIGQUIT and let POSIX children inherit the lock, reject duplicate
+  scenario JSON keys, and watch the engine while a menu waits. Nested
+  privateRoots can still run two sessions on one game copy (deferred).
+
 - Add profile-controlled five-second startup titles, key skipping, a separate
   menu and C/B/L/E shortcuts. Preserve legacy presentation when timing is absent.
   Verify the installed Steam startup's observed silence with a calibrated

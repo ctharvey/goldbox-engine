@@ -37,6 +37,14 @@ def equal(actual, expected):
     return actual == expected
 
 
+def _no_duplicate_keys(pairs):
+    keys = [key for key, _ in pairs]
+    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicates:
+        raise ValueError(f'scenario repeats keys: {duplicates}')
+    return dict(pairs)
+
+
 class ScriptInput:
     """Console-compatible scripted source. No stdin thread, LLM, sleeps or retries.
 
@@ -98,7 +106,7 @@ class ScriptInput:
                 data = source.read(256 * 1024 + 1)
             if len(data) > 256 * 1024:
                 raise ControlledError('scenario exceeds 256 KiB')
-            return cls(json.loads(data))
+            return cls(json.loads(data, object_pairs_hook=_no_duplicate_keys))
         except (OSError, ValueError, RecursionError) as error:
             raise ControlledError(f'cannot read scenario: {error}') from error
 

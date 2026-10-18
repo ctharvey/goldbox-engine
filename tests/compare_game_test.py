@@ -879,6 +879,73 @@ def test_termination_signals(fixture):
                 process.wait(timeout=5)
 
 
+def test_posix_lock_outlives_killed_controller(fixture):
+    # F-A3: SIGKILL (or OOM) gives the controller no cleanup. The children run in
+    # their own sessions, so the lock must stay held by them until they die.
+    # SIGQUIT must take the normal cleanup path.
+    if os.name == "nt":
+        print("test_posix_lock_outlives_killed_controller: POSIX only; skipped")
+        return
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    lock_path = os.path.realpath(fixture.private / "goldbox-compare.lock")
+
+    def holders():
+        found = []
+        for entry in os.listdir("/proc"):
+            if not entry.isdecimal() or int(entry) == os.getpid():
+                continue
+            try:
+                for fd in os.listdir(f"/proc/{entry}/fd"):
+                    if os.path.realpath(f"/proc/{entry}/fd/{fd}") == lock_path:
+                        found.append(int(entry))
+                        break
+            except OSError:
+                continue
+        return found
+
+    for label, number, expect_clean in (("SIGQUIT", signal.SIGQUIT, True),
+                                        ("SIGKILL", signal.SIGKILL, False)):
+        config = fixture.config("hang", name=f"lock-{label}.json", timeout=30)
+        process = subprocess.Popen(
+            [sys.executable, "-u", str(CONTROLLER), str(config)], stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        survivors = []
+        try:
+            deadline = time.monotonic() + 15
+            ready = False
+            while time.monotonic() < deadline and not ready:
+                ready = "[engine ready]" in process.stdout.readline()
+            check(ready, f"{label}: controller never reached ready")
+            process.send_signal(number)
+            process.wait(timeout=15)
+            survivors = [pid for pid in holders() if pid != process.pid]
+            if expect_clean:
+                check(not survivors, f"{label}: cleanup left lock holders {survivors}")
+                compare_game.SessionLock(fixture.private).acquire().release()
+            else:
+                check(len(survivors) >= 2, f"{label}: children do not hold the lock: {survivors}")
+                try:
+                    compare_game.SessionLock(fixture.private).acquire().release()
+                except compare_game.ControlledError:
+                    pass
+                else:
+                    check(False, f"{label}: lock free while owned children still run")
+        finally:
+            for pid in survivors:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+        deadline = time.monotonic() + 10
+        while holders() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        compare_game.SessionLock(fixture.private).acquire().release()
+
+
 def test_posix_leader_not_reaped(fixture):
     # F4: poll() on a POSIX leader must not reap it; a reaped leader frees the
     # pgid for reuse before killpg runs. Only meaningful on POSIX.
@@ -902,6 +969,190 @@ def test_posix_leader_not_reaped(fixture):
     except ChildProcessError:
         reaped = True
     check(reaped, "kill_tree did not reap the leader")
+
+
+def test_interrupted_kill_is_retried(fixture):
+    # N1: an interrupt that lands before the kill takes effect must be retried for
+    # real (the old retry returned early because `killed` was set on entry), and a
+    # kill that never completed must keep the session lock held.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    import compare_process
+    seen = []
+    original_kill = compare_game.OwnedProcess.kill_tree
+
+    def recording(self):
+        if self not in seen:
+            seen.append(self)
+        original_kill(self)
+
+    class Gate:
+        """Raises KeyboardInterrupt at the first (or every) kill syscall."""
+        always = False
+        hits = 0
+
+    gate = Gate()
+    if os.name == "nt":
+        real_kernel = compare_process._KERNEL32
+
+        class Proxy:
+            def __getattr__(self, name):
+                return getattr(real_kernel, name)
+
+            def TerminateJobObject(self, *args):
+                if gate.always or gate.hits == 0:
+                    gate.hits += 1
+                    raise KeyboardInterrupt
+                return real_kernel.TerminateJobObject(*args)
+
+        def arm():
+            compare_process._KERNEL32 = Proxy()
+
+        def disarm():
+            compare_process._KERNEL32 = real_kernel
+    else:
+        real_killpg = os.killpg
+
+        def interrupting(group, sig):
+            if sig != 0 and (gate.always or gate.hits == 0):
+                gate.hits += 1
+                raise KeyboardInterrupt
+            return real_killpg(group, sig)
+
+        def arm():
+            os.killpg = interrupting
+
+        def disarm():
+            os.killpg = real_killpg
+
+    held = []
+    real_lock = compare_game.SessionLock
+
+    class RecordingLock(real_lock):
+        def acquire(self):
+            result = super().acquire()
+            held.append(self)
+            return result
+
+    compare_game.SessionLock = RecordingLock
+    compare_game.OwnedProcess.kill_tree = recording
+    try:
+        for label, always in (("single", False), ("double", True)):
+            del seen[:]
+            gate.always, gate.hits = always, 0
+            config = compare_game.parse_config(
+                fixture.config("hang", name=f"interrupt-{label}.json", timeout=2))
+            arm()
+            message = ""
+            try:
+                compare_game.run_session(config)
+            except compare_game.ControlledError as error:
+                message = str(error)
+            except KeyboardInterrupt:
+                message = "KeyboardInterrupt"
+            finally:
+                disarm()
+            if label == "single":
+                check(all(owned.process.poll() is not None for owned in seen) and len(seen) == 2,
+                      f"single: the retried kill did not stop every tree ({len(seen)} trees)")
+                real_lock(config["privateRoot"]).acquire().release()
+            else:
+                check("interrupted twice" in message, f"double: unexpected message {message!r}")
+                try:
+                    real_lock(config["privateRoot"]).acquire().release()
+                except compare_game.ControlledError:
+                    pass
+                else:
+                    check(False, "double: lock released while a kill never completed")
+                for owned in seen:  # Clean up what the injected interrupts left alive.
+                    original_kill(owned)
+                held[-1].release()
+    finally:
+        disarm()
+        compare_game.OwnedProcess.kill_tree = original_kill
+        compare_game.SessionLock = real_lock
+
+
+def test_streamdown_does_not_reap_leader(fixture):
+    # F-A2: waiting for the engine to exit must not reap a POSIX group leader;
+    # a reaped leader frees its pgid for reuse before kill_tree's killpg.
+    if os.name == "nt":
+        print("test_streamdown_does_not_reap_leader: POSIX only; skipped")
+        return
+    import queue
+    import types
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    import compare_session
+    owned = compare_game.OwnedProcess.launch([sys.executable, "-c", "pass"], fixture.private)
+    try:
+        session = object.__new__(compare_session.Session)
+        session.engine = owned
+        session.deadline = time.monotonic() + 10
+        session._check_housekeeping = lambda: None
+        session.engine_queue = types.SimpleNamespace(
+            queue=queue.Queue(), reader=None, failure=None)
+        session.engine_queue.queue.put(("eof",))
+        session._finish_streamdown()
+        try:
+            os.waitid(os.P_PID, owned.process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        except ChildProcessError:
+            check(False, "_finish_streamdown reaped the group leader before killpg")
+        os.killpg(owned.posix_group, 0)  # the pgid must still be ours
+    finally:
+        owned.kill_tree()
+
+
+def test_scenario_duplicate_keys(fixture):
+    # B1: json.loads keeps the last duplicate key, so a scenario could run commands
+    # or checks other than the ones a reviewer read first.
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    from compare_script import ScriptInput
+    expect = ('[{"type":"ready","checks":{}},'
+              '{"type":"complete","checks":{"/id":1,"/status":"ok"}}]')
+    texts = {
+        "commands": '{"schemaVersion":1,"commands":["north","quit"],"commands":["quit"],'
+                    f'"expect":{expect}}}',
+        "nested": '{"schemaVersion":1,"commands":["quit"],"expect":'
+                  '[{"type":"ready","checks":{}},{"type":"complete",'
+                  '"checks":{"/id":1,"/status":"bad","/status":"ok"}}]}',
+    }
+    for label, text in texts.items():
+        path = fixture.private / f"dup-{label}.json"
+        path.write_text(text, encoding="utf-8")
+        try:
+            ScriptInput.from_file(path)
+        except compare_game.ControlledError as error:
+            check("repeats keys" in str(error), f"{label}: unexpected error {error}")
+        else:
+            check(False, f"{label}: duplicate keys were accepted")
+
+
+def test_menu_wait_pumps_engine_events(fixture):
+    # B2: while a menu awaits a choice, an engine exit or stray event must end the
+    # session promptly instead of waiting out the whole deadline.
+    import queue
+    import types
+    sys.path.insert(0, str(CONTROLLER.parent))
+    import compare_game
+    import compare_session
+    session = object.__new__(compare_session.Session)
+    session.deadline = time.monotonic() + 30
+    session.config = {"timeout": 30}
+    session.pending_menu = (4, 1, ["Alpha", "Beta"])
+    session.console = types.SimpleNamespace(queue=queue.Queue(), failure=None)
+    session.engine = types.SimpleNamespace(process=types.SimpleNamespace(poll=lambda: 7))
+    session.engine_queue = types.SimpleNamespace(queue=queue.Queue(), failure=None)
+    session.engine_queue.queue.put(("eof",))
+    started = time.monotonic()
+    try:
+        session._serve_menu_choice()
+    except compare_game.ControlledError as error:
+        check("engine exited" in str(error), f"unexpected error {error}")
+    else:
+        check(False, "a dead engine went unnoticed while a menu awaited input")
+    check(time.monotonic() - started < 5, "menu wait did not notice the dead engine promptly")
 
 
 def test_reference_input_cancel(fixture):
@@ -1009,6 +1260,11 @@ def main():
         test_reader_errors_are_failures(fixture)
         test_termination_signals(fixture)
         test_posix_leader_not_reaped(fixture)
+        test_posix_lock_outlives_killed_controller(fixture)
+        test_interrupted_kill_is_retried(fixture)
+        test_streamdown_does_not_reap_leader(fixture)
+        test_scenario_duplicate_keys(fixture)
+        test_menu_wait_pumps_engine_events(fixture)
         test_reference_input_cancel(fixture)
         if len(sys.argv) == 3:
             test_compiled_engine(fixture, sys.argv[1], sys.argv[2])

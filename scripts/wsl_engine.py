@@ -18,6 +18,10 @@ import sys
 import time
 
 LEASE_SECONDS = 5.0
+# The controller's lease clock is Windows time anchored once at ready; a slow WSL
+# clock (measured ~4%) makes its claim run ahead of ours. Tolerate 10% of the
+# elapsed time on top of 0.25 s; the grant is still capped at LEASE_SECONDS.
+DRIFT_FRACTION = 0.1
 CLEANUP_SECONDS = 3.0  # Must stay below the controller's 8 s wait for this process.
 REAP_SECONDS = 2.0
 INPUT_LIMIT = 128 * 1024
@@ -126,6 +130,7 @@ def read_start():
 def supervise(config, incoming):
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     now = time.monotonic()
+    ready_at = now
     deadline, lease = now + config["timeout"], now + LEASE_SECONDS
     pending_out = bytearray(encode({"type": "_goldbox_wsl", "nonce": config["nonce"],
                                    "phase": "ready", "clock": now}))
@@ -211,7 +216,8 @@ def supervise(config, incoming):
                     until = frame.get("until")
                     received = time.monotonic()
                     if isinstance(until, bool) or not isinstance(until, (int, float)) \
-                            or not math.isfinite(until) or until > received + LEASE_SECONDS + 0.25:
+                            or not math.isfinite(until) or until > received + LEASE_SECONDS + 0.25 \
+                            + DRIFT_FRACTION * (received - ready_at):
                         raise ValueError(f"invalid lease deadline: {until!r}; Linux clock {time.monotonic()!r}")
                     # Windows QPC and Linux CLOCK_MONOTONIC can drift by a few
                     # milliseconds. Tolerate that, but never grant >5s from receipt.

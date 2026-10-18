@@ -190,6 +190,25 @@ def test_lease_renewal(root):
     probe.close()
 
 
+def test_lease_renewal_under_clock_drift(root):
+    # N8: a slow Linux clock makes the controller's absolute expiry run ahead of
+    # the adapter's receipt time. Renewals must keep working, and a far-future
+    # claim made right after ready must still be rejected (test_input_bounds).
+    probe = Probe(root, "tree", duration=9)
+    clock = probe.ready()
+    received = time.monotonic()
+    probe.event()
+    end = received + 7
+    while time.monotonic() < end:
+        elapsed = time.monotonic() - received
+        probe.send({"op": "renew", "until": clock + elapsed * 1.08 + 5})
+        time.sleep(0.5)
+        assert probe.process.poll() is None, probe.stderr.decode(errors="replace")
+    probe.send({"op": "stop"})
+    probe.closed("controller stopped")
+    probe.close()
+
+
 def test_supervisor_loss(root):
     probe = Probe(root, "tree")
     probe.ready()
@@ -413,7 +432,8 @@ def main():
     try:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for test in (test_flow, test_cleanup, test_lease, test_lease_renewal, test_supervisor_loss,
+            for test in (test_flow, test_cleanup, test_lease, test_lease_renewal, test_lease_renewal_under_clock_drift,
+                         test_supervisor_loss,
                          test_invalid_start, test_input_bounds, test_hostile_frame_and_signal_policy,
                          test_blocked_output):
                 test(root)
