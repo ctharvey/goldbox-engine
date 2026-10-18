@@ -264,6 +264,22 @@
       "reviewed": "2026-10-17"
     },
     {
+      "id": "mame-tandy-reference",
+      "kind": "reference",
+      "project": "MAME",
+      "upstreamRepository": "https://github.com/mamedev/mame",
+      "upstreamRevision": "23a72a0f354fdd61532ad86bce782ccc150fd18d",
+      "upstreamFiles": ["src/devices/sound/sn76496.cpp"],
+      "license": "BSD-3-Clause (file-level notice)",
+      "licenseFile": null,
+      "licenseUrl": "https://github.com/mamedev/mame/blob/23a72a0f354fdd61532ad86bce782ccc150fd18d/src/devices/sound/sn76496.cpp",
+      "copyrightNotice": "Nicola Salmoria and contributors listed in the upstream file",
+      "localFiles": [],
+      "purpose": "Evaluate reusable SN76489 emulation and verify tone counter/attenuation behavior",
+      "modifications": "Research only; no source copied or translated. Full MAME device integration would add emulator infrastructure beyond the existing SDL audio path. Independent bounded SSI score decoding uses privately observed command behavior; the three-tone preview is an approximation without noise or analog filtering.",
+      "reviewed": "2026-10-17"
+    },
+    {
       "id": "exepack-format-reference",
       "kind": "reference",
       "project": "exepack",

@@ -89,6 +89,75 @@ int main(int argc, char** argv) {
     rejects([&] { unpack_exepack(invalid); });
     invalid = exe; invalid[64] = 0;
     rejects([&] { unpack_exepack(invalid); });
+    // Synthetic three-voice score: shared instrument setup, chord, then stop.
+    std::vector<std::uint8_t> score(512);
+    const auto sw = [&](std::size_t p, std::uint16_t v) { score[p] = v; score[p+1] = v >> 8; };
+    sw(0,64); score[16] = 3;
+    for (std::size_t i = 0; i < 12; ++i) sw(32+2*i,32768);
+    const std::vector<std::uint8_t> song{252,0,1, 0,12,32,24,64,164, 255,10,0,0,255,0,0,0};
+    std::copy(song.begin(),song.end(),score.begin()+64);
+    std::size_t setup = 256;
+    for (const auto channel : {48,96,0}) {
+        const std::vector<std::uint8_t> instrument{253,std::uint8_t(channel),0,
+            255,22,128,1,255,14,1,0};
+        std::copy(instrument.begin(),instrument.end(),score.begin()+setup);
+        setup += instrument.size();
+    }
+    score[setup] = 251;
+    sw(384,65535); sw(386,65535); sw(390,1000);
+    sw(402,65535); sw(406,1000); // Release at envelope +16: set volume to zero.
+    const auto music = decode_ssi_tandy(score,0,0,16,32,5041);
+    assert(music.frames.size() == 4);
+    assert((music.frames.front() == std::array<TandyTone,3>{{{256,0},{128,0},{64,0}}}));
+    assert(std::all_of(music.frames.back().begin(),music.frames.back().end(),
+        [](TandyTone tone) { return tone.attenuation == 15; }));
+    const auto tune = render_tandy(music);
+    assert(tune == render_tandy(music));
+    assert(tune.size() == std::uint64_t(4)*5041*48000/1193181);
+    assert(std::any_of(tune.begin(),tune.end(),[](float v) { return v != 0; }));
+    assert(std::all_of(tune.begin(),tune.end(),[](float v) { return std::isfinite(v) && std::abs(v) <= 0.121f; }));
+    auto broken_score = score;
+    broken_score[64] = 251;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Return without a call.
+    broken_score = score; broken_score[256] = 252; broken_score[257] = 0; broken_score[258] = 1;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Nested call.
+    broken_score = score; broken_score[257] = 47;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Misaligned channel selector.
+    broken_score = score; broken_score[67] = 19;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Invalid duration index.
+    broken_score = score; broken_score[71] = 96;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Noise note.
+    broken_score = score; broken_score[65] = 255; broken_score[66] = 255;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Call outside segment.
+    broken_score = score; broken_score[16] = 0;
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Zero note duration.
+    rejects([&] { decode_ssi_tandy(score,510,0,16,32,5041); });
+    rejects([&] { decode_ssi_tandy(score,0,0,510,32,5041); });
+    rejects([&] { decode_ssi_tandy(score,0,0,16,500,5041); });
+    rejects([&] { decode_ssi_tandy(score,0,0,16,32,0); });
+    broken_score = score;
+    const std::vector<std::uint8_t> spin{254,38,64,0};
+    std::copy(spin.begin(),spin.end(),broken_score.begin()+64);
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Command-loop limit.
+    const std::vector<std::uint8_t> endless{255,0,1,0,254,38,64,0};
+    std::copy(endless.begin(),endless.end(),broken_score.begin()+64);
+    rejects([&] { decode_ssi_tandy(broken_score,0,0,16,32,5041); }); // Timed-loop limit.
+    auto invalid_music = music; invalid_music.frames[0][0].attenuation = 16;
+    rejects([&] { render_tandy(invalid_music); });
+    invalid_music = music; invalid_music.frames[0][0].period = 1024;
+    rejects([&] { render_tandy(invalid_music); });
+    rejects([&] { render_tandy(music,0); });
+    broken_score = score;
+    const std::vector<std::uint8_t> rest{0,255,255,0,0,0};
+    std::copy(rest.begin(),rest.end(),broken_score.begin()+64);
+    const auto silence = render_tandy(decode_ssi_tandy(broken_score,0,0,16,32,5041));
+    assert(std::all_of(silence.begin(),silence.end(),[](float v) { return v == 0; }));
+    broken_score = score; broken_score[390] = 0; broken_score[391] = 0;
+    assert(decode_ssi_tandy(broken_score,0,0,16,32,5041).frames == music.frames);
+    broken_score = score;
+    const std::vector<std::uint8_t> counted{255,38,2,0,0,255,254,38,68,0,255,0,0,0};
+    std::copy(counted.begin(),counted.end(),broken_score.begin()+64);
+    assert(decode_ssi_tandy(broken_score,0,0,16,32,5041).frames.size() == 7);
 #ifdef GOLDBOX_RENDERER
     SDL_SetMainReady();
     assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"SDL_AUDIODRIVER","dummy",true));

@@ -2,6 +2,12 @@
 
 ## 2026-10-17
 
+- Add a bounded SSI Tandy tone-score decoder and deterministic three-voice PCM
+  preview, with caller-supplied tables, notes, shared instrument calls, envelopes,
+  sweeps and loops. Reject noise and malformed/nonterminating scores explicitly.
+  Startup integration and recorded-audio parity remain unfinished; no music
+  payload or original instrument table is distributed.
+
 - Add profile-controlled five-second startup titles, key skipping, a separate
   menu and C/B/L/E shortcuts. Preserve legacy presentation when timing is absent.
   Verify the installed Steam startup's observed silence with a calibrated

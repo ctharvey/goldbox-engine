@@ -284,3 +284,11 @@ The symbolic status binding also consults the pinned
 for the distinction between native status ordinals and script-facing readiness.
 The optional normalized status, JSON persistence and configurable byte mapping
 are independently implemented; no Java enum or status implementation was ported.
+
+The Tandy tone preview evaluates MAME's BSD-3-Clause `sn76496.cpp` at revision
+`23a72a0f354fdd61532ad86bce782ccc150fd18d` as a research-only reference for
+three tone counters and attenuation. No MAME code was copied or translated.
+Its device framework is unnecessary for the existing SDL output path; the
+independent preview approximates three square waves and omits noise and analog
+filtering. SSI score commands come from private static interoperability analysis;
+no original music data, frequency tables or instruments are redistributed.

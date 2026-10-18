@@ -1237,3 +1237,60 @@ concurrent user input, so interactive screenshots were not used as a timing
 oracle. The isolated recording and native control-flow probe supplied that
 evidence. WSL sandbox access-denied responses were resolved by approved bounded
 calls; no build parallelism was increased.
+
+## Recovered early DOS Tandy score (2026-10-17)
+
+The installed Steam overlay identifies itself as version 1.3. Its traced startup
+does not request music. Early DOS versions differ: a separate private preservation
+copy from https://archive.org/details/POR_EGA contains START.EXE (47,936 bytes,
+SHA-256 `14ecf7584a43bd1ab36e04af12d9e9a3a00c5899533c853304e1e0e8af164fa2`)
+and GAME.OVR (232,379 bytes,
+`cbb4cdc4d245e7a3abfc1c9d2323c93d146d67b061a04d1dea0b495c829247fe`).
+The exact release number is not established. ZIP fingerprints match the archive's
+metadata; Defender found no threats before and after extraction. Those checks
+do not guarantee safety. Only bounded static analysis was used; no downloaded
+program, installer or original game code was executed.
+
+This executable is an unpacked MZ image with a 944-byte header. Its SSI audio
+segment starts at resident image offset 0x27f0. The Tandy entry table is at
+segment offset 0x4ab, duration bytes at 0xba, and twelve frequency words at 0x3f3.
+Entry 12 begins a three-tone score. Entries 13 through 19 reach later score
+sections; these are not established as eight independent songs. Startup overlay
+0x19 is at GAME.OVR offset 0x7b, size 0x814, entry 0x600. At 0x61f it tests Tandy
+mode, then calls the sound wrapper with main-data word 0x2642 = 13. The wrapper
+subtracts one and selects entry 12. The main data segment is 0x740.
+
+The independent decoder accepts explicit table locations and bounded segment
+data, without title names, executable scanning, or proprietary note tables in
+the core. It handles six control commands, shared (not nested) calls, three-tone
+chords, rests, duration scaling, transposition, attack/release envelopes, sweeps,
+modulation and counter loops. Invalid fields, returns without calls, unsupported noise,
+out-of-bounds data and nontermination fail explicitly. Work is limited to 200,000
+operations, 30,000 ticks and 120 seconds; output sample allocation is bounded.
+Existing PC-speaker decoding is unchanged.
+
+MAME's BSD-3-Clause SN76496 implementation was evaluated at immutable revision
+`23a72a0f354fdd61532ad86bce782ccc150fd18d`. Importing its device framework would
+add unrelated emulator infrastructure. No source was copied; the research-only
+reference is recorded in the attribution registry. The preview approximates
+three square waves and logarithmic attenuation, without noise or analog filtering.
+Hardware phase accuracy and recorded-audio parity are not claimed. Original music
+and all generated audio remain private, outside the public repository.
+
+Private entry-12 decoding completed with 23,905 frames at PIT divisor 5041:
+4,847,751 mono samples at 48kHz, approximately 100.995 seconds. All three voices
+contain varying pitches and non-muted frames. The WAV preview SHA-256 is
+`4e1a517be9ad8e276fd022d79fdcf8585a1020828d668978b34798555fe065fe`.
+This is a decoder-generated approximation, not a recording or audible parity
+claim. Startup integration, reference-recording comparison and other editions
+remain unfinished. In particular, the Steam 1.3 startup has not gained music.
+
+The real score exposed a zero-duration envelope record: it disables subsequent
+envelope steps rather than constituting malformed data. A synthetic regression
+now covers that behavior. Synthetic checks also cover three-voice chords,
+instrument calls, rests, finite loops, invalid returns/calls/selectors/tables,
+noise rejection, deterministic PCM, amplitude bounds and nontermination limits.
+The bounded build and all 27 public CTest suites passed; the separate original
+RNG integration test skipped without configuration. Hygiene and attribution
+checks passed. No downloaded code was executed, no proprietary input/output was
+added to the repository, and no owned build or game process remains running.
