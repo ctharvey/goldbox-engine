@@ -52,6 +52,8 @@ public:
     std::vector<std::string> choices;
     std::size_t selected{};
     const OriginalPresentation* original{};
+    const OriginalPresentation* original_adapter{};
+    bool& enhanced_display;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> frame_texture{nullptr,SDL_DestroyTexture};
     Uint64 image_clock{};
     std::mt19937 creation_random{static_cast<unsigned>(SDL_GetPerformanceCounter())};
@@ -59,12 +61,12 @@ public:
     WindowHost(ExplorationSession& value, SDL_Renderer* target, const formats::WallGraphics* walls,
         const ImageArchives* archives, const GameProfile::ColorBackdrop* colors,
         std::span<const formats::IndexedImage> font, const GameProfile::Portrait* portrait, const WallArchives* sources,
-        const OriginalPresentation* presentation)
+        const OriginalPresentation* presentation, bool& enhanced)
         : session(value), renderer(target), graphics(walls), backdrop(colors), portrait_config(portrait), wall_archives(sources),
-          original(presentation) {
+          original(enhanced ? nullptr : presentation), original_adapter(presentation), enhanced_display(enhanced) {
         if (archives) images.emplace(*archives);
-        if (original) {
-            const auto& frame = original->frame;
+        if (original_adapter) {
+            const auto& frame = original_adapter->frame;
             frame_texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,
                 frame.width,frame.height));
             if (!frame_texture) throw std::runtime_error(SDL_GetError());
@@ -119,13 +121,32 @@ public:
         return event.type == SDL_EVENT_WINDOW_EXPOSED || event.type == SDL_EVENT_WINDOW_RESIZED ||
             event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event.type == SDL_EVENT_WINDOW_RESTORED;
     }
+    bool display_key(const SDL_Event& event) {
+        if (event.type != SDL_EVENT_KEY_DOWN || event.key.key != SDLK_F11) return false;
+        if (event.key.repeat || !original_adapter ||
+            (event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI))) return true;
+        if (!original && !choices.empty() && choice_presentation == ChoicePresentation::vertical &&
+            menu_prompt.lines.size() >= original_adapter->layout.dialogue[3]/8) return true;
+        const auto* next = original ? nullptr : original_adapter;
+        checked(SDL_SetRenderLogicalPresentation(renderer,next ? next->layout.canvas[0] : 960,
+            next ? next->layout.canvas[1] : 640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
+        original = next; enhanced_display = !original;
+        checked(SDL_SetWindowTitle(SDL_GetRenderWindow(renderer),
+            original ? "Goldbox Engine - original" : "Goldbox Engine - enhanced"));
+        return true;
+    }
     bool wait(SDL_Event& event) {
         const auto delay = images ? images->animation_wait_ms() : 0;
-        if (!delay) { checked(SDL_WaitEvent(&event)); return true; }
-        SDL_ClearError();
-        if (SDL_WaitEventTimeout(&event,static_cast<Sint32>(std::min(delay,60000u)))) return true;
-        if (*SDL_GetError()) throw std::runtime_error(SDL_GetError());
-        return false;
+        if (!delay) checked(SDL_WaitEvent(&event));
+        else {
+            SDL_ClearError();
+            if (!SDL_WaitEventTimeout(&event,static_cast<Sint32>(std::min(delay,60000u)))) {
+                if (*SDL_GetError()) throw std::runtime_error(SDL_GetError());
+                return false;
+            }
+        }
+        if (display_key(event)) { if (!event.key.repeat) draw(); return false; }
+        return true;
     }
     formats::WallGraphics load_banks(const ExplorationSession& context, std::array<std::uint8_t,3> banks) {
         if (!wall_archives) throw std::runtime_error("No wall archives selected");
@@ -216,7 +237,7 @@ public:
             }
             color(220,220,220);
             if (original) {
-                if (menu) label(0,original->layout.commands[1],"UP/DOWN ENTER  F10 RESTART");
+                if (menu) label(0,original->layout.commands[1],"UP/DOWN ENTER  F10 RESTART  F11 VIEW");
                 if (!error.empty()) label(original->layout.dialogue[0],original->layout.dialogue[1],error.substr(0,38));
             } else {
                 label(24,608,menu ? "UP / DOWN, ENTER OR LETTER TO SELECT - ESC TO QUIT - F10 RESTART" :
@@ -235,6 +256,7 @@ public:
                     continue;
                 }
             } else checked(SDL_WaitEvent(&event));
+            if (display_key(event)) continue;
             if (event.type == SDL_EVENT_QUIT ||
                 (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE)) return 0;
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) continue;
@@ -292,6 +314,7 @@ public:
             if (now >= end) break;
             SDL_Event event;
             if (!SDL_WaitEventTimeout(&event,static_cast<Sint32>(std::min<Uint64>(end-now,20)))) continue;
+            if (display_key(event)) continue;
             if (event.type == SDL_EVENT_QUIT) { running = false; throw std::runtime_error("Window closed"); }
             if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_F10) {
                 restart_requested = true; throw std::runtime_error("Restart requested");
@@ -329,13 +352,6 @@ public:
         }
     }
     void text(std::string_view value, bool clear) override {
-        if (original) {
-            append_dialogue(dialogue,value,clear,original->layout.dialogue[2]/8,original->layout.dialogue[3]/8,[&] {
-                const std::array<std::string,1> next{"PRESS RETURN TO CONTINUE"};
-                (void)choose(next,"",false);
-            });
-            return;
-        }
         if (clear) lines.clear();
         std::string line;
         for (const unsigned char ch : value) {
@@ -348,6 +364,15 @@ public:
         }
         if (!line.empty()) lines.push_back(std::move(line));
         while (lines.size() > 80) lines.pop_front();
+        if (original_adapter) {
+            append_dialogue(dialogue,value,clear,original_adapter->layout.dialogue[2]/8,
+                original_adapter->layout.dialogue[3]/8,[&] {
+                    if (original) {
+                        const std::array<std::string,1> next{"PRESS RETURN TO CONTINUE"};
+                        (void)choose(next,"",false);
+                    }
+                });
+        }
     }
     std::optional<std::size_t> pick(const std::vector<std::string>& values, const std::string& prompt) {
         text(prompt,true);
@@ -389,6 +414,7 @@ public:
         while (running) {
             choices = {"NAME: " + name}; selected = 0; draw();
             SDL_Event event; checked(SDL_WaitEvent(&event));
+            if (display_key(event)) continue;
             if (event.type == SDL_EVENT_QUIT) { running = false; break; }
             if (event.type == SDL_EVENT_TEXT_INPUT) {
                 for (const unsigned char c : std::string_view(event.text.text))
@@ -666,8 +692,8 @@ public:
                 label(party[0],y,option.substr(0,width));
                 if (option.size() > width) label(party[0],y+8,option.substr(width,width));
             }
-            color(255,255,255); label(commands[0],commands[1],"UP/DOWN ENTER  F10 RESTART");
-        } else label(commands[0],commands[1],"MOVE SEARCH REST  F5 SAVE F9 LOAD");
+            color(255,255,255); label(commands[0],commands[1],"UP/DOWN ENTER  F10 RESTART  F11 VIEW");
+        } else label(commands[0],commands[1],"MOVE SEARCH REST  F5/F9  F11 VIEW");
         checked(SDL_RenderPresent(renderer));
     }
     void draw() {
@@ -742,7 +768,8 @@ public:
         }
         color(145,157,167);
         label(24,448,"ARROWS/WASD move + turn | SPACE search | R rest | I initialize");
-        label(24,464,"F5 save | F9 load | F10 restart | ESC quit");
+        label(24,464,original_adapter ? "F5 save | F9 load | F10 restart | F11 view | ESC quit" :
+            "F5 save | F9 load | F10 restart | ESC quit");
         color(222,221,204);
         const auto first = lines.size() > 7 ? lines.size() - 7 : 0;
         for (std::size_t i = first; i < lines.size(); ++i) label(24,492 + float(i-first)*16,lines[i]);
@@ -765,13 +792,16 @@ public:
     std::optional<std::size_t> choose(std::span<const std::string> values, std::string_view prompt, bool cancelable,
         ChoicePresentation presentation = ChoicePresentation::panel) {
         if (values.empty()) throw std::runtime_error("Empty event menu");
-        if (original && presentation == ChoicePresentation::vertical) {
+        if (original_adapter && presentation == ChoicePresentation::vertical) {
             menu_prompt = {};
-            const auto rows = original->layout.dialogue[3]/8;
-            if (!prompt.empty() && rows < 2) throw std::runtime_error("No room for menu prompt and choices");
-            append_dialogue(menu_prompt,prompt,true,original->layout.dialogue[2]/8,
-                std::max<std::size_t>(1,rows-1),[] { throw std::runtime_error("Menu prompt exceeds its region"); });
-        } else text(prompt,false);
+            const auto rows = original_adapter->layout.dialogue[3]/8;
+            if (original && !prompt.empty() && rows < 2) throw std::runtime_error("No room for menu prompt and choices");
+            append_dialogue(menu_prompt,prompt,true,original_adapter->layout.dialogue[2]/8,
+                std::max<std::size_t>(1,rows-1),[&] {
+                    if (original) throw std::runtime_error("Menu prompt exceeds its region");
+                });
+        }
+        if (!original || presentation != ChoicePresentation::vertical) text(prompt,false);
         choices.assign(values.begin(),values.end());
         choice_presentation = presentation;
         selected = 0;
@@ -831,7 +861,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
     std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms,
     const formats::TandyClip* startup_music, const CampaignGraphics* campaign_graphics,
-    const OriginalPresentation* original) {
+    const OriginalPresentation* original, bool start_enhanced) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_title_period_ms > 60000) throw std::runtime_error("Invalid startup title period");
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
@@ -849,21 +879,22 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     checked(SDL_Init(SDL_INIT_VIDEO));
     struct Quit { ~Quit() { SDL_Quit(); } } quit;
     AudioPlayer audio(preview_audio || bool(sounds) || startup_music);
+    bool enhanced_display = start_enhanced || !original;
     SDL_Window* raw_window{};
     SDL_Renderer* raw_renderer{};
-    checked(SDL_CreateWindowAndRenderer(original ? "Goldbox Engine - original" : "Goldbox Engine - enhanced",960,
-        original ? 600 : 640,
+    checked(SDL_CreateWindowAndRenderer(enhanced_display ? "Goldbox Engine - enhanced" : "Goldbox Engine - original",960,
+        enhanced_display ? 640 : 600,
         SDL_WINDOW_RESIZABLE,&raw_window,&raw_renderer));
     std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> window(raw_window,SDL_DestroyWindow);
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer(raw_renderer,SDL_DestroyRenderer);
     checked(SDL_SetWindowPosition(raw_window,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED));
-    checked(SDL_SetRenderLogicalPresentation(raw_renderer,original ? original->layout.canvas[0] : 960,
-        original ? original->layout.canvas[1] : 640,SDL_LOGICAL_PRESENTATION_LETTERBOX));
+    checked(SDL_SetRenderLogicalPresentation(raw_renderer,enhanced_display ? 960 : original->layout.canvas[0],
+        enhanced_display ? 640 : original->layout.canvas[1],SDL_LOGICAL_PRESENTATION_LETTERBOX));
     bool campaign_assets_active = false;
     const auto create_host = [&] {
         const auto* active = campaign_assets_active ? campaign_graphics : nullptr;
         auto host = std::make_unique<WindowHost>(session,raw_renderer,active ? nullptr : graphics,
-            active ? &active->images : images,backdrop,font,portrait,active ? &active->walls : wall_archives,original);
+            active ? &active->images : images,backdrop,font,portrait,active ? &active->walls : wall_archives,original,enhanced_display);
         host->character_assets = images;
         host->audio = &audio;
         host->preview_audio = preview_audio;
@@ -914,10 +945,10 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
             }
         }
         auto& host = *window_host;
-        if (!original) host.text(startup_screens.empty() ?
+        if (!host.original_adapter) host.text(startup_screens.empty() ?
             "Explore a map. Initialize runs ECL explicitly; campaign startup is not yet implemented." :
             "Exploration ready. Arrows move, Space searches, F5 saves, F9 loads; I reruns initialization.",false);
-        const auto notify = [&](std::string_view value) { host.text(value,original != nullptr); };
+        const auto notify = [&](std::string_view value) { host.text(value,host.original != nullptr); };
         const auto trigger = [&](formats::EclEventKind kind) {
             const auto result = session.trigger(kind,host);
             if (!result.exited && !host.restart_requested) notify("Event stopped: " + result.diagnostic);
@@ -939,22 +970,22 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
             try {
                 if (key == SDLK_LEFT || key == SDLK_A || key == SDLK_RIGHT || key == SDLK_D) {
                     host.clear_images();
-                    if (original) host.text("",true);
+                    if (host.original) host.text("",true);
                     const int turn = key == SDLK_LEFT || key == SDLK_A ? 3 : 1;
                     session.facing = static_cast<Direction>((unsigned(session.facing)+turn)%4);
                 } else if (key == SDLK_UP || key == SDLK_W || key == SDLK_DOWN || key == SDLK_S) {
                     host.clear_images();
-                    if (original) host.text("",true);
+                    if (host.original) host.text("",true);
                     const auto facing = session.facing;
                     const bool backwards = key == SDLK_DOWN || key == SDLK_S;
-                    if (original && backwards) {
+                    if (host.original && backwards) {
                         session.facing = static_cast<Direction>((unsigned(facing)+2)%4);
                         continue;
                     }
                     const bool moved = session.move(static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4));
                     session.facing = facing;
                     if (moved) trigger(formats::EclEventKind::move);
-                    else if (!original) notify("Movement blocked.");
+                    else if (!host.original) notify("Movement blocked.");
                 } else if (key == SDLK_SPACE) trigger(formats::EclEventKind::search);
                 else if (key == SDLK_R) trigger(formats::EclEventKind::rest);
                 else if (key == SDLK_I) trigger(formats::EclEventKind::initialize);

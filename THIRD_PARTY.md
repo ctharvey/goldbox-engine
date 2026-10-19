@@ -19,6 +19,10 @@ presentation behavior; this does not establish original-executable timing parity
 
 ## Original display adapter (2026-10-18)
 
+F11 cutover and the retained text views reuse the project's own renderer and
+the separately installed SDL3 API; no additional upstream implementation was
+copied or translated for runtime switching.
+
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`, particularly
 Pool properties, `FrameRendererSymbols.java`, `DungeonRenderer.java`,
 `ProgramMenuRenderer.java` and `AbstractRenderer.java`, was consulted for symbol

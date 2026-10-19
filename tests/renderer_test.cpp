@@ -29,10 +29,11 @@ extern "C" bool __wrap_SDL_SetTextureColorMod(SDL_Texture* texture, Uint8 r, Uin
 #endif
 namespace {
 void near(double actual, double expected) { assert(std::abs(actual-expected) < 0.00001); }
-void key(SDL_Keycode code) {
+void key(SDL_Keycode code, bool repeat = false) {
     SDL_Event event{};
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.key = code;
+    event.key.repeat = repeat;
     assert(SDL_PushEvent(&event));
 }
 }
@@ -489,6 +490,12 @@ int main(int argc, char** argv) {
         std::vector<std::array<Uint8,3>> pixels;
         std::vector<std::array<Uint8,3>> text_pixels;
         if (native) observe_frame = [&](SDL_Renderer* renderer) {
+            int width,height; SDL_RendererLogicalPresentation mode;
+            assert(SDL_GetRenderLogicalPresentation(renderer,&width,&height,&mode));
+            if (width != layout.canvas[0] || height != layout.canvas[1]) {
+                pixels.push_back({255,0,255}); text_pixels.push_back({255,0,255});
+                return; // Original coordinates are outside the enhanced letterbox viewport.
+            }
             const auto sample = [&](int x, int y) {
                 const SDL_Rect pixel{x*3+1,y*3+1,1,1};
                 auto* surface = SDL_RenderReadPixels(renderer,&pixel);
@@ -503,15 +510,18 @@ int main(int argc, char** argv) {
         };
 #endif
         assert(SDL_Init(SDL_INIT_VIDEO));
-        key(SDLK_I); key(input); key(SDLK_ESCAPE);
+        key(SDLK_I);
+        if (native) { key(SDLK_F11); key(SDLK_F11); }
+        key(input); key(SDLK_ESCAPE);
         assert(run_exploration_window(view,"navigation-synthetic",save,nullptr,&campaign_assets.images,nullptr,font,
             nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,native ? &original : nullptr) == 0);
 #ifdef GOLDBOX_RENDER_CALL_TESTS
         observe_frame = {};
         if (native) {
-            assert(pixels.size() >= 3);
+            assert(pixels.size() >= 5);
             assert((pixels[1] == std::array<Uint8,3>{0,0,170}));
             assert((text_pixels[1] == std::array<Uint8,3>{85,255,85}));
+            assert(pixels[3] == pixels[1] && text_pixels[3] == text_pixels[1]);
             const std::array<Uint8,3> expected = fresh_picture ? std::array<Uint8,3>{0,0,170} :
                 std::array<Uint8,3>{0,0,0};
             assert(pixels.back() == expected);
@@ -537,4 +547,84 @@ int main(int argc, char** argv) {
     navigation(SDLK_UP,true,false,true);
     navigation(SDLK_UP,false,true,true);
     navigation(SDLK_DOWN,false,false,false);
+
+    const auto check_display = [&](bool start_enhanced, bool available) {
+        auto view = original_session;
+        view.state.memory[0x1234] = 91;
+        view.initial_random = HighWordLcg32(123,134775813,1);
+        view.state.random = view.initial_random;
+        view.random_dialect = EclRandomDialect::byte_upper;
+        const auto before = serialize_exploration(view,"display-toggle-synthetic");
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+        std::vector<int> canvases;
+        observe_frame = [&](SDL_Renderer* renderer) {
+            int width,height; SDL_RendererLogicalPresentation mode;
+            assert(SDL_GetRenderLogicalPresentation(renderer,&width,&height,&mode));
+            assert(mode == SDL_LOGICAL_PRESENTATION_LETTERBOX);
+            assert((width == 320 && height == 200) || (width == 960 && height == 640));
+            const std::string title = SDL_GetWindowTitle(SDL_GetRenderWindow(renderer));
+            assert(title == (width == 320 ? "Goldbox Engine - original" : "Goldbox Engine - enhanced"));
+            canvases.push_back(width);
+        };
+#endif
+        assert(SDL_Init(SDL_INIT_VIDEO));
+        key(SDLK_F11); key(SDLK_F11,true); key(SDLK_F11); key(SDLK_ESCAPE);
+        assert(run_exploration_window(view,"display-toggle-synthetic",save,nullptr,nullptr,nullptr,font,
+            nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,available ? &original : nullptr,start_enhanced) == 0);
+        assert(serialize_exploration(view,"display-toggle-synthetic") == before);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+        observe_frame = {};
+        assert(canvases.size() >= 3);
+        if (available) {
+            assert(canvases[0] == (start_enhanced ? 960 : 320));
+            assert(canvases[1] == (start_enhanced ? 320 : 960) && canvases[2] == canvases[0]);
+        } else for (const auto width : canvases) assert(width == 960);
+#endif
+        SDL_Quit();
+    };
+    check_display(false,true);
+    check_display(true,true);
+    check_display(true,false);
+
+    // Switch an active menu twice without accepting it or losing selection.
+    for (const bool vertical : {false,true}) for (const bool start_enhanced : {false,true}) {
+        auto view = original_session;
+        view.state.memory[0x4a03] = 99;
+        if (vertical) {
+            view.ecl_record.resize(20);
+            view.ecl_record.insert(view.ecl_record.end(),
+                {0x15,1,3,0x4a,0x81,0,0x4b,0,2,0x80,1,4,0x80,1,8,0});
+            view.state.strings[0x4b00] = "CHOOSE ONE";
+        }
+        assert(SDL_Init(SDL_INIT_VIDEO));
+        key(SDLK_SPACE); key(vertical || start_enhanced ? SDLK_DOWN : SDLK_RIGHT);
+        key(SDLK_F11); if (!start_enhanced) key(SDLK_F11);
+        key(SDLK_SPACE); key(SDLK_ESCAPE);
+        assert(run_exploration_window(view,"display-menu-synthetic",save,nullptr,nullptr,nullptr,font,
+            nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original,start_enhanced) == 0);
+        assert(view.state.memory[0x4a03] == 1 && view.row == original_session.row && view.column == original_session.column);
+        SDL_Quit();
+    }
+
+    // The selected presentation survives F10 and the startup-to-campaign host replacement.
+    auto startup_view = session;
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    std::vector<int> startup_canvases;
+    observe_frame = [&](SDL_Renderer* renderer) {
+        int width,height; SDL_RendererLogicalPresentation mode;
+        assert(SDL_GetRenderLogicalPresentation(renderer,&width,&height,&mode));
+        startup_canvases.push_back(width);
+    };
+#endif
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_F11); key(SDLK_F10); key(SDLK_B); key(SDLK_ESCAPE);
+    assert(run_exploration_window(startup_view,"display-startup-synthetic",save,nullptr,&launch_assets,nullptr,font,
+        nullptr,nullptr,titles,nullptr,{},0,nullptr,&campaign_assets,&original) == 0);
+    assert(startup_view.current_program_record == 0 && startup_view.state.memory[0x4a20] == 7);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    observe_frame = {};
+    assert(startup_canvases.size() >= 3 && startup_canvases[0] == 320);
+    for (std::size_t i = 1; i < startup_canvases.size(); ++i) assert(startup_canvases[i] == 960);
+#endif
+    SDL_Quit();
 }

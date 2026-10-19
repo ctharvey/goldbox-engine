@@ -27,6 +27,24 @@ map overview. Put this switch after `--window`, before the resource arguments.
 The two presentations use the same VM, rules and saves. Profiles without
 an original adapter default to enhanced; an explicit unsupported original mode fails.
 
+Press **F11** to switch between original and enhanced presentation in place,
+including startup, creation, exploration, event menus and scripted waits. The
+window title and logical canvas change without forcing a physical window resize.
+The current image/animation, menu selection, character draft and game/RNG state
+are retained. A pending choice or page-continuation prompt still needs its normal
+confirmation; switching does not advance the VM. Repeated held-F11 events and
+Ctrl/Alt/GUI-modified F11 are ignored. The selected presentation survives F10
+and campaign startup, but is not part of engine saves.
+
+Enhanced launches prepare the configured original adapter when its resource
+files are available. If no adapter/resources are available, F11 has no effect
+and enhanced mode remains usable. A vertical menu whose prompt cannot fit the
+original region also prevents switching back until that menu closes. Both text
+views are maintained as output arrives; original mode shows its current page
+and enhanced mode retains its bounded history. Switching from enhanced does not
+replay older original pages. Existing original/enhanced navigation conventions
+still apply to the currently selected view.
+
 Pool's first original adapter renders a 320x200 logical canvas, an 88x88 scene at
 (24,24), original symbol borders from `8X8D1.DAX` record 202, native font, party
 panel, green dialogue below the scene and a separate command row. Profile fields
@@ -75,6 +93,10 @@ original text reveal timing or character-status indicators. Inline colors have
 synthetic coverage for all selectors, escaped/malformed controls, color changes
 inside words, continuation and clears, plus an original-mode ECL/SDL smoke test.
 They have not yet been compared against a color-changing DOS scene.
+Cutover tests compare complete serialized game/RNG state before and after F11,
+check both logical canvases/window titles, retain native scene/text pixels after
+a round trip, preserve horizontal/vertical menu selection, and cover enhanced
+launches, unavailable adapters, repeat keys and startup/restart transitions.
 Synthetic menu tests exercise both orientations, shortcuts, wraparound, Space
 confirmation, viewport bounds and unchanged party position through the real SDL
 loop. Native ECL selection styling, duplicate-initial behavior, mouse activation

@@ -2,6 +2,12 @@
 
 ## 2026-10-18
 
+- Add F11 original/enhanced display cutover without restarting the game or VM.
+  Retain artwork, dialogue, menu selection and game/RNG state; preserve the
+  selected layout across F10 and campaign startup. Prepare the original adapter
+  for enhanced launches when its resources are available. Add cutover/state,
+  pixel, menu and startup/restart regressions; ignore held-key repeats.
+
 - Dismiss stale event artwork on navigation and clear old dialogue in original
   mode. Make original-mode Down/S turn around in place; enhanced mode retains
   backward movement. Add synthetic pixel/state regressions for turning, blocked
