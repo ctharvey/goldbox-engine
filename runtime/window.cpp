@@ -938,11 +938,19 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
             redraw = true;
             try {
                 if (key == SDLK_LEFT || key == SDLK_A || key == SDLK_RIGHT || key == SDLK_D) {
+                    host.clear_images();
+                    if (original) host.text("",true);
                     const int turn = key == SDLK_LEFT || key == SDLK_A ? 3 : 1;
                     session.facing = static_cast<Direction>((unsigned(session.facing)+turn)%4);
                 } else if (key == SDLK_UP || key == SDLK_W || key == SDLK_DOWN || key == SDLK_S) {
+                    host.clear_images();
+                    if (original) host.text("",true);
                     const auto facing = session.facing;
                     const bool backwards = key == SDLK_DOWN || key == SDLK_S;
+                    if (original && backwards) {
+                        session.facing = static_cast<Direction>((unsigned(facing)+2)%4);
+                        continue;
+                    }
                     const bool moved = session.move(static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4));
                     session.facing = facing;
                     if (moved) trigger(formats::EclEventKind::move);

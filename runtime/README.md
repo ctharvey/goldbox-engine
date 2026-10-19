@@ -24,7 +24,7 @@ portraits and cutscene artwork visible. Dialogue stays below the artwork.
 `--display original` selects the profile's original presentation adapter; Pool
 defaults to this mode. `--display enhanced` retains the larger scene and revealed
 map overview. Put this switch after `--window`, before the resource arguments.
-The two presentations use the same VM, rules, inputs and saves. Profiles without
+The two presentations use the same VM, rules and saves. Profiles without
 an original adapter default to enhanced; an explicit unsupported original mode fails.
 
 Pool's first original adapter renders a 320x200 logical canvas, an 88x88 scene at
@@ -94,9 +94,18 @@ use the configured toolchain, build with two workers, and run the resulting `.ex
 SDL's runtime library must be discoverable. The option defaults OFF, preserving
 the headless build and JSONL harness without an SDL dependency.
 
-Arrows or WASD move forward/backward and turn. Space searches, R rests, I runs
+Up/W moves forward and Left/A or Right/D turns. Original-mode Down/S turns
+around in place without moving or running a movement event; enhanced-mode
+Down/S moves backward while preserving facing. Navigation dismisses previous
+event artwork, including on a blocked move. Original mode also clears the old
+dialogue. Artwork/text produced by a new movement event remain visible until
+the next navigation action. Space searches, R rests, I runs
 initialization explicitly, F5 saves to a new file, F9 restores, Escape closes.
 Menus use Up/Down and Enter; map actions are suspended until a choice is made.
+Linux/WSL synthetic tests read pixels directly from the SDL software renderer
+to check that old artwork/dialogue disappear and newly produced event output
+survives. These captures use synthetic content only, with no desktop capture.
+Original-executable comparison of navigation timing remains outstanding.
 F10 restarts from the launch state in exploration, event menus, or startup. It
 returns to the first title when `--startup` is active; otherwise it resets the
 exploration preview without automatically initializing it. Current unsaved

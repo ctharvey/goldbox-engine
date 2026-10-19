@@ -11,13 +11,16 @@
 #include <cmath>
 #include <limits>
 #include <iostream>
+#include <functional>
 
 using namespace goldbox;
 #ifdef GOLDBOX_RENDER_CALL_TESTS
 static unsigned render_presents{}, font_color_changes{};
+static std::function<void(SDL_Renderer*)> observe_frame;
 extern "C" bool __real_SDL_RenderPresent(SDL_Renderer*);
 extern "C" bool __real_SDL_SetTextureColorMod(SDL_Texture*, Uint8, Uint8, Uint8);
 extern "C" bool __wrap_SDL_RenderPresent(SDL_Renderer* renderer) {
+    if (observe_frame) observe_frame(renderer);
     ++render_presents; return __real_SDL_RenderPresent(renderer);
 }
 extern "C" bool __wrap_SDL_SetTextureColorMod(SDL_Texture* texture, Uint8 r, Uint8 g, Uint8 b) {
@@ -467,4 +470,71 @@ int main(int argc, char** argv) {
     assert(session.map.dax_record_id == 0 && session.current_program_record == 0);
     assert(session.state.memory[0x4a20] == 7 && session.party[0].name == "TEST");
     SDL_Quit();
+
+    // Navigation dismisses old event art, exposing the dungeon, while a new
+    // movement event may supply fresh art. Capture only this synthetic SDL frame.
+    const auto navigation = [&](SDL_Keycode input, bool blocked, bool fresh_picture, bool native) {
+        ExplorationSession view;
+        view.row = view.column = 5;
+        view.dialect = {"ssi-five-entry-v1",0x9900,0xc04f,true,std::nullopt};
+        view.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3);
+        for (unsigned i = 0; i < 5; ++i) {
+            const std::uint8_t target = i == static_cast<unsigned>(formats::EclEventKind::initialize) ||
+                (i == static_cast<unsigned>(formats::EclEventKind::move) && fresh_picture) ? 20 : 27;
+            view.ecl_record.insert(view.ecl_record.end(),{1,1,target,0x99});
+        }
+        view.ecl_record.insert(view.ecl_record.end(),{0x0e,0,7,0x11,0x80,1,4,0});
+        if (blocked) view.map.cells[5*16+5].north = 1;
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+        std::vector<std::array<Uint8,3>> pixels;
+        std::vector<std::array<Uint8,3>> text_pixels;
+        if (native) observe_frame = [&](SDL_Renderer* renderer) {
+            const auto sample = [&](int x, int y) {
+                const SDL_Rect pixel{x*3+1,y*3+1,1,1};
+                auto* surface = SDL_RenderReadPixels(renderer,&pixel);
+                assert(surface);
+                Uint8 r,g,b,a;
+                const bool read = SDL_ReadSurfacePixel(surface,0,0,&r,&g,&b,&a);
+                SDL_DestroySurface(surface);
+                assert(read); return std::array<Uint8,3>{r,g,b};
+            };
+            pixels.push_back(sample(layout.scene[0],layout.scene[1]));
+            text_pixels.push_back(sample(layout.dialogue[0]+1,layout.dialogue[1]));
+        };
+#endif
+        assert(SDL_Init(SDL_INIT_VIDEO));
+        key(SDLK_I); key(input); key(SDLK_ESCAPE);
+        assert(run_exploration_window(view,"navigation-synthetic",save,nullptr,&campaign_assets.images,nullptr,font,
+            nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,native ? &original : nullptr) == 0);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+        observe_frame = {};
+        if (native) {
+            assert(pixels.size() >= 3);
+            assert((pixels[1] == std::array<Uint8,3>{0,0,170}));
+            assert((text_pixels[1] == std::array<Uint8,3>{85,255,85}));
+            const std::array<Uint8,3> expected = fresh_picture ? std::array<Uint8,3>{0,0,170} :
+                std::array<Uint8,3>{0,0,0};
+            assert(pixels.back() == expected);
+            const std::array<Uint8,3> expected_text = fresh_picture ? std::array<Uint8,3>{85,255,85} :
+                std::array<Uint8,3>{0,0,0};
+            assert(text_pixels.back() == expected_text);
+        }
+#endif
+        SDL_Quit();
+        if (input == SDLK_LEFT) assert(view.facing == Direction::west && view.row == 5 && view.column == 5);
+        if (input == SDLK_RIGHT) assert(view.facing == Direction::east && view.row == 5 && view.column == 5);
+        if (input == SDLK_DOWN || input == SDLK_S) {
+            assert(view.row == (native ? 5 : 6) && view.column == 5);
+            assert(view.facing == (native ? Direction::south : Direction::north));
+        }
+        if (input == SDLK_UP) assert(view.row == (blocked ? 5 : 4) && view.column == 5);
+    };
+    navigation(SDLK_LEFT,false,false,true);
+    navigation(SDLK_RIGHT,false,false,true);
+    navigation(SDLK_DOWN,false,false,true);
+    navigation(SDLK_S,false,false,true);
+    navigation(SDLK_UP,false,false,true);
+    navigation(SDLK_UP,true,false,true);
+    navigation(SDLK_UP,false,true,true);
+    navigation(SDLK_DOWN,false,false,false);
 }

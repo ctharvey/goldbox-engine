@@ -2,6 +2,11 @@
 
 ## 2026-10-18
 
+- Dismiss stale event artwork on navigation and clear old dialogue in original
+  mode. Make original-mode Down/S turn around in place; enhanced mode retains
+  backward movement. Add synthetic pixel/state regressions for turning, blocked
+  movement, ordinary movement and fresh artwork produced by a new event.
+
 - Fix GEO16 ordinary-door traversal: honor directional state 1 on both sides
   of an edge while preserving solid walls, closed states and map boundaries.
   Avoid redrawing exploration/menus for irrelevant events, and render same-color

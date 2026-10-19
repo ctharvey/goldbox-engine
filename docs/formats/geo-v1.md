@@ -43,6 +43,13 @@ blocked 361 solid edges plus one boundary door. No map cells or extracted
 content are included here. This checks collision against original resources,
 not original executable behavior, event timing or closed-door gameplay parity.
 
+Movement lifecycle parity remains a separate gap: SSI Engine runs the move
+script before stepping, then searches the resulting location. Its Pool profile
+uses movement-block byte `0x6DC9`, tried-exit byte `0x6DD5` and previous-position
+bytes `0x49F0/0x49F1`. These are research-only bindings, not yet enabled or
+verified against the original executable. The current pilot still runs the move
+event after a successful step; navigation display cleanup does not change that.
+
 ## GEO → ECL association
 
 `bind_geo_events_to_ecl(map, eclArchive, recordId)` only binds a map to an **explicitly selected ECL DAX record**, after checking the ECL record exists and extracts. It does *not* guess matching IDs, scan arbitrary bytecode for patterns, or confuse the selector with an ECL byte offset. A future game-specific map/ECL dispatch decoder must resolve `(record ID, event selector)` to a **verified** `(bytecode offset, dialect)` before invoking the ECL instruction decoder.

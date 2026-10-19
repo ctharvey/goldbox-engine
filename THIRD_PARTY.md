@@ -11,6 +11,12 @@ checks are independently implemented. The upstream placeholder auto-opening of
 closed doors is not adopted; locks, bashing and map-edge exits remain unfinished.
 No original map data or Java implementation is distributed.
 
+At that revision, `DungeonMovementHandler.java`, `engine/Engine.java` and
+`ui/classic/ClassicMode.java` were also consulted for Down-as-turnaround and
+clearing stale pictures/text during navigation. The C++ input handling is
+independently implemented. Synthetic software-renderer pixel tests check the
+presentation behavior; this does not establish original-executable timing parity.
+
 ## Original display adapter (2026-10-18)
 
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`, particularly
