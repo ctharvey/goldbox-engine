@@ -9,6 +9,9 @@ allow passage; states 0, 2 and 3 on nonzero walls remain blocking. Doorway artwo
 still occludes the view, as in the source map; collision and visual occlusion
 are distinct. Opening/bashing closed doors and map-boundary exits are unfinished.
 The renderer has no title checks and does not change decoder/VM state semantics.
+Optional image packs bind enhanced artwork to original resource identities using
+the existing mod loader. See [replacement image library](../docs/image-library.md)
+for `--mods`, exact source keys, supported BMP files and current limits.
 Exploration and choice menus redraw when input changes their presentation, an
 animation advances, or the window is exposed/resized. Mouse motion, key releases
 and ignored repeat events do not force another frame. Adjacent dialogue glyphs

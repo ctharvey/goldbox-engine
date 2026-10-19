@@ -2,6 +2,8 @@
 #pragma once
 #include "goldbox/exploration.hpp"
 #include "goldbox/formats/graphics.hpp"
+#include "goldbox/image_library.hpp"
+#include <memory>
 #include <optional>
 
 namespace goldbox {
@@ -11,6 +13,8 @@ struct ImageArchives {
     std::optional<PortraitArchives> portraits{};
     std::uint32_t picture_period_ms{}; // Explicit presentation policy; zero keeps pictures static.
     std::uint32_t sprite_replacement_ms{}; // Zero rejects timed replacement.
+    std::string game_id{}, picture_archive{}, sprite_archive{};
+    std::shared_ptr<const ImageLibrary> library{};
 };
 // Presentation state only: never alters the decoded campaign or ECL memory.
 // Picture/replacement timing is supplied explicitly; sprite frames use distance views.
@@ -26,6 +30,8 @@ public:
     std::uint32_t animation_wait_ms() const;
     void clear();
     const formats::EgaFrame* frame() const;
+    std::optional<ImageKey> source() const;
+    const ImageReplacement* replacement(bool enhanced) const;
     formats::EgaPaletteKind palette() const { return sprite_ ? formats::EgaPaletteKind::sprite : formats::EgaPaletteKind::standard; }
 private:
     const ImageArchives& archives_;
@@ -34,5 +40,6 @@ private:
     bool sprite_{};
     std::uint64_t elapsed_ms_{};
     std::vector<formats::EgaFrame> replacement_;
+    std::optional<std::uint8_t> record_, replacement_record_;
 };
 } // namespace goldbox

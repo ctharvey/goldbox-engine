@@ -18,6 +18,17 @@ add_executable(goldbox_mod_tests mod_loader_test.cpp)
 target_link_libraries(goldbox_mod_tests PRIVATE goldbox_core)
 add_test(NAME goldbox_mod_loader_test COMMAND goldbox_mod_tests)
 
+add_executable(goldbox_image_library_tests image_library_test.cpp)
+target_link_libraries(goldbox_image_library_tests PRIVATE goldbox_core)
+if(GOLDBOX_BUILD_RENDERER)
+    target_include_directories(goldbox_image_library_tests PRIVATE ${PROJECT_SOURCE_DIR}/runtime)
+    target_link_libraries(goldbox_image_library_tests PRIVATE SDL3::SDL3)
+    target_compile_definitions(goldbox_image_library_tests PRIVATE GOLDBOX_RENDERER)
+endif()
+add_test(NAME goldbox_image_library_tests COMMAND goldbox_image_library_tests ${CMAKE_CURRENT_BINARY_DIR}/image-library-fixture)
+set_tests_properties(goldbox_image_library_tests PROPERTIES TIMEOUT 20
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
+
 add_test(NAME goldbox_cli_enhanced
     COMMAND goldbox_cli
         --content ${PROJECT_SOURCE_DIR}/examples/content/demo-campaign/journals.json

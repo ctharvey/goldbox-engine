@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "goldbox/exploration.hpp"
 #include "goldbox/game_profile.hpp"
+#include "goldbox/mods.hpp"
 #ifdef GOLDBOX_RENDERER
 #include "view.hpp"
 #endif
@@ -314,10 +315,17 @@ int main(int argc, char** argv) {
         std::optional<goldbox::formats::DaxArchive> startup_archive;
         std::optional<std::filesystem::path> audio_file;
         std::optional<std::string> display_mode;
+        std::optional<fs::path> mods_root;
+        std::shared_ptr<const goldbox::ImageLibrary> image_library;
         while (window && argc > 1 && (std::string_view(argv[1]) == "--walls" ||
             std::string_view(argv[1]) == "--images" || std::string_view(argv[1]) == "--font" ||
             std::string_view(argv[1]) == "--portraits" || std::string_view(argv[1]) == "--startup" ||
-            std::string_view(argv[1]) == "--audio" || std::string_view(argv[1]) == "--display")) {
+            std::string_view(argv[1]) == "--audio" || std::string_view(argv[1]) == "--display" ||
+            std::string_view(argv[1]) == "--mods")) {
+            if (std::string_view(argv[1]) == "--mods") {
+                if (argc < 3 || mods_root) throw std::runtime_error("--mods requires one mod directory");
+                mods_root = argv[2]; argc -= 2; argv += 2; continue;
+            }
             if (std::string_view(argv[1]) == "--display") {
                 if (argc < 3 || display_mode || (std::string_view(argv[2]) != "original" &&
                     std::string_view(argv[2]) != "enhanced"))
@@ -355,6 +363,8 @@ int main(int argc, char** argv) {
                 if (argc < 5 || images) throw std::runtime_error("--images requires one PIC and one SPRIT archive");
                 images.emplace(goldbox::ImageArchives{goldbox::formats::DaxArchive::from_file(argv[2]),
                     goldbox::formats::DaxArchive::from_file(argv[3])});
+                images->picture_archive = fs::path(argv[2]).filename().string();
+                images->sprite_archive = fs::path(argv[3]).filename().string();
                 argc -= 3; argv += 3;
                 continue;
             }
@@ -379,6 +389,7 @@ int main(int argc, char** argv) {
                          "With --harness as the first argument, the same six arguments run the JSONL protocol instead.\n";
             std::cout << "With --window, optional --walls <WALLDEF.DAX> <8X8D.DAX> <shared-8X8D.DAX> <bank1> <bank2> <bank3> precedes the six arguments.\n";
             std::cout << "Optional --images <PIC.DAX> <SPRIT.DAX> also precedes the six resource arguments.\n";
+            std::cout << "Optional --mods <directory> binds enhanced replacement BMP images through mod.json.\n";
             std::cout << "Optional --font <8X8D.DAX> <record-id> selects SSI-order monochrome text glyphs.\n";
             std::cout << "Optional --portraits <HEAD.DAX> <BODY.DAX> enables profile-based portraits with --images.\n";
             std::cout << "Optional --startup <TITLE.DAX> opens profile-selected titles and the startup menu.\n";
@@ -390,6 +401,12 @@ int main(int argc, char** argv) {
         const auto profile = goldbox::read_game_profile(argv[1]);
 #ifdef GOLDBOX_RENDERER
         std::optional<goldbox::OriginalPresentation> original;
+        if (mods_root) {
+            const auto mods = goldbox::resolve_mods(goldbox::discover_mods(*mods_root),{profile.id,"",{}});
+            for (const auto& warning : mods.warnings) std::cerr << warning << '\n';
+            image_library = std::make_shared<goldbox::ImageLibrary>(goldbox::build_image_library(mods));
+        }
+        if (images) { images->game_id = profile.id; images->library = image_library; }
         const bool start_enhanced = display_mode.value_or(profile.original_display ? "original" : "enhanced") == "enhanced";
         if (window && !start_enhanced && !profile.original_display)
             throw std::runtime_error("Profile has no original display adapter");
@@ -513,6 +530,9 @@ int main(int argc, char** argv) {
                     return goldbox::formats::DaxArchive::from_file(fs::path(argv[4]).parent_path()/start.graphics_archives[index]);
                 };
                 goldbox::ImageArchives art{read(0),read(1)};
+                art.game_id = profile.id; art.library = image_library;
+                art.picture_archive = start.graphics_archives[0];
+                art.sprite_archive = start.graphics_archives[1];
                 art.portraits = goldbox::PortraitArchives{read(2),read(3)};
                 art.picture_period_ms = profile.picture_period_ms;
                 art.sprite_replacement_ms = profile.sprite_replacement_ms;

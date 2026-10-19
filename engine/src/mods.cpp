@@ -26,7 +26,7 @@ bool valid_mod_id(const std::string& id) {
 ModManifest parse_manifest(const fs::path& file) {
     const auto parsed = j::read_json(file);
     const auto& root = j::object(parsed, "mod manifest");
-    j::fields_only(root, {"schemaVersion", "id", "version", "priority", "requires", "patches"}, "mod manifest");
+    j::fields_only(root, {"schemaVersion", "id", "version", "priority", "requires", "patches", "images"}, "mod manifest");
     if (j::integer(j::field(root, "schemaVersion", "mod manifest"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported mod schemaVersion in " + file.string());
     }
@@ -77,6 +77,48 @@ ModManifest parse_manifest(const fs::path& file) {
             if (const auto* body = obj.if_contains("body")) patch.body = j::string(*body, "patch.body");
             if (!patch.title && !patch.body) throw std::runtime_error("empty patch in " + mod.id);
             mod.journal_patches.push_back(std::move(patch));
+        }
+    }
+    if (const auto* value = root.if_contains("images")) {
+        const auto& images = j::array(*value,"mod.images");
+        if (images.size() > 10000) throw std::runtime_error("too many replacement images");
+        std::set<ImageKey> seen;
+        for (const auto& item : images) {
+            const auto& obj = j::object(item,"mod image");
+            j::fields_only(obj,{"game", "archive", "kind", "record", "frame", "file"},"mod image");
+            ImageKey key;
+            key.game = j::string(j::field(obj,"game","mod image"),"image.game");
+            if (!valid_mod_id(key.game)) throw std::runtime_error("Invalid image game identity");
+            key.archive = image_archive_id(j::string(j::field(obj,"archive","mod image"),"image.archive"));
+            key.kind = j::string(j::field(obj,"kind","mod image"),"image.kind");
+            const auto record = j::integer(j::field(obj,"record","mod image"),"image.record");
+            const auto frame = j::integer(j::field(obj,"frame","mod image"),"image.frame");
+            if (record < 0 || record > 254 || frame < 0 || frame > 255 ||
+                (key.kind != "picture" && key.kind != "sprite"))
+                throw std::runtime_error("Unsupported image source identity");
+            key.record = static_cast<std::uint16_t>(record);
+            key.frame = static_cast<std::uint16_t>(frame);
+            if (!seen.insert(key).second) throw std::runtime_error("Duplicate image binding in " + mod.id);
+            const auto name = j::string(j::field(obj,"file","mod image"),"image.file");
+            if (std::any_of(name.begin(),name.end(),[](unsigned char c) { return c < 32; }))
+                throw std::runtime_error("Control characters in image path");
+            const fs::path relative(name);
+            if (name.find('\\') != std::string::npos || name.find(':') != std::string::npos ||
+                relative.empty() || relative.is_absolute() || relative.extension() != ".bmp")
+                throw std::runtime_error("Image file must be a relative .bmp path");
+            auto path = file.parent_path();
+            for (const auto& part : relative) {
+                if (part == "." || part == "..") throw std::runtime_error("Image path traversal rejected");
+                path /= part;
+                if (fs::is_symlink(path)) throw std::runtime_error("Symlinked image paths are not allowed");
+            }
+            if (!fs::is_regular_file(path) || fs::file_size(path) > 32u*1024u*1024u)
+                throw std::runtime_error("Image must be a regular file at most 32 MiB");
+            const auto canonical = fs::canonical(path);
+            const auto within = canonical.lexically_relative(fs::canonical(file.parent_path()));
+            if (within.empty() || within.is_absolute() || *within.begin() == "..")
+                throw std::runtime_error("Image escaped mod directory");
+            mod.images.push_back({std::move(key),canonical,mod.id});
         }
     }
     return mod;
@@ -152,7 +194,18 @@ ModResolution resolve_mods(std::vector<ModManifest> mods, const ImportedContent&
         if (!base_ids.insert(entry.id).second) throw std::runtime_error("duplicate journal in imported content");
     }
     std::map<std::pair<JournalId, std::string>, std::string> touched;
+    std::map<ImageKey,std::string> image_touched;
     for (const auto& mod : result.ordered) {
+        for (const auto& image : mod.images) {
+            if (image.source.game != content.game_id) continue;
+            auto key = image.source;
+            key.archive = image_archive_id(key.archive);
+            if (const auto found = image_touched.find(key); found != image_touched.end())
+                result.warnings.push_back("image " + key.archive + ":" + std::to_string(key.record) +
+                    ":" + key.kind + ":" + std::to_string(key.frame) + " changed by " + found->second +
+                    " then " + mod.id + "; latter wins");
+            image_touched[key] = mod.id;
+        }
         for (const auto& patch : mod.journal_patches) {
             if (!base_ids.contains(patch.id)) {
                 throw std::runtime_error("mod " + mod.id + " targets nonexistent journal #" + std::to_string(patch.id));
@@ -184,6 +237,13 @@ Journal build_journal(const ImportedContent& content, const ModResolution& mods,
         }
     }
     return journal;
+}
+
+ImageLibrary build_image_library(const ModResolution& mods) {
+    ImageLibrary library;
+    for (const auto& mod : mods.ordered)
+        for (const auto& image : mod.images) library.add(image);
+    return library;
 }
 
 std::string make_session_metadata(const ImportedContent& content, const ModResolution& mods, bool enhanced) {

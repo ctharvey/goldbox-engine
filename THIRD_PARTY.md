@@ -1,5 +1,14 @@
 # Third-party licensing and provenance
 
+## Replacement image library (2026-10-18)
+
+The existing OpenXcom audit (revision `4a4bae5fa2e5a09282928e84943fc84b093e34ff`)
+was consulted for resource-overlay architecture. Its loader remains a research-only
+reference; the existing Goldbox JSON resolver is extended independently. No upstream
+implementation was copied. The optional replacement renderer reuses the separately
+installed, unmodified SDL3 BMP/surface APIs under the existing Zlib dependency
+entry. No new decoder, artwork or upstream source is bundled.
+
 ## Door traversal (2026-10-18)
 
 SSI Engine `data/dungeon/DungeonMap.java` and

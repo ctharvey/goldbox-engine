@@ -2,6 +2,12 @@
 
 ## 2026-10-18
 
+- Add an optional mod image library keyed by game, archive, kind, record and frame.
+  Connect picture and sprite identities to full-color BMP replacements in enhanced
+  mode, retaining original artwork and F11 cutover. Reuse mod dependency ordering
+  and report binding conflicts; validate paths and bound BMP allocations. Add
+  synthetic library/pixel/cutover regressions. No production artwork is bundled.
+
 - Add F11 original/enhanced display cutover without restarting the game or VM.
   Retain artwork, dialogue, menu selection and game/RNG state; preserve the
   selected layout across F10 and campaign startup. Prepare the original adapter

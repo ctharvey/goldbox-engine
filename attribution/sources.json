@@ -191,7 +191,8 @@
         "include/SDL3/SDL_render.h",
         "include/SDL3/SDL_events.h",
         "LICENSE.txt",
-        "include/SDL3/SDL_audio.h"
+        "include/SDL3/SDL_audio.h",
+        "include/SDL3/SDL_surface.h"
       ],
       "license": "Zlib",
       "licenseFile": "licenses/SDL3-zlib.txt",
@@ -200,11 +201,12 @@
       "localFiles": [
         "runtime/window.cpp",
         "runtime/CMakeLists.txt",
-        "runtime/audio.hpp"
+        "runtime/audio.hpp",
+        "runtime/image_replacement.hpp"
       ],
-      "purpose": "Optional window, input, software/accelerated geometry and temporary ASCII debug font; bounded mono audio playback through SDL audio streams",
+      "purpose": "Optional window, input, software/accelerated geometry and temporary ASCII debug font; bounded mono audio playback through SDL audio streams; bounded BMP replacement image loading with SDL surface APIs",
       "modifications": "Unmodified external library, linked via SDL3::SDL3; no SDL source or font copied. Independent GEO ray casting and application UI. Preserve supplied SDL notices when distributing its binaries.",
-      "reviewed": "2026-10-17"
+      "reviewed": "2026-10-18"
     },
     {
       "id": "sdl3-debug-font",

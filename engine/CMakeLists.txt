@@ -10,6 +10,7 @@ add_library(goldbox_core STATIC
     src/ecl_vm.cpp
     src/exploration.cpp
     src/image_presentation.cpp
+    src/image_library.cpp
     src/party.cpp
     src/party_memory.cpp
 )

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "goldbox/content.hpp"
+#include "goldbox/image_library.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -15,6 +16,7 @@ struct ModManifest {
     int priority = 0;
     std::vector<std::string> requires_mods;
     std::vector<JournalPatch> journal_patches;
+    std::vector<ImageReplacement> images;
 };
 
 struct ModResolution {
@@ -27,6 +29,7 @@ struct ModResolution {
 [[nodiscard]] std::vector<ModManifest> discover_mods(const std::filesystem::path& mods_root);
 [[nodiscard]] ModResolution resolve_mods(std::vector<ModManifest> mods, const ImportedContent& content);
 [[nodiscard]] Journal build_journal(const ImportedContent& content, const ModResolution& mods, bool enhanced);
+[[nodiscard]] ImageLibrary build_image_library(const ModResolution& mods);
 
 // Save metadata is intentionally not a full campaign save file.
 [[nodiscard]] std::string make_session_metadata(const ImportedContent& content, const ModResolution& mods,

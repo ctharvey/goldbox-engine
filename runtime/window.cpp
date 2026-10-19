@@ -3,6 +3,7 @@
 // Uses unmodified, separately installed SDL3; no upstream implementation copied.
 #include "view.hpp"
 #include "audio.hpp"
+#include "image_replacement.hpp"
 #include <SDL3/SDL.h>
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL_main.h>
@@ -41,6 +42,7 @@ public:
     const formats::TandyClip* startup_music{};
     std::function<formats::SpeakerClip(std::uint16_t)> sounds;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> image_texture{nullptr,SDL_DestroyTexture};
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> replacement_texture{nullptr,SDL_DestroyTexture};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> font_texture{nullptr,SDL_DestroyTexture};
     bool running{true};
     bool restart_requested{};
@@ -97,6 +99,7 @@ public:
     void update_image() {
         image_clock = SDL_GetTicks();
         image_texture.reset();
+        replacement_texture.reset();
         const auto* frame = images ? images->frame() : nullptr;
         if (frame) {
             image_texture.reset(SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,
@@ -108,6 +111,13 @@ public:
             std::vector<formats::Rgba> rgba;
             for (const auto pixel : frame->image.pixels) rgba.push_back(palette[pixel]);
             checked(SDL_UpdateTexture(image_texture.get(),nullptr,rgba.data(),frame->image.width*4));
+            if (const auto* replacement = images->replacement(true)) {
+                try { replacement_texture.reset(load_image_replacement(renderer,replacement->file)); }
+                catch (const std::exception& error) {
+                    SDL_Log("Image replacement from %s failed (%s): %s; using original",
+                        replacement->mod.c_str(),replacement->file.string().c_str(),error.what());
+                }
+            }
         }
     }
     bool animate() {
@@ -438,8 +448,9 @@ public:
         WindowHost& host;
         ImagePresentation saved;
         decltype(image_texture) texture;
+        decltype(replacement_texture) replacement;
         explicit PortraitPreview(WindowHost& value) : host(value),saved(std::move(*value.images)),
-            texture(std::move(value.image_texture)) {
+            texture(std::move(value.image_texture)),replacement(std::move(value.replacement_texture)) {
             if (value.character_assets) {
                 value.images.reset(); value.images.emplace(*value.character_assets);
             }
@@ -447,6 +458,7 @@ public:
         ~PortraitPreview() {
             host.images.reset(); host.images.emplace(std::move(saved));
             host.image_texture = std::move(texture); host.image_clock = SDL_GetTicks();
+            host.replacement_texture = std::move(replacement);
         }
     };
     void show_character(const Character& c) {
@@ -742,7 +754,8 @@ public:
             constexpr float scale = 360.0f/88;
             const SDL_FRect destination{144+frame->x_offset*scale,72+frame->y_offset*scale,
                 frame->image.width*scale,frame->image.height*scale};
-            checked(SDL_RenderTexture(renderer,image_texture.get(),nullptr,&destination));
+            checked(SDL_RenderTexture(renderer,replacement_texture ? replacement_texture.get() : image_texture.get(),
+                nullptr,&destination));
         }
         color(207,176,112); label(664,72,"MAP OVERVIEW (REVEALED)");
         for (int row = 0; row < 16; ++row) for (int col = 0; col < 16; ++col) {

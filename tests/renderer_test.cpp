@@ -627,4 +627,48 @@ int main(int argc, char** argv) {
     for (std::size_t i = 1; i < startup_canvases.size(); ++i) assert(startup_canvases[i] == 960);
 #endif
     SDL_Quit();
+    // An explicit mod binding swaps only the enhanced texture, including a live F11 round trip.
+    const auto replacement_file = save.parent_path()/"renderer-replacement.bmp";
+    assert(!std::filesystem::exists(replacement_file));
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    auto* modern = SDL_CreateSurface(176,176,SDL_PIXELFORMAT_RGBA32); assert(modern);
+    assert(SDL_FillSurfaceRect(modern,nullptr,SDL_MapSurfaceRGBA(modern,123,45,67,255)));
+    assert(SDL_SaveBMP(modern,replacement_file.string().c_str())); SDL_DestroySurface(modern);
+    SDL_Quit();
+    auto replacement_library = std::make_shared<ImageLibrary>();
+    replacement_library->add({{"synthetic.game","PIC3.DAX","picture",7,0},replacement_file,"synthetic-art"});
+    auto remastered_assets = campaign_assets.images;
+    remastered_assets.game_id = "synthetic.game"; remastered_assets.picture_archive = "PIC3.DAX";
+    remastered_assets.library = replacement_library;
+    ExplorationSession remastered;
+    remastered.dialect = {"ssi-five-entry-v1",0x9900,0xc04f,true,std::nullopt};
+    remastered.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3);
+    for (unsigned i = 0; i < 5; ++i) remastered.ecl_record.insert(remastered.ecl_record.end(),{1,1,20,0x99});
+    remastered.ecl_record.insert(remastered.ecl_record.end(),{0x0e,0,7,0});
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    std::vector<std::array<Uint8,3>> original_pixels, enhanced_pixels;
+    observe_frame = [&](SDL_Renderer* renderer) {
+        int width,height; SDL_RendererLogicalPresentation mode;
+        assert(SDL_GetRenderLogicalPresentation(renderer,&width,&height,&mode));
+        float x,y;
+        assert(SDL_RenderCoordinatesToWindow(renderer,width == 320 ? layout.scene[0]+0.5f : 145.0f,
+            width == 320 ? layout.scene[1]+0.5f : 73.0f,&x,&y));
+        const SDL_Rect point{int(x),int(y),1,1};
+        auto* pixel = SDL_RenderReadPixels(renderer,&point); assert(pixel);
+        Uint8 r,g,b,a; assert(SDL_ReadSurfacePixel(pixel,0,0,&r,&g,&b,&a)); SDL_DestroySurface(pixel);
+        (width == 320 ? original_pixels : enhanced_pixels).push_back({r,g,b});
+    };
+#endif
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_I); key(SDLK_F11); key(SDLK_F11); key(SDLK_ESCAPE);
+    assert(run_exploration_window(remastered,"replacement-synthetic",save,nullptr,&remastered_assets,nullptr,font,
+        nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    observe_frame = {};
+    assert(!enhanced_pixels.empty() && original_pixels.size() >= 3);
+    assert((enhanced_pixels.back() == std::array<Uint8,3>{123,45,67}));
+    assert((original_pixels.back() == std::array<Uint8,3>{0,0,170}));
+#endif
+    assert(remastered.row == 0 && remastered.column == 0);
+    SDL_Quit(); std::filesystem::remove(replacement_file);
 }

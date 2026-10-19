@@ -21,6 +21,7 @@ void ImagePresentation::picture(std::uint8_t id) {
     sprite_ = false;
     elapsed_ms_ = 0;
     replacement_.clear();
+    record_ = id; replacement_record_.reset();
 }
 void ImagePresentation::sprite_start(EclSpriteRequest request, const ExplorationSession& session,
     std::optional<formats::EgaFrame> replacement_portrait) {
@@ -67,6 +68,9 @@ void ImagePresentation::sprite_start(EclSpriteRequest request, const Exploration
     index_ = distance;
     sprite_ = true;
     elapsed_ms_ = 0;
+    record_ = request.sprite;
+    replacement_record_ = replacement_portrait ? std::nullopt :
+        std::optional<std::uint8_t>(request.replacement_picture);
 }
 void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const formats::EgaPortraitLayout& layout) {
     if (!archives_.portraits) throw std::runtime_error("No portrait archives selected");
@@ -80,6 +84,7 @@ void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const for
     frames_ = std::move(decoded); index_ = 0; sprite_ = false;
     elapsed_ms_ = 0;
     replacement_.clear();
+    record_.reset(); replacement_record_.reset();
 }
 void ImagePresentation::sprite_advance() {
     if (sprite_ && index_) { --index_; elapsed_ms_ = 0; }
@@ -99,6 +104,7 @@ bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
         elapsed_ms -= wait;
         frames_ = std::move(replacement_); replacement_.clear();
         sprite_ = false; index_ = 0; elapsed_ms_ = 0; replaced = true;
+        record_ = replacement_record_; replacement_record_.reset();
         if (!animation_wait_ms()) return true;
     }
     const auto period = archives_.picture_period_ms;
@@ -110,6 +116,19 @@ bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
     elapsed_ms_ = total % period;
     return replaced || index_ != previous;
 }
-void ImagePresentation::clear() { frames_.clear(); replacement_.clear(); index_ = 0; sprite_ = false; elapsed_ms_ = 0; }
+void ImagePresentation::clear() {
+    frames_.clear(); replacement_.clear(); index_ = 0; sprite_ = false; elapsed_ms_ = 0;
+    record_.reset(); replacement_record_.reset();
+}
 const formats::EgaFrame* ImagePresentation::frame() const { return frames_.empty() ? nullptr : &frames_[index_]; }
+std::optional<ImageKey> ImagePresentation::source() const {
+    const auto& archive = sprite_ ? archives_.sprite_archive : archives_.picture_archive;
+    if (!record_ || frames_.empty() || archive.empty() || archives_.game_id.empty()) return std::nullopt;
+    return ImageKey{archives_.game_id,image_archive_id(archive),sprite_ ? "sprite" : "picture",
+        *record_,static_cast<std::uint16_t>(index_)};
+}
+const ImageReplacement* ImagePresentation::replacement(bool enhanced) const {
+    const auto key = source();
+    return key && archives_.library ? archives_.library->find(*key,enhanced) : nullptr;
+}
 } // namespace goldbox
