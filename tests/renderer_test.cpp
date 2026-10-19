@@ -670,5 +670,45 @@ int main(int argc, char** argv) {
     assert((original_pixels.back() == std::array<Uint8,3>{0,0,170}));
 #endif
     assert(remastered.row == 0 && remastered.column == 0);
+    SDL_Quit();
+    // Composed portraits retain both source archives/records through the ECL host and F11.
+    const auto portrait_part = [](std::uint8_t id, std::uint8_t color) {
+        std::vector<std::uint8_t> raw(49,color*17);
+        std::fill_n(raw.begin(),17,0); raw[0]=8; raw[2]=1; raw[8]=1;
+        std::vector<std::uint8_t> bytes{9,0,id,0,0,0,0,49,0,50,0,48};
+        bytes.insert(bytes.end(),raw.begin(),raw.end());
+        return formats::DaxArchive::parse(bytes);
+    };
+    remastered_assets.portraits = PortraitArchives{portrait_part(7,3),portrait_part(9,4),"HEAD3.DAX","BODY3.DAX"};
+    replacement_library->add({{"synthetic.game","HEAD3.DAX","portrait",7,0,"BODY3.DAX",9},
+        replacement_file,"synthetic-portrait"});
+    remastered.ecl_record.resize(20); remastered.ecl_record.insert(remastered.ecl_record.end(),{0x0e,0,9,0});
+    remastered.state.memory[0x5000] = 7;
+    const GameProfile::Portrait composite_config{0x5000,{88,88,{0,0},{0,40}}};
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    original_pixels.clear(); enhanced_pixels.clear();
+    observe_frame = [&](SDL_Renderer* renderer) {
+        int width,height; SDL_RendererLogicalPresentation mode;
+        assert(SDL_GetRenderLogicalPresentation(renderer,&width,&height,&mode));
+        float x,y;
+        assert(SDL_RenderCoordinatesToWindow(renderer,width == 320 ? layout.scene[0]+0.5f : 145.0f,
+            width == 320 ? layout.scene[1]+0.5f : 73.0f,&x,&y));
+        const SDL_Rect point{int(x),int(y),1,1};
+        auto* pixel = SDL_RenderReadPixels(renderer,&point); assert(pixel);
+        Uint8 r,g,b,a; assert(SDL_ReadSurfacePixel(pixel,0,0,&r,&g,&b,&a)); SDL_DestroySurface(pixel);
+        (width == 320 ? original_pixels : enhanced_pixels).push_back({r,g,b});
+    };
+#endif
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_I); key(SDLK_F11); key(SDLK_F11); key(SDLK_ESCAPE);
+    assert(run_exploration_window(remastered,"portrait-replacement-synthetic",save,nullptr,&remastered_assets,nullptr,font,
+        &composite_config,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    observe_frame = {};
+    assert(!enhanced_pixels.empty() && original_pixels.size() >= 3);
+    assert((enhanced_pixels.back() == std::array<Uint8,3>{123,45,67}));
+    assert((original_pixels.back() == std::array<Uint8,3>{0,170,170}));
+#endif
+    assert(remastered.state.memory[0x5000] == 7);
     SDL_Quit(); std::filesystem::remove(replacement_file);
 }

@@ -348,6 +348,8 @@ int main(int argc, char** argv) {
                 if (argc < 4 || portraits) throw std::runtime_error("--portraits requires HEAD and BODY archives");
                 portraits.emplace(goldbox::PortraitArchives{goldbox::formats::DaxArchive::from_file(argv[2]),
                     goldbox::formats::DaxArchive::from_file(argv[3])});
+                portraits->head_archive = fs::path(argv[2]).filename().string();
+                portraits->body_archive = fs::path(argv[3]).filename().string();
                 argc -= 3; argv += 3;
                 continue;
             }
@@ -534,6 +536,8 @@ int main(int argc, char** argv) {
                 art.picture_archive = start.graphics_archives[0];
                 art.sprite_archive = start.graphics_archives[1];
                 art.portraits = goldbox::PortraitArchives{read(2),read(3)};
+                art.portraits->head_archive = fs::path(start.graphics_archives[2]).filename().string();
+                art.portraits->body_archive = fs::path(start.graphics_archives[3]).filename().string();
                 art.picture_period_ms = profile.picture_period_ms;
                 art.sprite_replacement_ms = profile.sprite_replacement_ms;
                 campaign_graphics.emplace(goldbox::CampaignGraphics{std::move(art),{read(4),read(5),read(6)}});

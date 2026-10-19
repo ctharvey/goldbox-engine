@@ -2,6 +2,11 @@
 
 ## 2026-10-18
 
+- Support enhanced character portraits keyed by both original head/body archives
+  and record IDs. Preserve composition, picker selections, saves and original-mode
+  artwork; carry portrait identities through timed sprite replacements. Validate
+  paired bindings and test picker cycling, conflicts, fallback and F11 pixels.
+
 - Add an optional mod image library keyed by game, archive, kind, record and frame.
   Connect picture and sprite identities to full-color BMP replacements in enhanced
   mode, retaining original artwork and F11 cutover. Reuse mod dependency ordering

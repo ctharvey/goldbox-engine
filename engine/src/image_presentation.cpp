@@ -22,9 +22,13 @@ void ImagePresentation::picture(std::uint8_t id) {
     elapsed_ms_ = 0;
     replacement_.clear();
     record_ = id; replacement_record_.reset();
+    portrait_source_.reset(); replacement_source_.reset();
 }
 void ImagePresentation::sprite_start(EclSpriteRequest request, const ExplorationSession& session,
-    std::optional<formats::EgaFrame> replacement_portrait) {
+    std::optional<formats::EgaFrame> replacement_portrait, std::optional<ImageKey> replacement_source) {
+    if (replacement_source && (!replacement_portrait || replacement_source->kind != "portrait"))
+        throw std::runtime_error("Replacement portrait identity requires composed portrait pixels");
+    if (replacement_source) replacement_source = normalize_image_key(std::move(*replacement_source));
     if (request.replacement_picture != 255 && !archives_.sprite_replacement_ms)
         throw std::runtime_error("Timed sprite replacement policy unavailable");
     if (request.sprite == 255) {
@@ -71,6 +75,7 @@ void ImagePresentation::sprite_start(EclSpriteRequest request, const Exploration
     record_ = request.sprite;
     replacement_record_ = replacement_portrait ? std::nullopt :
         std::optional<std::uint8_t>(request.replacement_picture);
+    portrait_source_.reset(); replacement_source_ = std::move(replacement_source);
 }
 void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const formats::EgaPortraitLayout& layout) {
     if (!archives_.portraits) throw std::runtime_error("No portrait archives selected");
@@ -81,10 +86,16 @@ void ImagePresentation::portrait(std::uint8_t head, std::uint8_t body, const for
     frame.image = std::move(image);
     std::vector<formats::EgaFrame> decoded{std::move(frame)};
     validate(decoded);
+    std::optional<ImageKey> source;
+    if (!archives_.game_id.empty() && !archives_.portraits->head_archive.empty() &&
+        !archives_.portraits->body_archive.empty())
+        source = normalize_image_key({archives_.game_id,archives_.portraits->head_archive,"portrait",head,0,
+            archives_.portraits->body_archive,body});
     frames_ = std::move(decoded); index_ = 0; sprite_ = false;
     elapsed_ms_ = 0;
     replacement_.clear();
     record_.reset(); replacement_record_.reset();
+    portrait_source_ = std::move(source); replacement_source_.reset();
 }
 void ImagePresentation::sprite_advance() {
     if (sprite_ && index_) { --index_; elapsed_ms_ = 0; }
@@ -105,6 +116,7 @@ bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
         frames_ = std::move(replacement_); replacement_.clear();
         sprite_ = false; index_ = 0; elapsed_ms_ = 0; replaced = true;
         record_ = replacement_record_; replacement_record_.reset();
+        portrait_source_ = std::move(replacement_source_); replacement_source_.reset();
         if (!animation_wait_ms()) return true;
     }
     const auto period = archives_.picture_period_ms;
@@ -119,9 +131,11 @@ bool ImagePresentation::advance_time(std::uint64_t elapsed_ms) {
 void ImagePresentation::clear() {
     frames_.clear(); replacement_.clear(); index_ = 0; sprite_ = false; elapsed_ms_ = 0;
     record_.reset(); replacement_record_.reset();
+    portrait_source_.reset(); replacement_source_.reset();
 }
 const formats::EgaFrame* ImagePresentation::frame() const { return frames_.empty() ? nullptr : &frames_[index_]; }
 std::optional<ImageKey> ImagePresentation::source() const {
+    if (!sprite_ && !frames_.empty() && portrait_source_) return portrait_source_;
     const auto& archive = sprite_ ? archives_.sprite_archive : archives_.picture_archive;
     if (!record_ || frames_.empty() || archive.empty() || archives_.game_id.empty()) return std::nullopt;
     return ImageKey{archives_.game_id,image_archive_id(archive),sprite_ ? "sprite" : "picture",

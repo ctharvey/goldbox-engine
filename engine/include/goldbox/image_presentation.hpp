@@ -7,7 +7,10 @@
 #include <optional>
 
 namespace goldbox {
-struct PortraitArchives { formats::DaxArchive heads, bodies; };
+struct PortraitArchives {
+    formats::DaxArchive heads, bodies;
+    std::string head_archive{}, body_archive{};
+};
 struct ImageArchives {
     formats::DaxArchive pictures, sprites;
     std::optional<PortraitArchives> portraits{};
@@ -24,7 +27,7 @@ public:
     void picture(std::uint8_t id);
     void portrait(std::uint8_t head, std::uint8_t body, const formats::EgaPortraitLayout& layout);
     void sprite_start(EclSpriteRequest request, const ExplorationSession& session,
-        std::optional<formats::EgaFrame> replacement_portrait = {});
+        std::optional<formats::EgaFrame> replacement_portrait = {}, std::optional<ImageKey> replacement_source = {});
     void sprite_advance();
     bool advance_time(std::uint64_t elapsed_ms);
     std::uint32_t animation_wait_ms() const;
@@ -41,5 +44,6 @@ private:
     std::uint64_t elapsed_ms_{};
     std::vector<formats::EgaFrame> replacement_;
     std::optional<std::uint8_t> record_, replacement_record_;
+    std::optional<ImageKey> portrait_source_, replacement_source_;
 };
 } // namespace goldbox

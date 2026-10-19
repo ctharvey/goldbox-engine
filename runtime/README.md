@@ -12,6 +12,9 @@ The renderer has no title checks and does not change decoder/VM state semantics.
 Optional image packs bind enhanced artwork to original resource identities using
 the existing mod loader. See [replacement image library](../docs/image-library.md)
 for `--mods`, exact source keys, supported BMP files and current limits.
+Composed character portraits can bind a complete enhanced image to an exact
+head/body pair. Changing either picker selection chooses its own binding or the
+original composition; F11 retains the selected pair and compares original art.
 Exploration and choice menus redraw when input changes their presentation, an
 animation advances, or the window is exposed/resized. Mouse motion, key releases
 and ignored repeat events do not force another frame. Adjacent dialogue glyphs

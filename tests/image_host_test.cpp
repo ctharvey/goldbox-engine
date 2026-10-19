@@ -108,11 +108,16 @@ int main(int argc, char** argv) {
         assert(profile.portrait);
         ImageArchives portrait_assets{DaxArchive::from_file(argv[3]),DaxArchive::from_file(argv[4])};
         portrait_assets.portraits = PortraitArchives{portrait_assets.pictures,portrait_assets.sprites};
+        portrait_assets.game_id = profile.id;
+        portrait_assets.portraits->head_archive = std::filesystem::path(argv[3]).filename().string();
+        portrait_assets.portraits->body_archive = std::filesystem::path(argv[4]).filename().string();
         assert(portrait_assets.pictures.records().size() <= 32 && portrait_assets.sprites.records().size() <= 32);
         ImagePresentation portrait_display(portrait_assets);
         unsigned combinations = 0;
         for (const auto& head : portrait_assets.pictures.records()) for (const auto& body : portrait_assets.sprites.records()) {
             portrait_display.portrait(head.id,body.id,profile.portrait->layout);
+            const auto source = portrait_display.source();
+            assert(source && source->kind == "portrait" && source->record == head.id && source->body_record == body.id);
             assert(portrait_display.frame()); ++combinations;
         }
         std::cout << "portrait heads=" << portrait_assets.pictures.records().size()
@@ -490,6 +495,18 @@ int main(int argc, char** argv) {
     auto portrait_creation = creation; portrait_creation.portrait = CreationPortrait{{7,8},{9,10}};
     ImageArchives creation_assets{assets.pictures,assets.sprites};
     creation_assets.portraits = PortraitArchives{archive(7,part(3),8),archive(9,part(4),10)};
+    creation_assets.game_id = "synthetic.game";
+    creation_assets.portraits->head_archive = "HEAD3.DAX";
+    creation_assets.portraits->body_archive = "BODY3.DAX";
+    const auto portrait_file = startup_save.parent_path()/"goldbox-creation-replacement.bmp";
+    assert(!std::filesystem::exists(portrait_file));
+    auto* portrait_surface = SDL_CreateSurface(176,176,SDL_PIXELFORMAT_RGBA32); assert(portrait_surface);
+    assert(SDL_FillSurfaceRect(portrait_surface,nullptr,SDL_MapSurfaceRGBA(portrait_surface,123,45,67,255)));
+    assert(SDL_SaveBMP(portrait_surface,portrait_file.string().c_str())); SDL_DestroySurface(portrait_surface);
+    auto portrait_library = std::make_shared<ImageLibrary>();
+    portrait_library->add({{"synthetic.game","HEAD3.DAX","portrait",8,0,"BODY3.DAX",10},
+        portrait_file,"synthetic-portrait"});
+    creation_assets.library = portrait_library;
     const GameProfile::Portrait creation_layout{0,layout};
     session.party.clear(); session.state.random = session.initial_random; session.character_rules = portrait_creation;
     startup_window({SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,
@@ -497,6 +514,8 @@ int main(int argc, char** argv) {
         SDLK_DOWN,SDLK_RETURN,SDLK_RETURN,SDLK_RETURN,SDLK_ESCAPE,SDLK_ESCAPE},
         true,&creation_assets,&creation_layout);
     assert(session.party.size() == 1 && session.party[0].portrait->head == 8 && session.party[0].portrait->body == 10);
+    std::filesystem::remove(portrait_file);
+    creation_assets.library.reset();
     assert(session.state.random->state() == 0xe28f6d7a); // Choosing/cycling artwork consumes no RNG.
     const auto painted_save = serialize_exploration(session,"startup-synthetic"); session.party.clear();
     restore_exploration(session,painted_save,"startup-synthetic");

@@ -12,18 +12,29 @@ std::string image_archive_id(std::string name) {
     }
     return name;
 }
-void ImageLibrary::add(ImageReplacement replacement) {
-    if (replacement.source.game.empty() ||
-        (replacement.source.kind != "picture" && replacement.source.kind != "sprite") ||
-        replacement.source.record > 254 || replacement.source.frame > 255)
+ImageKey normalize_image_key(ImageKey source) {
+    if (source.game.empty() ||
+        (source.kind != "picture" && source.kind != "sprite" && source.kind != "portrait") ||
+        source.record > 254 || source.frame > 255)
         throw std::runtime_error("Invalid replacement image identity");
-    replacement.source.archive = image_archive_id(replacement.source.archive);
+    source.archive = image_archive_id(source.archive);
+    if (source.kind == "portrait") {
+        if (!source.body_record || *source.body_record > 254 || source.frame != 0)
+            throw std::runtime_error("Portrait requires a body record and frame zero");
+        source.body_archive = image_archive_id(source.body_archive);
+    } else if (!source.body_archive.empty() || source.body_record) {
+        throw std::runtime_error("Body identity is only supported for portraits");
+    }
+    return source;
+}
+void ImageLibrary::add(ImageReplacement replacement) {
+    replacement.source = normalize_image_key(std::move(replacement.source));
     const auto key = replacement.source;
     entries_.insert_or_assign(key,std::move(replacement));
 }
 const ImageReplacement* ImageLibrary::find(ImageKey source, bool enhanced) const {
     if (!enhanced || source.archive.empty()) return nullptr;
-    source.archive = image_archive_id(source.archive);
+    source = normalize_image_key(std::move(source));
     const auto found = entries_.find(source);
     return found == entries_.end() ? nullptr : &found->second;
 }

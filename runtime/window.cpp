@@ -307,14 +307,16 @@ public:
     void sprite_start(EclSpriteRequest request) override {
         if (!images) throw std::runtime_error("No image archives selected");
         std::optional<formats::EgaFrame> portrait;
+        std::optional<ImageKey> portrait_source;
         if (request.replacement_picture != 255 && portrait_config &&
             session.state.memory[portrait_config->head_id_address] != 255) {
             auto replacement = *images;
             replacement.portrait(session.state.memory[portrait_config->head_id_address],
                 request.replacement_picture,portrait_config->layout);
             portrait = *replacement.frame();
+            portrait_source = replacement.source();
         }
-        images->sprite_start(request,session,std::move(portrait)); update_image();
+        images->sprite_start(request,session,std::move(portrait),std::move(portrait_source)); update_image();
     }
     void delay() override {
         const auto end = SDL_GetTicks() + session.script_delay_ms;

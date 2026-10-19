@@ -85,7 +85,7 @@ ModManifest parse_manifest(const fs::path& file) {
         std::set<ImageKey> seen;
         for (const auto& item : images) {
             const auto& obj = j::object(item,"mod image");
-            j::fields_only(obj,{"game", "archive", "kind", "record", "frame", "file"},"mod image");
+            j::fields_only(obj,{"game", "archive", "kind", "record", "frame", "file", "bodyArchive", "bodyRecord"},"mod image");
             ImageKey key;
             key.game = j::string(j::field(obj,"game","mod image"),"image.game");
             if (!valid_mod_id(key.game)) throw std::runtime_error("Invalid image game identity");
@@ -94,10 +94,17 @@ ModManifest parse_manifest(const fs::path& file) {
             const auto record = j::integer(j::field(obj,"record","mod image"),"image.record");
             const auto frame = j::integer(j::field(obj,"frame","mod image"),"image.frame");
             if (record < 0 || record > 254 || frame < 0 || frame > 255 ||
-                (key.kind != "picture" && key.kind != "sprite"))
+                (key.kind != "picture" && key.kind != "sprite" && key.kind != "portrait"))
                 throw std::runtime_error("Unsupported image source identity");
             key.record = static_cast<std::uint16_t>(record);
             key.frame = static_cast<std::uint16_t>(frame);
+            if (const auto* body = obj.if_contains("bodyRecord")) {
+                const auto id = j::integer(*body,"image.bodyRecord");
+                if (id < 0 || id > 254) throw std::runtime_error("Invalid portrait body record");
+                key.body_record = static_cast<std::uint16_t>(id);
+            }
+            if (const auto* body = obj.if_contains("bodyArchive")) key.body_archive = j::string(*body,"image.bodyArchive");
+            key = normalize_image_key(std::move(key));
             if (!seen.insert(key).second) throw std::runtime_error("Duplicate image binding in " + mod.id);
             const auto name = j::string(j::field(obj,"file","mod image"),"image.file");
             if (std::any_of(name.begin(),name.end(),[](unsigned char c) { return c < 32; }))
@@ -199,10 +206,12 @@ ModResolution resolve_mods(std::vector<ModManifest> mods, const ImportedContent&
         for (const auto& image : mod.images) {
             if (image.source.game != content.game_id) continue;
             auto key = image.source;
-            key.archive = image_archive_id(key.archive);
+            key = normalize_image_key(std::move(key));
             if (const auto found = image_touched.find(key); found != image_touched.end())
                 result.warnings.push_back("image " + key.archive + ":" + std::to_string(key.record) +
-                    ":" + key.kind + ":" + std::to_string(key.frame) + " changed by " + found->second +
+                    ":" + key.kind + ":" + std::to_string(key.frame) +
+                    (key.body_record ? ":" + key.body_archive + ":" + std::to_string(*key.body_record) : "") +
+                    " changed by " + found->second +
                     " then " + mod.id + "; latter wins");
             image_touched[key] = mod.id;
         }
