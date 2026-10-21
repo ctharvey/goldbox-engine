@@ -1,0 +1,8 @@
+# LF in the repo and in the working tree on every platform. Git for Windows
+# defaults to core.autocrlf=true, which checks out CRLF and breaks exact-text
+# edits and LF-anchored scripts.
+* text=auto eol=lf
+
+# cmd.exe needs CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
