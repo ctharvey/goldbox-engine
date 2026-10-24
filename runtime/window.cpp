@@ -349,7 +349,9 @@ public:
         checked(SDL_RenderFillRect(renderer, &rect));
     }
     void label(float x, float y, const std::string& value) {
-        if (!font_texture) { checked(SDL_RenderDebugText(renderer,x,y,value.c_str())); return; }
+        // Enhanced UI uses SDL's upright, readable UI font. Imported SSI glyphs
+        // belong to the original presentation, including its native metrics.
+        if (!original || !font_texture) { checked(SDL_RenderDebugText(renderer,x,y,value.c_str())); return; }
         std::uint8_t r,g,b,a;
         checked(SDL_GetRenderDrawColor(renderer,&r,&g,&b,&a));
         checked(SDL_SetTextureColorMod(font_texture.get(),r,g,b));

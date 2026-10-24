@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-24
+
+- Use SDL's built-in readable font for enhanced menus and labels while retaining
+  imported SSI glyphs in original mode. Add rendered-pixel checks across F11
+  round trips for font selection and original glyph orientation.
+
 ## 2026-10-18
 
 - Support enhanced character portraits keyed by both original head/body archives

@@ -26,6 +26,8 @@ changes from 102,915 to 27. These counts measure avoided work, not live WSLg
 frame latency; responsiveness still needs confirmation in the running game.
 In enhanced mode, choice menus use the right-hand overview panel, with two-line labels, leaving
 portraits and cutscene artwork visible. Dialogue stays below the artwork.
+Enhanced labels use SDL's built-in UI font for readability. Original mode retains
+the imported SSI font; F11 switches fonts with the layout without changing state.
 
 `--display original` selects the profile's original presentation adapter; Pool
 defaults to this mode. `--display enhanced` retains the larger scene and revealed

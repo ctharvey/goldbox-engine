@@ -393,6 +393,44 @@ int main(int argc, char** argv) {
     check_menu(true,{SDLK_B},1);
     check_menu(true,{SDLK_RIGHT,SDLK_RETURN},0);
 
+    // Enhanced labels remain readable independently of imported glyph shapes;
+    // original labels preserve asymmetric glyph rows across F11 round trips.
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    unsigned font_frames = 0;
+    observe_frame = [&](SDL_Renderer* renderer) {
+        int width,height; SDL_RendererLogicalPresentation mode;
+        assert(SDL_GetRenderLogicalPresentation(renderer,&width,&height,&mode));
+        const bool enhanced = width == 960;
+        const auto glyph = font_glyph(enhanced ? 'G' : 'N');
+        const float left = enhanced ? 24 : layout.party[0];
+        const float top = enhanced ? 22 : layout.party[1];
+        unsigned ink_pixels = 0;
+        for (unsigned y = 0; y < 8; ++y) for (unsigned x = 0; x < 8; ++x) {
+            float wx,wy;
+            assert(SDL_RenderCoordinatesToWindow(renderer,left+x+0.5f,top+y+0.5f,&wx,&wy));
+            const SDL_Rect pixel{int(wx),int(wy),1,1};
+            auto* surface = SDL_RenderReadPixels(renderer,&pixel);
+            assert(surface);
+            Uint8 r,g,b,a;
+            assert(SDL_ReadSurfacePixel(surface,0,0,&r,&g,&b,&a));
+            SDL_DestroySurface(surface);
+            const bool ink = enhanced ? r == 207 && g == 176 && b == 112 : r == 255 && g == 255 && b == 255;
+            ink_pixels += ink;
+            if (!enhanced) assert(ink == (font[glyph].pixels[y*8+x] != 0));
+        }
+        // The supplied G has one pixel; the enhanced UI must use its own font.
+        if (enhanced) assert(ink_pixels > 1);
+        ++font_frames;
+    };
+    assert(SDL_Init(SDL_INIT_VIDEO));
+    key(SDLK_F11); key(SDLK_F11); key(SDLK_ESCAPE);
+    assert(run_exploration_window(session,"renderer-font",save,nullptr,nullptr,nullptr,font,
+        nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original,true) == 0);
+    assert(font_frames >= 3);
+    observe_frame = {};
+    SDL_Quit();
+#endif
+
     // An input-event flood must not cause a frame for every irrelevant event.
     // Linux/WSL link wrappers count calls while still invoking the real SDL.
     auto responsive = session;
