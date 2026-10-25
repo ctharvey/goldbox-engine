@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Verify Pool's PARTY_STRENGTH handler in 205 bounded original-code checks.
+  Document its weighted numeric formula and the missing combat/level state
+  required for a faithful host implementation; execution remains unsupported.
+
 - Clear profile-defined numeric temporary ranges on validated ECL program
   transfers, before initialize/move/search. Verify Pool's ranges with the complete
   original reset routine and retain saved temporaries during engine restore.

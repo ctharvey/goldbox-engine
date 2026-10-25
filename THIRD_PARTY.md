@@ -338,6 +338,13 @@ complete original reset routine with synthetic headers and sentinel buffers,
 including its preserve guard. The shared C++ implementation uses validated
 profile ranges; no Java loops or memory layout implementation were translated.
 
+PARTY_STRENGTH research checked the pinned VM's empty handler and
+`data/character/CharacterValues.java` for Pool HP and class-level field labels.
+Gold Box Explorer's pinned `FruaCharacter.cs` annotates offsets 0x110/0x111 as
+current THAC0/AC encoded as 60 minus the value. The arithmetic was independently
+tested using the original handler and synthetic party records; no upstream
+party-rating implementation was adopted. Combat-stat derivation is unfinished.
+
 Gold Box Explorer at `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` (MIT,
 Bil Simser) was consulted for `src/Common/Plugins/Dax/DaxFile.cs` and
 `src/Common/Plugins/DaxEcl/Program.cs`. Both it and SSI Engine agree that the

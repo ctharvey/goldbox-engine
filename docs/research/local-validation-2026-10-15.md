@@ -1558,3 +1558,49 @@ Windows RNG integration suite skipped under WSL. The authorized original-resourc
 test ran, including the corrected boundary-flag regression. Log:
 `.cache/goldbox-validation/transfer-reset-full-tests.log`. Hygiene and attribution
 checks passed. The four native-reset checks are separate from full-game parity.
+
+## PARTY_STRENGTH arithmetic and host-input gate (2026-10-25)
+
+The installed interpreter's opcode dispatch compares 0x1D at overlay 0x1F
+offset 0x3033 and calls handler 0x12C6. This establishes the handler through
+executable dispatch, without scanning ECL bytes for instruction patterns.
+The handler decodes one numeric destination, walks the party list, computes
+one contribution per member and writes the byte total through its ordinary
+operand writer. It does not read the Strength ability or filter by status.
+
+For unsigned native record bytes H=0x11B, A=0x111, T=0x110, M=0x9B and C=0x96:
+
+```
+member = floor((H + 5*max(A-60,0) + 5*max(T-39,0) + 8*M + 4*C) / 10)
+party = sum(member) modulo 256
+```
+
+Rounding occurs per member before summation. The empty list produces zero.
+SSI Engine's pinned Pool CharacterValues identifies H as current HP and M/C
+as mage/cleric levels. Gold Box Explorer's pinned FruaCharacter annotations
+identify T/A as current THAC0/AC, encoded as 60 minus the displayed value.
+Those labels corroborate the fields; neither reference establishes their
+complete derivation from equipment, effects or character progression.
+
+Private `probe_original_party_strength.py` ran the original handler, operand
+decoder and destination writer with synthetic linked records and ECL operands.
+All 205 cases passed: empty party, each of five bytes varied over 14 boundary
+values, all-max parties of sizes 1..6, and 128 deterministic generated parties.
+The checks cover threshold subtraction, per-member division, multi-member
+accumulation and byte overflow. Each invocation had a 15,000-instruction and
+one-second bound; the batch had a 45-second deadline. Every call returned and
+advanced the synthetic instruction PC by four bytes. No instruction callbacks
+replaced original code. Private report:
+`.cache/goldbox-validation/original-party-strength-report.json`.
+
+The runtime gate remains intentional. `Character` has current HP, but does not
+represent current AC/THAC0 or per-class levels, and the selected-character
+adapter supplies none of these missing fields. Deriving levels solely from a
+class name, assuming unequipped combat stats, or storing an arbitrary cached
+rating would not reproduce the original state. The next implementation needs
+typed current combat/level state and verified creation/update bindings before
+enabling this opcode through the per-game adapter. No complete combat engine
+is required to expose those inputs, but equipment/effect behavior cannot be
+silently assumed. The existing original-resource test continues to enforce
+the explicit opcode stop at offset 421. This research changes no runtime code
+and establishes arithmetic interoperability, not complete boundary parity.
