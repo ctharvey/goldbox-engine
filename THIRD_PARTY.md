@@ -352,6 +352,14 @@ shared C++ rules setting, normalized level map, save validation and read-only
 field bindings were authored independently; no upstream creator or level system
 was copied or translated. Combat and level advancement remain unfinished.
 
+Starting combat-state research retained the pinned CharacterValues and
+FruaCharacter field labels as references. SSI Engine's THAC0 accessor and
+PARTY_STRENGTH handler are placeholders, so they supply no reusable calculation.
+The original creator and complete resident stat-refresh routine were separately
+probed on synthetic unequipped records. The C++ rules policy, normalized combat
+state, save validation and weighted-rating host were independently authored;
+no upstream combat, equipment or party-strength implementation was adapted.
+
 Gold Box Explorer at `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` (MIT,
 Bil Simser) was consulted for `src/Common/Plugins/Dax/DaxFile.cs` and
 `src/Common/Plugins/DaxEcl/Program.cs`. Both it and SSI Engine agree that the

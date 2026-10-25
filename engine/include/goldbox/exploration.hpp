@@ -46,6 +46,7 @@ struct ExplorationSession {
     std::optional<CreationRules> character_rules{};
     Party party;
     std::optional<PartyMemoryLayout> party_memory{};
+    std::optional<PartyStrengthBinding> party_strength{};
     std::uint8_t loaded_character{};
     // Immutable initial configuration used to validate saved RNG parameters.
     std::optional<HighWordLcg32> initial_random{};

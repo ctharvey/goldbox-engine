@@ -78,6 +78,33 @@ int main(int argc, char** argv) {
         rejects([&] { validate_party_memory_layout(bad,rules); });
     }
     assert(run({0x0a,0,0,0}).exited);
+    assert(profile.party_strength);
+    const auto strength = *profile.party_strength;
+    validate_party_strength(strength,rules);
+    assert(calculate_party_strength({},strength) == 0);
+    auto rated = session.party[0]; rated.hit_points = HitPoints{10,10,10}; rated.combat = CombatStats{10,20};
+    assert(calculate_party_strength({rated},strength) == 1);
+    rated.combat->thac0 = 21; rated.hit_points->current = 5;
+    assert(calculate_party_strength({rated,rated},strength) == 0); // Divide each member before summing.
+    rated.hit_points = HitPoints{255,255,255}; rated.combat = CombatStats{-195,-195};
+    rated.levels = {{strength.cleric_class,255},{strength.mage_class,255}};
+    assert(calculate_party_strength(Party(6,rated),strength) == 150); // Original byte wrap.
+    rated.combat.reset(); rejects([&] { (void)calculate_party_strength({rated},strength); });
+    rated.combat = CombatStats{61,20}; rejects([&] { (void)calculate_party_strength({rated},strength); });
+    rated.combat = CombatStats{10,20}; rated.levels.clear();
+    rejects([&] { (void)calculate_party_strength({rated},strength); });
+    rated = session.party[0]; rejects([&] { (void)calculate_party_strength({rated},strength); });
+    auto bad_strength = strength; bad_strength.mage_class = "unknown";
+    rejects([&] { validate_party_strength(bad_strength,rules); });
+    bad_strength = strength; bad_strength.dialect = "unknown";
+    rejects([&] { (void)calculate_party_strength({},bad_strength); });
+    for (auto& c : session.party) { c.combat = CombatStats{10,20}; c.hit_points = HitPoints{10,10,10}; }
+    session.party_strength = strength;
+    session.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,EclPartyDialect::weighted_strength);
+    assert(run({0x1d,1,0x20,0x4a,0}).exited && session.state.memory[0x4a20] == 3);
+    assert(!run({0x1d,1,0x96,0x6b,0}).exited && session.party[0].levels.at("cleric") == 1);
+    session.party_strength.reset();
+    session.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,EclPartyDialect::load_character);
     session.state.memory[0x6e3e] = 255;
     assert(run({9,1,0x3e,0x6e,1,0,0x4a,0x0a,0,1,0x11,0x81,0,0x6b,
         9,1,0x10,0x6b,1,1,0x4a,9,3,0x10,0x6b,3,2,0x4a,

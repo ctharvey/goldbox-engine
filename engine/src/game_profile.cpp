@@ -19,7 +19,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
         "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
-        "originalDisplay"}, "game profile");
+        "originalDisplay", "partyStrength"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -383,6 +383,15 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         }
         validate_party_memory_layout(layout,*profile.character_rules);
         profile.party_memory = std::move(layout);
+    }
+    if (const auto* value = root.if_contains("partyStrength")) {
+        if (!profile.character_rules || !profile.party_memory)
+            throw std::runtime_error("Party strength requires party rules and memory bindings");
+        const auto& o = j::object(*value,"party strength");
+        j::fields_only(o,{"dialect","clericClass","mageClass"},"party strength");
+        const auto field = [&](const char* name) { return j::string(j::field(o,name,"party strength"),name); };
+        profile.party_strength = PartyStrengthBinding{field("dialect"),field("clericClass"),field("mageClass")};
+        validate_party_strength(*profile.party_strength,*profile.character_rules);
     }
     if (const auto* value = root.if_contains("speakerAudio")) {
         const auto& audio = j::object(*value,"speakerAudio");

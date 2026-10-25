@@ -13,6 +13,21 @@ characters save a `levels` object keyed by component class IDs. A known object
 must include every active component with a positive level and no extra classes;
 legacy saves without it retain unknown levels. Loading does not infer levels
 from a class name. This adds no experience, training or level advancement.
+
+Optional rules `startingCombat` selects base `armorClass`/`thac0`, a
+`defenseAbility` ID, `abilityMinimum` and signed `defenseModifiers`. Both creation
+paths compute current AC from the base plus the configured ability modifier,
+with no new random draws. Pool selects unequipped AC 10, THAC0 20 and the verified
+Dexterity adjustments for its level-one starting classes. Unequipped native
+refresh does not add Strength or exceptional-Strength bonuses to this THAC0.
+Equipment, spell effects and advancement require separate updates and remain
+unsupported. An alternate ruleset can omit or replace the starting policy.
+
+Saved `combat` contains explicit current `armorClass` and `thac0` values in the
+normalized range -1000..1000. Legacy records retain unknown combat stats; restore
+does not apply creation defaults. These values are current state, rather than
+being recalculated from abilities on every load. The native rating adapter
+requires the narrower range representable by its SSI byte encoding.
 Optional age is stored in years; older saves without age remain unknown.
 Creation rules supply the ability names/count, option labels, race/gender bounds, legal
 classes/alignments, class minima, percentile policy and party/name limits.

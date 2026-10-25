@@ -97,11 +97,12 @@ int main(int argc, char** argv) {
         session.dialect = {dispatch.dialect,dispatch.code_base,dispatch.square_info_address,true,dispatch.position_addresses};
         session.movement_addresses = dispatch.movement_addresses;
         session.transfer_clear_ranges = dispatch.transfer_clear_ranges;
-        session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::load_character);
+        session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::weighted_strength);
         session.campaign_start = std::array<std::uint8_t,2>{config.map_record,config.program_record};
         session.position_refresh_call = config.position_refresh_call;
         session.position_advance_call = config.position_advance_call;
         session.sound_call = profile.sound_call; session.party_memory = profile.party_memory;
+        session.party_strength = profile.party_strength;
         session.character_rules = profile.character_rules; session.initial_random = profile.random;
         session.random_dialect = profile.random_dialect;
         auto random = *profile.random;
@@ -129,10 +130,10 @@ int main(int argc, char** argv) {
         auto walked = session; MovementHost movement_host(walked);
         const auto move = walked.move(Direction::west,movement_host);
         check(move.execution.has_value(),"Boundary event did not run");
-        // This is an explicit compatibility stop, not a successful transition
-        // checkpoint. Pool's pinned dialect assigns 0x1D to PARTY_STRENGTH.
-        check(!move.execution->exited && move.execution->diagnostic == "Unknown ECL opcode 29",
-            "Boundary probe's unsupported-operation gate changed; investigate before claiming parity");
+        // Complete headless execution is separate from matched native party/UI parity.
+        check(move.execution->exited,move.execution->diagnostic.c_str());
+        check(move.execution->bytecode_offset == 615 && walked.current_program_record == 20 &&
+            walked.map.dax_record_id == 20,"Boundary execution checkpoint changed");
         check(move.moved && walked.column == 15 && walked.row == 4 && walked.facing == Direction::west,
             "Boundary probe did not reach the verified forced-step position");
         check(walked.state.memory[0x4a17] == 0 && walked.state.memory[0x4ac4] == 0 &&
@@ -146,7 +147,7 @@ int main(int argc, char** argv) {
             << ",\"19140\":" << unsigned(session.state.memory[0x4ac4])
             << ",\"19141\":" << unsigned(session.state.memory[0x4ac5])
             << "},\"saveRoundTrip\":true,\"deterministicReplay\":true,\"fullParityVerified\":false"
-            << ",\"boundaryProbe\":{\"status\":\"unsupported\",\"diagnostic\":\"Unknown ECL opcode 29\",\"column\":"
+            << ",\"boundaryProbe\":{\"status\":\"executed\",\"diagnostic\":\"\",\"column\":"
             << unsigned(walked.column) << ",\"row\":" << unsigned(walked.row)
             << ",\"facing\":" << unsigned(walked.facing) << ",\"bytecodeOffset\":"
             << move.execution->bytecode_offset << ",\"programRecord\":"

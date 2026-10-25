@@ -19,7 +19,7 @@ struct EclState {
 enum class EclRandomDialect { disabled, byte_upper };
 enum class EclImageDialect { disabled, sprite3 };
 enum class EclAreaDialect { disabled, map3 };
-enum class EclPartyDialect { disabled, load_character };
+enum class EclPartyDialect { disabled, load_character, weighted_strength };
 struct EclSpriteRequest {
     std::uint8_t sprite{}, distance{}, replacement_picture{};
 };
@@ -51,6 +51,7 @@ public:
     virtual void load_area(std::array<std::uint8_t,3> values);
     virtual void load_character(std::uint8_t index);
     virtual void select_character(std::string_view prompt);
+    virtual std::uint8_t party_strength();
     // Optional virtual memory overlays. Unhandled accesses retain ordinary RAM/string semantics.
     virtual std::optional<std::uint8_t> memory_byte(std::uint16_t address);
     virtual bool write_memory(std::uint16_t address, std::uint32_t value, std::size_t width);

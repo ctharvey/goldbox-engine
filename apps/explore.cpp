@@ -498,6 +498,7 @@ int main(int argc, char** argv) {
         session.random_dialect = profile.random_dialect;
 
         session.party_memory = profile.party_memory;
+        session.party_strength = profile.party_strength;
 #ifdef GOLDBOX_RENDERER
         if (images) images->sprite_replacement_ms = profile.sprite_replacement_ms;
         session.wall_banks = initial_banks;
@@ -512,6 +513,7 @@ int main(int argc, char** argv) {
         session.opcodes = goldbox::minimal_vm_opcodes(profile.image_dialect == "ssi-images-3-v1" ?
             goldbox::EclImageDialect::sprite3 : goldbox::EclImageDialect::disabled,
             profile.area_dialect == "ssi-area-map3-v1" ? goldbox::EclAreaDialect::map3 : goldbox::EclAreaDialect::disabled,
+            profile.party_strength ? goldbox::EclPartyDialect::weighted_strength :
             profile.party_memory ? goldbox::EclPartyDialect::load_character : goldbox::EclPartyDialect::disabled);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
         if (profile.campaign_startup && window && campaign_mode) {

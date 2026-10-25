@@ -2,6 +2,11 @@
 
 ## 2026-10-25
 
+- Add rules-defined unequipped starting AC/THAC0 and persisted current combat
+  stats. Implement profile-selected PARTY_STRENGTH through a read-only VM host,
+  including native per-member rounding and byte wrapping. The imported opening
+  boundary event now reaches EXIT; complete native party/UI parity is unverified.
+
 - Add rules-configured starting levels for each active class component, saved
   class-level state and profile-bound read-only ECL level fields. Preserve unknown
   levels in legacy saves; verify native single/multiclass initialization separately.

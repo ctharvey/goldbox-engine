@@ -61,11 +61,14 @@ int main(int argc, char** argv) {
         if (choice.components.empty()) expected.emplace(choice.id,1);
         else for (const auto& name : choice.components) expected.emplace(name,1);
         assert(rolled.levels == expected);
+        assert(rolled.combat && rolled.combat->thac0 == 20);
         auto completion_random = random;
         assert(finish_character(rules,rolled,completion_random).levels == expected);
         validate_character(rules,rolled);
         const auto saved = serialize_party({rolled},rules);
         assert(read_party(saved,rules)[0].levels == expected);
+        assert(read_party(saved,rules)[0].combat->armor_class == rolled.combat->armor_class);
+        rejects([&] { (void)read_party(changed(saved,"\"thac0\":20","\"thac0\":1001"),rules); });
         auto bad = rolled; bad.levels.begin()->second = 0;
         rejects([&] { validate_character(rules,bad); });
         bad = rolled; bad.levels.emplace("unknown",1);
@@ -80,6 +83,14 @@ int main(int argc, char** argv) {
     assert(finish_character(custom_rules,hero,random).levels.at("cleric") == 3);
     custom_rules.starting_level.reset();
     assert(finish_character(custom_rules,hero,random).levels.empty());
+    const int armor[]{14,13,12,11,10,10,10,10,10,10,10,10,9,8,7,6};
+    for (int dex = 3; dex <= 18; ++dex) {
+        auto draft = hero; draft.abilities[3].value = dex;
+        const auto ready = finish_character(rules,draft,random);
+        assert(ready.combat && ready.combat->armor_class == armor[dex-3] && ready.combat->thac0 == 20);
+    }
+    custom_rules.starting_combat.reset();
+    assert(!finish_character(custom_rules,hero,random).combat);
     assert(exceptional.abilities[0].percentile >= 1 && exceptional.abilities[0].percentile <= 50);
     rejects([&] { validate_character(rules,fighter); }); // Missing exceptional score is not silently accepted.
     for (int failure = 0; failure < 6; ++failure) {
@@ -100,6 +111,7 @@ int main(int argc, char** argv) {
     assert(!read_party(json,rules)[0].age); // Legacy ages remain unknown.
     assert(!read_party(json,rules)[0].portrait);
     assert(read_party(json,rules)[0].levels.empty());
+    assert(!read_party(json,rules)[0].combat);
     auto painted = hero; painted.portrait = CharacterPortrait{0,1};
     const auto portrait_json = serialize_party({painted},rules);
     assert(read_party(portrait_json,rules)[0].portrait->head == 0 && read_party(portrait_json,rules)[0].portrait->body == 1);
@@ -176,6 +188,7 @@ int main(int argc, char** argv) {
     const auto legacy = serialize_exploration(no_rules,"party-test");
     restore_exploration(loaded,legacy,"party-test"); assert(loaded.party.empty() && loaded.character_rules);
     auto custom = rules; custom.id = "other-family"; custom.abilities.resize(2); custom.races.resize(1);
+    custom.starting_combat.reset(); // This fixture removes the configured defense ability.
     custom.genders.resize(1); custom.classes.resize(1); custom.percentile_ability.reset();
     custom.classes[0].minimum = {1,1}; custom.classes[0].percentile = false;
     custom.classes[0].creation_minimum.clear();

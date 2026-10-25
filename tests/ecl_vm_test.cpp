@@ -41,6 +41,27 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 
 int main() {
     {
+        struct StrengthHost : Host {
+            unsigned queries{};
+            std::uint8_t party_strength() override { ++queries; return 42; }
+        } rating_host;
+        EclState rating_state;
+        rating_state.memory[0x4a21] = 255;
+        auto ops = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,EclPartyDialect::weighted_strength);
+        const auto invoke = [&](const auto& bytes, const auto& selected) {
+            return execute_ecl(bytes,EclEventKind::move,{"ssi-five-entry-v1",0x9900,0xc04f},
+                selected,rating_state,rating_host);
+        };
+        assert(invoke(program({0x1d,3,0x20,0x4a,0}),ops).exited);
+        assert(rating_state.memory[0x4a20] == 42 && rating_state.memory[0x4a21] == 0 && rating_host.queries == 1);
+        assert(!invoke(program({0x1d,0,0,0}),ops).exited && rating_host.queries == 1);
+        assert(!invoke(program({0x1d,1,0x20,0x4a,0}),minimal_vm_opcodes()).exited);
+        auto conflict = ops; conflict.push_back({0x1d,"OTHER",1});
+        assert(!invoke(program({0x1d,1,0x20,0x4a,0}),conflict).exited);
+        for (auto& spec : ops) if (spec.opcode == 0x1d) spec.operand_count = 0;
+        assert(!invoke(program({0x1d,0}),ops).exited);
+    }
+    {
         EclState transfer_state; Host transfer_host;
         const auto transfer = run(program({0x20,0,7,9,0,1,1,0,0x4a,0}),transfer_state,transfer_host);
         assert(transfer.exited && transfer.next_program == 7 && transfer_state.memory[0x4a00] == 0);

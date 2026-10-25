@@ -1641,3 +1641,63 @@ levels, selected-character reads and read-only/overlap/byte-range failures.
 Logs: `.cache/goldbox-validation/class-levels-focused.log` and
 `class-levels-full-tests.log`. Hygiene and attribution checks passed. No original
 save files or installed resources were modified.
+
+## Unequipped combat state and executed PARTY_STRENGTH (2026-10-25)
+
+The original creator initializes encoded base AC to 50 (displayed AC 10) and
+computes base THAC0 from active class levels. Current values are populated by
+the complete resident refresh routine at image offset 0x1758, rather than
+copied directly from those bases. Its equipment/effect paths are distinct.
+Private probes use the actual creator base-THAC0 loop and complete refresh,
+with synthetic records containing no equipment or effects.
+
+`probe_original_starting_combat.py` passed 198 checks: all eleven supported
+class combinations at level one, each with Dexterity 3..20. Base/current THAC0
+was 20 throughout. Starting current AC was 10 plus the observed Dexterity
+modifier. A further 629 original refresh invocations covered Strength and
+Dexterity 3..25 and every exceptional-Strength percentile 1..100. These results
+were asserted against the same unequipped policy: no Strength-dependent THAC0
+change, and the verified Dexterity AC adjustments. Per-call execution limits
+were 20,000 instructions/100 ms; batches had fixed deadlines. No original
+instructions were replaced. Private reports:
+`.cache/goldbox-validation/original-starting-combat-report.json` and
+`original-unarmed-combat-report.json`. This does not verify armed attacks,
+equipment bonuses, spell effects or higher-level combat progression.
+
+Shared creation rules now optionally supply `startingCombat`; Pool selects
+these verified level-one unequipped settings. Both creation paths compute
+current combat state without extra RNG draws. Saves retain explicit normalized
+AC/THAC0, while legacy records remain unknown. The broad normalized bounds are
+independent of the narrower native byte encoding required by the rating adapter.
+No title-specific class IDs, addresses or creation defaults enter the VM.
+
+Profile `partyStrength` selects a weighted-rating dialect and class IDs. The VM
+opts into unary opcode 0x1D and writes the host's byte result through the existing
+typed, protected destination interface. The host implements the independently
+verified 205-case formula above, using current HP/combat/levels. It rejects
+unknown or unrepresentable state; it does not infer defaults during save load.
+Synthetic regressions check native rounding/overflow cases, unknown inputs,
+dialect conflicts, invalid operands and read-only destinations. Creation and
+save tests cover the Dexterity AC boundaries and alternate rules without that
+ability. The earlier alternate-rules fixture explicitly disables the inherited
+combat policy after removing its defense ability.
+
+The authorized-resource boundary probe now executes through EXIT at offset 615
+in map/program 20, at (15,4), west. Block and exit-attempt are zero; flags are
+0x4A17=0, 0x4AC4=0, 0x4AC5=1. The opening remains 761 instructions, 42 text calls,
+eight menus, (0,4), west, EXIT 5512, with deterministic engine save/replay intact.
+Private checkpoint: `.cache/goldbox-validation/party-strength-engine-checkpoint.json`.
+This is headless execution with an engine-created party. A prior native capture
+after a subsequent turn has return PC 39784, consistent with EXIT 615 plus one
+at base 39168, but its input/facing differ; no matched native boundary comparison
+or complete party equivalence is claimed. Graphical program/graphics rebinding
+still has its explicit guard and remains unfinished.
+
+The final serialized two-worker build/CTest run passed 30 suites, with the native
+Windows RNG integration suite skipped under WSL. The original-resource opening
+and executed boundary checks ran successfully. Log:
+`.cache/goldbox-validation/party-strength-full-tests.log`. The initial focused
+run found the alternate-rules fixture's removed-ability configuration; this was
+corrected before the full green run. Hygiene and attribution checks passed.
+Private original bytes and captures remain outside the public checkout; the
+installed game and user saves were not modified.

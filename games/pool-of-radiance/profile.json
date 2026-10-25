@@ -51,6 +51,7 @@
   "characterCreationRules": "../../rules/adnd-first-edition-creation.json",
   "validationStatus": "unverified",
   "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"],
+  "partyStrength": {"dialect": "ssi-weighted-party-strength-v1", "clericClass": "cleric", "mageClass": "magic-user"},
   "partyMemory": {
     "dialect": "ssi-selected-character-v1",
     "recordBase": 27392,

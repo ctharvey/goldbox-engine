@@ -108,13 +108,26 @@ std::string folded(std::string value) {
     for (auto& c : value) if (c >= 'a' && c <= 'z') c -= 'a'-'A';
     return value;
 }
+void prepare_combat(const CreationRules& rules, Character& draft) {
+    if (!rules.starting_combat) return;
+    const auto& rule = *rules.starting_combat;
+    require(rule.defense_ability < draft.abilities.size(),"Invalid combat modifier ability");
+    const int index = draft.abilities[rule.defense_ability].value-rule.ability_minimum;
+    require(index >= 0 && static_cast<std::size_t>(index) < rule.defense_modifiers.size(),
+        "Missing starting combat modifier");
+    draft.combat = rule.base;
+    draft.combat->armor_class += rule.defense_modifiers[index];
+    require(draft.combat->armor_class >= -1000 && draft.combat->armor_class <= 1000 &&
+        draft.combat->thac0 >= -1000 && draft.combat->thac0 <= 1000,"Invalid starting combat stats");
+}
 }
 CreationRules read_creation_rules(const std::filesystem::path& path) {
     require(!std::filesystem::is_symlink(path),"Creation rules must not be a symlink");
     const auto parsed = j::read_json(path);
     const auto& root = j::object(parsed,"creation rules");
     j::fields_only(root,{"schemaVersion","id","partyLimit","nameLimit","dice","abilities","genders",
-        "alignments","races","classes","percentile","initialRandomBounds","portrait","startingLevel"},"creation rules");
+        "alignments","races","classes","percentile","initialRandomBounds","portrait","startingLevel",
+        "startingCombat"},"creation rules");
     const auto field = [&](const char* key) -> const bj::value& { return j::field(root,key,"creation rules"); };
     require(number(field("schemaVersion"),1,1) == 1,"Unsupported creation schema");
     CreationRules r; r.id = id(field("id"));
@@ -160,6 +173,21 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
         unique(result); return result;
     };
     r.abilities = choices("abilities"); require(r.abilities.size() <= 16,"Too many abilities");
+    if (const auto* value = root.if_contains("startingCombat")) {
+        const auto& o = j::object(*value,"starting combat");
+        j::fields_only(o,{"armorClass","thac0","defenseAbility","abilityMinimum","defenseModifiers"},"starting combat");
+        CreationCombat rule;
+        rule.base = {number(j::field(o,"armorClass","starting combat"),-1000,1000),
+            number(j::field(o,"thac0","starting combat"),-1000,1000)};
+        const auto name = id(j::field(o,"defenseAbility","starting combat"));
+        const auto& ability = find(r.abilities,name);
+        rule.defense_ability = static_cast<std::size_t>(&ability-r.abilities.data());
+        rule.ability_minimum = number(j::field(o,"abilityMinimum","starting combat"),1,1000);
+        const auto& modifiers = j::array(j::field(o,"defenseModifiers","starting combat"),"combat modifiers");
+        require(!modifiers.empty() && modifiers.size() <= 1000,"Invalid combat modifier count");
+        for (const auto& modifier : modifiers) rule.defense_modifiers.push_back(number(modifier,-100,100));
+        r.starting_combat = std::move(rule);
+    }
     r.genders = choices("genders"); r.alignments = choices("alignments");
     if (const auto* value = root.if_contains("percentile")) {
         const auto& o = j::object(*value,"percentile");
@@ -542,6 +570,7 @@ Character roll_character_impl(const CreationRules& rules, Character draft, Rando
         for (const auto& [name,book] : choice.starting_spellbooks)
             draft.spellbooks.emplace(id(bj::value(name)),prepare_book(book));
     }
+    prepare_combat(rules,draft);
     draft.status = "okay";
     random = candidate;
     return draft;
@@ -553,6 +582,8 @@ Character roll_character(const CreationRules& rules, Character draft, HighWordLc
     return roll_character_impl(rules,std::move(draft),random);
 }
 void validate_character(const CreationRules& rules, const Character& c) {
+    if (c.combat) require(c.combat->armor_class >= -1000 && c.combat->armor_class <= 1000 &&
+        c.combat->thac0 >= -1000 && c.combat->thac0 <= 1000,"Invalid character combat stats");
     require(!c.age || *c.age > 0,"Invalid character age");
     if (c.portrait) validate_portrait(rules,*c.portrait);
     if (c.hit_points) {
@@ -621,6 +652,7 @@ Character finish_character_impl(const CreationRules& rules, Character draft, Ran
             draft.abilities[*rules.percentile_ability].percentile = std::min(die(random,sides),maximum);
         }
     }
+    prepare_combat(rules,draft);
     validate_character(rules,draft); return draft;
 }
 std::vector<AbilityValue> roll_abilities(const CreationRules& rules, std::string_view race,
@@ -646,6 +678,7 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
         bj::object member{{"name",c.name},{"race",c.race},{"gender",c.gender},
             {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}};
         if (c.status) member["status"] = *c.status;
+        if (c.combat) member["combat"] = bj::object{{"armorClass",c.combat->armor_class},{"thac0",c.combat->thac0}};
         if (!c.levels.empty()) {
             bj::object levels;
             for (const auto& [name,level] : c.levels) levels[name] = level;
@@ -681,10 +714,16 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
         j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age",
-            "hitPoints","money","spellbook","spellbooks","portrait","levels"},"character");
+            "hitPoints","money","spellbook","spellbooks","portrait","levels","combat"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
         if (const auto* value = o.if_contains("status")) c.status = id(*value);
+        if (const auto* value = o.if_contains("combat")) {
+            const auto& combat = j::object(*value,"saved combat stats");
+            j::fields_only(combat,{"armorClass","thac0"},"saved combat stats");
+            c.combat = CombatStats{number(j::field(combat,"armorClass","combat"),-1000,1000),
+                number(j::field(combat,"thac0","combat"),-1000,1000)};
+        }
         if (const auto* value = o.if_contains("levels")) {
             const auto& levels = j::object(*value,"saved class levels");
             require(!levels.empty() && levels.size() <= 64,"Invalid saved class level count");

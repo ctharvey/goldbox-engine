@@ -40,6 +40,10 @@ class SessionHost final : public EclHost {
     EclHost& delegate;
 public:
     SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {
+        if (session.party_strength) {
+            if (!session.character_rules) throw std::runtime_error("Party strength requires creation rules");
+            validate_party_strength(*session.party_strength,*session.character_rules);
+        }
         if (session.transfer_clear_ranges.size() > 32) throw std::runtime_error("Too many transfer clear ranges");
         for (std::size_t i = 0; i < session.transfer_clear_ranges.size(); ++i) {
             const auto [start,length] = session.transfer_clear_ranges[i];
@@ -192,6 +196,10 @@ public:
         return delegate.menu(choices,prompt,vertical);
     }
     void combat(EclState& state) override { delegate.combat(state); }
+    std::uint8_t party_strength() override {
+        if (!session.party_strength) throw std::runtime_error("Party strength adapter unavailable");
+        return calculate_party_strength(session.party,*session.party_strength);
+    }
     void native_call(std::uint16_t function) override {
         if (session.position_advance_call && function == session.position_advance_call->function) {
             const auto& addresses = *session.dialect.position_addresses;

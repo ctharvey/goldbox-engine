@@ -57,6 +57,13 @@ struct CreationClass {
 };
 enum class CreationBounds { reject, clamp };
 struct CreationPortrait { std::vector<std::uint8_t> heads, bodies; };
+struct CombatStats { int armor_class{}, thac0{}; };
+struct CreationCombat {
+    CombatStats base;
+    std::size_t defense_ability{};
+    int ability_minimum{};
+    std::vector<int> defense_modifiers;
+};
 struct CreationRules {
     std::string id;
     std::size_t party_limit{}, name_limit{};
@@ -72,6 +79,7 @@ struct CreationRules {
     std::vector<std::uint16_t> initial_random_bounds{};
     std::optional<CreationPortrait> portrait{};
     std::optional<std::uint16_t> starting_level{};
+    std::optional<CreationCombat> starting_combat{};
 };
 struct AbilityValue { int value{}, percentile{}; };
 struct HitPoints { int base{}, current{}, maximum{}; };
@@ -90,6 +98,7 @@ struct Character {
     std::optional<CharacterPortrait> portrait{};
     // Empty means unknown; known levels contain every active class component.
     std::map<std::string,std::uint16_t> levels{};
+    std::optional<CombatStats> combat{};
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);

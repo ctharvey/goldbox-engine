@@ -193,14 +193,27 @@ and overlapping wall registers are rejected. Call tokens and addresses come from
 the profile, with no title checks in the engine.
 
 The boundary route next reaches opcode 0x1D, which Pool's pinned profile names
-PARTY_STRENGTH (one operand). It remains unsupported; the corresponding SSI Engine
-handler is empty. Independent original-code checks now establish its weighted
-HP/combat/level calculation, documented in the local-validation research.
-The host now exposes verified per-class level state, but still lacks current AC/THAC0;
-the character's Strength ability is not a substitute. Another title's
-zero-operand INPUT_RETURN meaning must not be substituted. The opt-in original
-test reports this as an unsupported `boundaryProbe`, separate from its successful
-opening checkpoint. It does not claim a completed boundary transition.
+PARTY_STRENGTH (one destination). A profile `partyStrength` selects dialect
+`ssi-weighted-party-strength-v1` and explicit `clericClass`/`mageClass` IDs. It
+opts into the corresponding party opcode set; other profiles retain their
+existing dialect. The VM uses a read-only host callback and the ordinary typed
+destination writer, including protected-memory checks. Duplicate or conflicting
+opcode definitions fail before execution. Another title's zero-operand
+INPUT_RETURN meaning is unsupported and cannot be substituted.
+
+The host computes each member's contribution from current HP, AC, THAC0 and
+configured class levels, divides each contribution by ten, then adds with byte
+wrapping. Empty parties yield zero. Unknown state and values outside the native
+byte representation fail explicitly. Class IDs and creation defaults belong to
+profiles/rules, with no title checks in the VM. The corresponding SSI Engine
+handler is empty; the calculation was independently verified against original
+code. See the local-validation research for its formula and limits.
+
+The original-resource headless `boundaryProbe` now reports `executed`: map/program
+20, (15,4), west, EXIT at offset 615. Its opening remains unchanged. This is
+supported original-bytecode execution with an engine-created party; equivalent
+native party state, UI pacing, graphics rebinding and full boundary parity
+remain unverified. The graphical program/graphics binding guard still applies.
 
 ADD stores through the existing typed memory interface with byte/word wrapping.
 DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and

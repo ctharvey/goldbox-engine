@@ -50,6 +50,7 @@ struct GameProfile {
     std::vector<std::uint8_t> startup_title_records; // Ordered screens; presentation controls the final backdrop.
     std::optional<CreationRules> character_rules{};
     std::optional<PartyMemoryLayout> party_memory{};
+    std::optional<PartyStrengthBinding> party_strength{};
     std::optional<HighWordLcg32> random{};
     EclRandomDialect random_dialect{EclRandomDialect::disabled};
     struct SpeakerAudio {

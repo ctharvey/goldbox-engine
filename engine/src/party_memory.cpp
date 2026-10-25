@@ -104,4 +104,39 @@ std::optional<std::string> party_memory_string(const PartyMemoryLayout& layout, 
     if (address == layout.count_address) throw std::runtime_error("Party count is not a string");
     return std::nullopt;
 }
+void validate_party_strength(const PartyStrengthBinding& binding, const CreationRules& rules) {
+    if (binding.dialect != "ssi-weighted-party-strength-v1" || binding.cleric_class == binding.mage_class)
+        throw std::runtime_error("Unsupported or conflicting party strength binding");
+    for (const auto& name : {binding.cleric_class,binding.mage_class}) {
+        const auto found = std::find_if(rules.classes.begin(),rules.classes.end(),
+            [&](const auto& choice) { return choice.id == name; });
+        if (found == rules.classes.end() || !found->components.empty())
+            throw std::runtime_error("Invalid party strength class binding");
+    }
+}
+std::uint8_t calculate_party_strength(const Party& party, const PartyStrengthBinding& binding) {
+    if (binding.dialect != "ssi-weighted-party-strength-v1" || binding.cleric_class.empty() ||
+        binding.mage_class.empty() || binding.cleric_class == binding.mage_class)
+        throw std::runtime_error("Unsupported or conflicting party strength binding");
+    std::uint8_t total = 0;
+    for (const auto& character : party) {
+        if (!character.hit_points || character.hit_points->current < 0 || character.hit_points->current > 255)
+            throw std::runtime_error("Party strength requires byte-valued current HP");
+        if (!character.combat) throw std::runtime_error("Party strength requires current combat stats");
+        const auto [ac,thac0] = *character.combat;
+        if (ac < -195 || ac > 60 || thac0 < -195 || thac0 > 60)
+            throw std::runtime_error("Party strength combat stats exceed native range");
+        if (character.levels.empty()) throw std::runtime_error("Party strength requires known class levels");
+        const auto level = [&](const std::string& name) -> unsigned {
+            const auto found = character.levels.find(name);
+            if (found == character.levels.end()) return 0;
+            if (!found->second || found->second > 255) throw std::runtime_error("Party strength level exceeds byte range");
+            return found->second;
+        };
+        const auto score = character.hit_points->current + 5*std::max(-ac,0) + 5*std::max(21-thac0,0) +
+            8*level(binding.mage_class) + 4*level(binding.cleric_class);
+        total = static_cast<std::uint8_t>(total+score/10);
+    }
+    return total;
+}
 } // namespace goldbox

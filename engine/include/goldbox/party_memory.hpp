@@ -18,6 +18,11 @@ struct PartyLevelBinding {
     std::uint16_t offset{};
     std::string character_class;
 };
+struct PartyStrengthBinding {
+    std::string dialect, cleric_class, mage_class;
+};
+void validate_party_strength(const PartyStrengthBinding& binding, const CreationRules& rules);
+std::uint8_t calculate_party_strength(const Party& party, const PartyStrengthBinding& binding);
 // Shared SSI dialect adapter. Native addresses/offsets belong to game profiles.
 struct PartyMemoryLayout {
     std::string dialect;
