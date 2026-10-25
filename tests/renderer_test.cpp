@@ -367,6 +367,36 @@ int main(int argc, char** argv) {
     assert(original_session.state.strings[0x4b00] == "%FWHITE %CRED %0GREEN %% %Z");
     SDL_Quit();
 
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+    // Current AC is right aligned; legacy unknown combat state remains explicit.
+    for (const auto armor : {std::optional<int>{10},std::optional<int>{0},std::optional<int>{-2},std::optional<int>{}}) {
+        auto candidate = session;
+        candidate.party = {Character{}};
+        if (armor) candidate.party[0].combat = CombatStats{*armor,20};
+        const auto expected = armor ? std::to_string(*armor) : "?";
+        unsigned frames = 0;
+        observe_frame = [&](SDL_Renderer* renderer) {
+            ++frames;
+            const int right = layout.party[0]+layout.party[2]-32;
+            for (int y = 0; y < 8; ++y) for (int x = 0; x < 32; ++x) {
+                const int text_x = x-(32-int(expected.size()*8));
+                const bool ink = text_x >= 0 && font[font_glyph(expected[text_x/8])].pixels[y*8+text_x%8];
+                float wx,wy;
+                assert(SDL_RenderCoordinatesToWindow(renderer,right-32+x+0.5f,
+                    layout.party[1]+layout.party_row_height+y+0.5f,&wx,&wy));
+                const SDL_Rect point{int(wx),int(wy),1,1};
+                auto* sample = SDL_RenderReadPixels(renderer,&point); assert(sample);
+                Uint8 r,g,b,a; assert(SDL_ReadSurfacePixel(sample,0,0,&r,&g,&b,&a)); SDL_DestroySurface(sample);
+                assert(r == (ink ? 85 : 0) && g == (ink ? 255 : 0) && b == (ink ? 85 : 0));
+            }
+        };
+        assert(SDL_Init(SDL_INIT_VIDEO)); key(SDLK_ESCAPE);
+        assert(run_exploration_window(candidate,"armor-display-synthetic",save,nullptr,nullptr,nullptr,font,
+            nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original) == 0);
+        assert(frames); observe_frame = {}; SDL_Quit();
+    }
+#endif
+
     // Code-driven original ECL input: orientation, wrapping, shortcut activation,
     // and confirmation must write the original choice index, never move the party.
     const auto check_menu = [&](bool vertical, std::initializer_list<SDL_Keycode> keys, unsigned expected) {

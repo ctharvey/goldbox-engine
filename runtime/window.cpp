@@ -676,8 +676,8 @@ public:
             const float y = party[1]+float(i+1)*row_height;
             label(party[0],y,session.party[i].name.substr(0,(party[2]-56)/8));
             color(85,255,85);
-            // Equipment/armor is not implemented; never invent an armor class.
-            label(party[0]+party[2]-48,y,"?");
+            const auto armor = session.party[i].combat ? std::to_string(session.party[i].combat->armor_class) : "?";
+            label(party[0]+party[2]-32-float(armor.size()*8),y,armor);
             const auto hp = session.party[i].hit_points;
             const auto health = hp ? std::to_string(hp->current) : "?";
             label(party[0]+party[2]-float(health.size()*8),y,health);

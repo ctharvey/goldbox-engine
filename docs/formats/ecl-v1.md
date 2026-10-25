@@ -234,6 +234,15 @@ matching boundary observations. A boundary mismatch makes the overall run fail
 even if the opening matches. Its live comparison covers state and resource group;
 scene fingerprints are checked separately by the original-resource view test.
 
+On Linux renderer builds that original-resource test also drives the SDL window
+from the opening through the same boundary using queued inputs and the dummy
+software backend. It fingerprints logical-pixel regions read from the actual
+rendered frame. The top border, dungeon scene, party headings, selected TEST name
+and AC now match native capture fingerprints. Original mode displays known
+normalized current AC with right alignment; unknown legacy combat state remains
+`?`. These region checks do not establish whole-screen parity: dialogue, command
+labels and the position/clock line still differ, and HP rolls are not synchronized.
+
 ADD stores through the existing typed memory interface with byte/word wrapping.
 DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and
 `spriteReplacementMs` are explicit presentation policies, currently 400/1000 ms

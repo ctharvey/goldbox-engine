@@ -9,6 +9,34 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
+#ifdef GOLDBOX_CAMPAIGN_WINDOW_TESTS
+#include <SDL3/SDL.h>
+static std::map<std::string,std::uint64_t> window_fingerprints;
+extern "C" bool __real_SDL_RenderPresent(SDL_Renderer*);
+extern "C" bool __wrap_SDL_RenderPresent(SDL_Renderer* renderer) {
+    const std::pair<const char*,SDL_Rect> regions[]{
+        {"topBorder",{0,0,320,8}}, {"scene",{24,24,88,88}},
+        {"partyHeaders",{136,16,176,8}}, {"partyName",{136,32,120,8}},
+        {"armorClass",{256,32,24,8}}, {"hitPoints",{288,32,24,8}},
+        {"position",{136,120,176,8}}, {"dialogue",{8,136,304,48}}, {"commands",{0,192,320,8}}};
+    auto* surface = SDL_RenderReadPixels(renderer,nullptr);
+    if (!surface) throw std::runtime_error(SDL_GetError());
+    for (const auto& [name,r] : regions) {
+        std::uint64_t hash = 14695981039346656037ull;
+        for (int y = r.y; y < r.y+r.h; ++y) for (int x = r.x; x < r.x+r.w; ++x) {
+            float wx,wy; Uint8 red,green,blue,alpha;
+            if (!SDL_RenderCoordinatesToWindow(renderer,x+0.5f,y+0.5f,&wx,&wy) ||
+                !SDL_ReadSurfacePixel(surface,int(wx),int(wy),&red,&green,&blue,&alpha)) {
+                SDL_DestroySurface(surface); throw std::runtime_error(SDL_GetError());
+            }
+            for (const auto channel : {red,green,blue}) { hash ^= channel; hash *= 1099511628211ull; }
+        }
+        window_fingerprints[name] = hash;
+    }
+    SDL_DestroySurface(surface);
+    return __real_SDL_RenderPresent(renderer);
+}
+#endif
 
 using namespace goldbox;
 using namespace goldbox::formats;
@@ -177,6 +205,38 @@ int main(int argc, char** argv) {
         // Only the fingerprint is public; original pixels remain private.
         check(scene_hash == 15040589715104877255ull,"Native boundary scene fingerprint differs");
 #endif
+#ifdef GOLDBOX_CAMPAIGN_WINDOW_TESTS
+        auto windowed = session;
+        const auto& layout = *profile.original_display;
+        const auto font = decode_mono8_tiles(DaxArchive::from_file(game/layout.font_archive).extract(layout.font_record));
+        const auto symbols = decode_ega_images(DaxArchive::from_file(game/layout.symbols_archive).extract(layout.symbols_record));
+        const OriginalPresentation original{layout,compose_original_frame(layout,symbols.images)};
+        const auto initial_walls = load_wall_graphics(host.definitions,host.tiles,host.shared,*session.wall_banks);
+        auto destination = std::make_shared<const CampaignGraphics>(CampaignGraphics{*movement_host.assets,
+            {*movement_host.definitions,*movement_host.tiles,*movement_host.shared}});
+        const CampaignGraphicsResources graphics_sources{[&](std::uint8_t id) {
+            check(id == 20,"Unexpected window graphics program"); return destination;
+        }};
+        check(SDL_Init(SDL_INIT_VIDEO),"SDL initialization failed");
+        const auto key = [](SDL_Keycode code) {
+            SDL_Event event{}; event.type = SDL_EVENT_KEY_DOWN; event.key.key = code;
+            check(SDL_PushEvent(&event),"SDL input queue failed");
+        };
+        key(SDLK_UP);
+        for (unsigned i = 0; i < 8; ++i) key(SDLK_RETURN);
+        key(SDLK_ESCAPE);
+        check(run_exploration_window(windowed,"private-window-check",{},&initial_walls,&assets,
+            profile.color_backdrop ? &*profile.color_backdrop : nullptr,font,&*profile.portrait,nullptr,
+            {},nullptr,{},0,nullptr,nullptr,&original,false,&graphics_sources) == 0,"Boundary window failed");
+        check(windowed.current_program_record == 20 && windowed.column == 15 && windowed.row == 4 &&
+            windowed.facing == Direction::west,"Window boundary state differs");
+        check(window_fingerprints.at("scene") == scene_hash,"Window scene differs from compositor");
+        check(window_fingerprints.at("topBorder") == 14742927133863922091ull,"Native top border differs");
+        check(window_fingerprints.at("partyHeaders") == 10366432056459273136ull,"Native party headers differ");
+        check(window_fingerprints.at("partyName") == 13181112814587718321ull,"Native party name differs");
+        check(window_fingerprints.at("armorClass") == 10896576774587328698ull,"Native armor class display differs");
+        SDL_Quit();
+#endif
         std::cout << "{\"status\":\"original-resource-replay\",\"steps\":" << run.steps
             << ",\"texts\":" << host.texts << ",\"menus\":" << host.menus
             << ",\"column\":" << unsigned(session.column) << ",\"row\":" << unsigned(session.row)
@@ -199,7 +259,17 @@ int main(int argc, char** argv) {
 #endif
             << ",\"flags\":{\"18967\":" << unsigned(walked.state.memory[0x4a17])
             << ",\"19140\":" << unsigned(walked.state.memory[0x4ac4])
-            << ",\"19141\":" << unsigned(walked.state.memory[0x4ac5]) << "}}}\n";
+            << ",\"19141\":" << unsigned(walked.state.memory[0x4ac5]) << "}}";
+#ifdef GOLDBOX_CAMPAIGN_WINDOW_TESTS
+        std::cout << ",\"windowRegionRgbFnv1a64\":{";
+        bool first = true;
+        for (const auto& [name,hash] : window_fingerprints) {
+            if (!first) std::cout << ',';
+            first = false; std::cout << '"' << name << "\":\"" << hash << '"';
+        }
+        std::cout << '}';
+#endif
+        std::cout << "}\n";
         return 0;
     } catch (const std::exception& failure) { std::cerr << failure.what() << '\n'; return 1; }
 }

@@ -1785,3 +1785,44 @@ The serialized two-worker build passed all 30 runnable CTest suites; the native
 Windows RNG suite was skipped under WSL. Four focused suites also passed. Log:
 `.cache/goldbox-validation/program-graphics-full-tests.log`. Installed assets
 and user saves were not modified; public tests contain synthetic graphics only.
+
+## Actual original-mode SDL frame comparison (2026-10-25)
+
+The optional original-resource test now drives the real SDL host from the
+completed opening through the west boundary, using queued forward/Return/escape
+inputs. Linux renderer builds use the dummy video and software rendering
+backends, with the existing 30-second test deadline. A linker wrapper reads the
+rendered surface before presentation and samples logical pixel centers for
+comparison with the native 320x200 frame. It stores only numeric RGB FNV-1a 64
+region fingerprints in test output, never extracted pixels or game text.
+
+Reference: the stable boundary capture at
+`.cache/goldbox-validation/startup-reference-2rec5fm3/boundary-03.png`.
+Engine output and private region comparisons are `parity-window-engine.json`,
+`parity-window-regions-before.json` and `parity-window-regions.json` in the same
+private validation cache. This run reused that matched native checkpoint; it did
+not launch another native game session or synchronize its character RNG.
+
+The top border, 88x88 dungeon scene, party headers and selected TEST name matched
+immediately. AC did not: the renderer still showed a question mark despite the
+now-known normalized current combat state. The shared display now draws that
+value right aligned, preserving `?` only when combat state is unknown. Its native
+AC-region fingerprint now matches `10896576774587328698`. No game-specific
+condition or default AC was introduced. Synthetic rendered-pixel checks cover
+AC 10, zero, -2 and unknown state, including alignment and color. The installed
+test asserts all five matching region fingerprints after the transition.
+
+Confirmed remaining differences are dialogue-region content/layout, command
+labels and the position/clock line. The engine omits the native clock and uses
+its current exploration command labels. The HP region also differs, but this
+party's rolls were not synchronized, so that is not evidence of a glyph or HP
+display defect. Other screen pixels and interaction/timing equivalence remain
+unverified; complete screen parity is not claimed. The next presentation check
+should resolve the dialogue-region mismatch before expanding gameplay controls.
+
+The two focused suites passed, followed by the full serialized two-worker run:
+30 suites passed; the Windows-only original RNG integration suite was skipped
+under WSL. The installed-resource window test ran successfully. Logs are
+`parity-window-fixed.log` and `parity-window-full-tests.log` in the private
+validation cache. Hygiene and attribution checks passed. No user saves or
+installed resources were modified, and no user-owned windows were closed.

@@ -122,9 +122,18 @@ if(TARGET goldbox_view)
     target_link_libraries(goldbox_campaign_startup_tests PRIVATE goldbox_view)
     target_compile_definitions(goldbox_campaign_startup_tests PRIVATE GOLDBOX_CAMPAIGN_VIEW_TESTS=1)
 endif()
+if(GOLDBOX_BUILD_RENDERER AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(goldbox_campaign_startup_tests PRIVATE goldbox_runtime SDL3::SDL3)
+    target_compile_definitions(goldbox_campaign_startup_tests PRIVATE GOLDBOX_CAMPAIGN_WINDOW_TESTS=1)
+    target_link_options(goldbox_campaign_startup_tests PRIVATE "-Wl,--wrap=SDL_RenderPresent")
+endif()
 add_test(NAME goldbox_campaign_startup_tests COMMAND goldbox_campaign_startup_tests
     ${PROJECT_SOURCE_DIR}/games/pool-of-radiance/profile.json)
 set_tests_properties(goldbox_campaign_startup_tests PROPERTIES TIMEOUT 30 SKIP_RETURN_CODE 77)
+if(GOLDBOX_BUILD_RENDERER AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_tests_properties(goldbox_campaign_startup_tests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
+endif()
 add_test(NAME goldbox_pool_startup_reference_tests COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/pool_startup_reference_test.py)
 set_tests_properties(goldbox_pool_startup_reference_tests PROPERTIES TIMEOUT 10)

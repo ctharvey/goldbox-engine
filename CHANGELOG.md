@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Render known current armor class in original mode, right aligned, retaining
+  `?` for unknown legacy state. Compare actual SDL boundary-frame regions with
+  native fingerprints and test positive, zero, negative and unknown AC rendering.
+
 - Verify a matched native boundary checkpoint and the 88x88 RGB scene fingerprint.
   Extend the bounded reference harness to compare boundary position, facing,
   flags, return PC and resource group; retain partial-parity reporting.
