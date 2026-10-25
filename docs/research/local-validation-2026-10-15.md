@@ -1604,3 +1604,40 @@ is required to expose those inputs, but equipment/effect behavior cannot be
 silently assumed. The existing original-resource test continues to enforce
 the explicit opcode stop at offset 421. This research changes no runtime code
 and establishes arithmetic interoperability, not complete boundary parity.
+
+## Character class-level inputs (2026-10-25)
+
+Private `probe_original_creation_levels.py` exercised the original creator's
+class-selection level-initialization block, overlay 0x78 offsets 0x0BA7..0x0CB8,
+with zeroed synthetic character records. All 17 native class-code cases passed:
+single classes set their own level byte to one; multiclasses set each component
+to one and leave other class bytes zero. Each case had a 1,000-instruction and
+100 ms bound, with a 20-second batch deadline and no substituted instructions.
+Report: `.cache/goldbox-validation/original-creation-levels-report.json`.
+This checks the isolated initialization block, not complete character creation
+or the unsupported native classes absent from our rules.
+
+The shared creation rules now optionally select a starting level. Pool selects
+one; both raw-roll creation and finish-character creation publish complete
+component level maps without additional random draws. Saved characters retain
+their explicit levels. Legacy state remains unknown instead of being upgraded
+from a class name. Validation rejects missing/extra components and zero levels.
+
+Pool's profile selects four supported numeric field bindings: cleric 0x96,
+fighter 0x98, magic-user 0x9B and thief 0x9C. The existing read-only selected-
+character adapter returns a known component level or zero for a known inactive
+class, and rejects unknown state, oversized byte values, writes and conflicting
+bindings. Core code contains no Pool class codes or offsets. Current AC/THAC0
+initialization and updates remain the missing PARTY_STRENGTH inputs; the opcode
+and original boundary checkpoint still retain their explicit unsupported gate.
+
+The focused five-suite run passed, followed by a full serialized two-worker
+build and CTest run: 30 suites passed and the native Windows RNG integration
+suite skipped under WSL. Original-resource opening/replay and the explicit
+boundary-stop check ran successfully. Synthetic coverage includes all eleven
+supported single/multiclass choices, both creation paths, exact level save/load,
+invalid/incomplete component maps, legacy unknown state, alternate starting
+levels, selected-character reads and read-only/overlap/byte-range failures.
+Logs: `.cache/goldbox-validation/class-levels-focused.log` and
+`class-levels-full-tests.log`. Hygiene and attribution checks passed. No original
+save files or installed resources were modified.

@@ -44,6 +44,15 @@ void validate_party_memory_layout(const PartyMemoryLayout& layout, const Creatio
             if (!std::regex_match(name,pattern)) throw std::runtime_error("Invalid party status ID");
         }
     }
+    if (layout.levels.size() > 64) throw std::runtime_error("Too many party level bindings");
+    std::set<std::string> classes;
+    for (const auto& binding : layout.levels) {
+        const auto found = std::find_if(rules.classes.begin(),rules.classes.end(),
+            [&](const auto& choice) { return choice.id == binding.character_class; });
+        if (found == rules.classes.end() || !found->components.empty() || binding.offset >= layout.record_size ||
+            !offsets.insert(binding.offset).second || !classes.insert(binding.character_class).second)
+            throw std::runtime_error("Invalid/conflicting party level binding");
+    }
 }
 bool party_memory_intersects(const PartyMemoryLayout& layout, std::uint16_t address, std::size_t width) {
     if (!width || width > 65536u-address) throw std::runtime_error("Invalid party memory access width");
@@ -60,6 +69,15 @@ std::optional<std::uint8_t> party_memory_byte(const PartyMemoryLayout& layout, c
     if (!character_address(layout,address)) return std::nullopt;
     const auto& character = member(party,loaded);
     const auto offset = address-layout.record_base;
+    const auto level = std::find_if(layout.levels.begin(),layout.levels.end(),
+        [&](const auto& binding) { return binding.offset == offset; });
+    if (level != layout.levels.end()) {
+        if (character.levels.empty()) throw std::runtime_error("Character class levels are unknown");
+        const auto found = character.levels.find(level->character_class);
+        if (found == character.levels.end()) return 0;
+        if (!found->second || found->second > 255) throw std::runtime_error("Character level exceeds byte range");
+        return static_cast<std::uint8_t>(found->second);
+    }
     if (layout.status && offset == layout.status->offset) {
         if (!character.status) throw std::runtime_error("Character status is unknown");
         const auto value = layout.status->values.find(*character.status);

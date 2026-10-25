@@ -345,6 +345,13 @@ current THAC0/AC encoded as 60 minus the value. The arithmetic was independently
 tested using the original handler and synthetic party records; no upstream
 party-rating implementation was adopted. Combat-stat derivation is unfinished.
 
+Class-level initialization was independently checked in the original creator's
+class-selection block using synthetic records for 17 native class codes. The
+existing pinned CharacterValues labels corroborate component offsets. The
+shared C++ rules setting, normalized level map, save validation and read-only
+field bindings were authored independently; no upstream creator or level system
+was copied or translated. Combat and level advancement remain unfinished.
+
 Gold Box Explorer at `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` (MIT,
 Bil Simser) was consulted for `src/Common/Plugins/Dax/DaxFile.cs` and
 `src/Common/Plugins/DaxEcl/Program.cs`. Both it and SSI Engine agree that the

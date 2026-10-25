@@ -114,10 +114,12 @@ CreationRules read_creation_rules(const std::filesystem::path& path) {
     const auto parsed = j::read_json(path);
     const auto& root = j::object(parsed,"creation rules");
     j::fields_only(root,{"schemaVersion","id","partyLimit","nameLimit","dice","abilities","genders",
-        "alignments","races","classes","percentile","initialRandomBounds","portrait"},"creation rules");
+        "alignments","races","classes","percentile","initialRandomBounds","portrait","startingLevel"},"creation rules");
     const auto field = [&](const char* key) -> const bj::value& { return j::field(root,key,"creation rules"); };
     require(number(field("schemaVersion"),1,1) == 1,"Unsupported creation schema");
     CreationRules r; r.id = id(field("id"));
+    if (const auto* value = root.if_contains("startingLevel"))
+        r.starting_level = static_cast<std::uint16_t>(number(*value,1,65535));
     if (const auto* value = root.if_contains("portrait")) {
         const auto& portrait = j::object(*value,"creation portrait");
         j::fields_only(portrait,{"heads","bodies"},"creation portrait");
@@ -472,6 +474,11 @@ Character roll_character_impl(const CreationRules& rules, Character draft, Rando
         }
     }
     const auto divisor = static_cast<int>(components.size());
+    if (rules.starting_level) {
+        require(*rules.starting_level > 0,"Invalid starting level");
+        draft.levels.clear();
+        for (const auto* component : components) draft.levels.emplace(component->id,*rules.starting_level);
+    }
     const auto money_known = std::count_if(components.begin(),components.end(),
         [](const auto* c) { return c->starting_money.has_value(); });
     require(money_known == 0 || static_cast<std::size_t>(money_known) == components.size(),
@@ -563,6 +570,15 @@ void validate_character(const CreationRules& rules, const Character& c) {
     require(!c.name.empty() && c.name.size() <= rules.name_limit && c.name.front() != ' ' && c.name.back() != ' ' &&
         std::all_of(c.name.begin(),c.name.end(),[](unsigned char b) { return b >= 32 && b < 127; }),"Invalid character name");
     const auto eligible = eligible_classes(rules,c); const auto& choice = find(rules.classes,c.character_class);
+    if (!c.levels.empty()) {
+        std::vector<std::string> expected = choice.components.empty() ?
+            std::vector<std::string>{choice.id} : choice.components;
+        require(c.levels.size() == expected.size(),"Incomplete or extra character class levels");
+        for (const auto& name : expected) {
+            const auto found = c.levels.find(name);
+            require(found != c.levels.end() && found->second > 0,"Missing or invalid character class level");
+        }
+    }
     const auto index = static_cast<std::size_t>(&choice-rules.classes.data());
     require(std::find(eligible.begin(),eligible.end(),index) != eligible.end(),"Character does not qualify for class");
     require(std::find(choice.alignments.begin(),choice.alignments.end(),c.alignment) != choice.alignments.end(),
@@ -580,6 +596,12 @@ Character finish_character_impl(const CreationRules& rules, Character draft, Ran
     draft.status = "okay";
     (void)find(rules.genders,draft.gender);
     const auto& choice = find(rules.classes,draft.character_class);
+    if (rules.starting_level) {
+        require(*rules.starting_level > 0,"Invalid starting level");
+        draft.levels.clear();
+        if (choice.components.empty()) draft.levels.emplace(choice.id,*rules.starting_level);
+        else for (const auto& name : choice.components) draft.levels.emplace(name,*rules.starting_level);
+    }
     if (!choice.creation_minimum.empty()) {
         const auto available = creation_classes(rules,draft);
         const auto selected = static_cast<std::size_t>(&choice-rules.classes.data());
@@ -624,6 +646,11 @@ std::string serialize_party(const Party& party, const CreationRules& rules) {
         bj::object member{{"name",c.name},{"race",c.race},{"gender",c.gender},
             {"class",c.character_class},{"alignment",c.alignment},{"abilities",std::move(abilities)}};
         if (c.status) member["status"] = *c.status;
+        if (!c.levels.empty()) {
+            bj::object levels;
+            for (const auto& [name,level] : c.levels) levels[name] = level;
+            member["levels"] = std::move(levels);
+        }
         if (c.age) member["age"] = *c.age;
         if (c.portrait) member["portrait"] = bj::object{{"head",c.portrait->head},{"body",c.portrait->body}};
         if (c.hit_points) member["hitPoints"] = bj::object{{"base",c.hit_points->base},
@@ -654,10 +681,16 @@ Party read_party(std::string_view json, const CreationRules& rules) {
     for (const auto& v : members) {
         const auto& o = j::object(v,"character");
         j::fields_only(o,{"name","race","gender","class","alignment","abilities","status","age",
-            "hitPoints","money","spellbook","spellbooks","portrait"},"character");
+            "hitPoints","money","spellbook","spellbooks","portrait","levels"},"character");
         const auto s = [&](const char* key) { return j::string(j::field(o,key,"character"),key); };
         Character c{s("name"),s("race"),s("gender"),s("class"),s("alignment"),{}};
         if (const auto* value = o.if_contains("status")) c.status = id(*value);
+        if (const auto* value = o.if_contains("levels")) {
+            const auto& levels = j::object(*value,"saved class levels");
+            require(!levels.empty() && levels.size() <= 64,"Invalid saved class level count");
+            for (const auto& [name,level] : levels)
+                c.levels.emplace(id(bj::value(name)),static_cast<std::uint16_t>(number(level,1,65535)));
+        }
         if (const auto* value = o.if_contains("age")) c.age = static_cast<std::uint16_t>(number(*value,1,65535));
         if (const auto* value = o.if_contains("portrait")) {
             const auto& portrait = j::object(*value,"saved portrait");

@@ -5,6 +5,7 @@
 #undef NDEBUG
 #endif
 #include <cassert>
+#include <algorithm>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -46,6 +47,39 @@ int main(int argc, char** argv) {
     Character fighter = hero; fighter.character_class = "fighter"; fighter.abilities[0].value = 18;
     const auto exceptional = finish_character(rules,fighter,random);
     assert(exceptional.status == "okay");
+    assert(rules.starting_level == 1 && exceptional.levels ==
+        (std::map<std::string,std::uint16_t>{{"fighter",1}}));
+    for (const auto& choice : rules.classes) {
+        const auto race = std::find_if(rules.races.begin(),rules.races.end(),[&](const auto& r) {
+            return std::find(r.classes.begin(),r.classes.end(),choice.id) != r.classes.end();
+        });
+        assert(race != rules.races.end());
+        auto draft = hero; draft.race = race->id; draft.gender = "male";
+        draft.character_class = choice.id; draft.alignment = choice.alignments.front();
+        const auto rolled = roll_character(rules,draft,random);
+        std::map<std::string,std::uint16_t> expected;
+        if (choice.components.empty()) expected.emplace(choice.id,1);
+        else for (const auto& name : choice.components) expected.emplace(name,1);
+        assert(rolled.levels == expected);
+        auto completion_random = random;
+        assert(finish_character(rules,rolled,completion_random).levels == expected);
+        validate_character(rules,rolled);
+        const auto saved = serialize_party({rolled},rules);
+        assert(read_party(saved,rules)[0].levels == expected);
+        auto bad = rolled; bad.levels.begin()->second = 0;
+        rejects([&] { validate_character(rules,bad); });
+        bad = rolled; bad.levels.emplace("unknown",1);
+        rejects([&] { validate_character(rules,bad); });
+        if (expected.size() > 1) {
+            bad = rolled; bad.levels.erase(bad.levels.begin());
+            rejects([&] { validate_character(rules,bad); });
+        }
+        rejects([&] { (void)read_party(changed(saved,"\"levels\":{","\"levels\":{\"unknown\":1,"),rules); });
+    }
+    auto custom_rules = rules; custom_rules.starting_level = 3;
+    assert(finish_character(custom_rules,hero,random).levels.at("cleric") == 3);
+    custom_rules.starting_level.reset();
+    assert(finish_character(custom_rules,hero,random).levels.empty());
     assert(exceptional.abilities[0].percentile >= 1 && exceptional.abilities[0].percentile <= 50);
     rejects([&] { validate_character(rules,fighter); }); // Missing exceptional score is not silently accepted.
     for (int failure = 0; failure < 6; ++failure) {
@@ -65,6 +99,7 @@ int main(int argc, char** argv) {
     const auto json = serialize_party(party,rules);
     assert(!read_party(json,rules)[0].age); // Legacy ages remain unknown.
     assert(!read_party(json,rules)[0].portrait);
+    assert(read_party(json,rules)[0].levels.empty());
     auto painted = hero; painted.portrait = CharacterPortrait{0,1};
     const auto portrait_json = serialize_party({painted},rules);
     assert(read_party(portrait_json,rules)[0].portrait->head == 0 && read_party(portrait_json,rules)[0].portrait->body == 1);

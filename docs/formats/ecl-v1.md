@@ -196,7 +196,7 @@ The boundary route next reaches opcode 0x1D, which Pool's pinned profile names
 PARTY_STRENGTH (one operand). It remains unsupported; the corresponding SSI Engine
 handler is empty. Independent original-code checks now establish its weighted
 HP/combat/level calculation, documented in the local-validation research.
-The host still lacks verified current AC/THAC0 and per-class level state;
+The host now exposes verified per-class level state, but still lacks current AC/THAC0;
 the character's Strength ability is not a substitute. Another title's
 zero-operand INPUT_RETURN meaning must not be substituted. The opt-in original
 test reports this as an unsupported `boundaryProbe`, separate from its successful

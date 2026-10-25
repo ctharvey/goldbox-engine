@@ -5,6 +5,14 @@ records. Each character has a name, race ID, gender ID, class ID,
 alignment ID and ordered ability values with optional percentiles. Creation
 also records a symbolic status (`okay` on completion); status is independent of
 ability values. An absent status in older saves remains unknown.
+
+Optional rules `startingLevel` (1..65535) initializes each active class component
+in both creation entry points without consuming random draws. Pool's creation
+rules select one, verified against the original class-selection code. Normalized
+characters save a `levels` object keyed by component class IDs. A known object
+must include every active component with a positive level and no extra classes;
+legacy saves without it retain unknown levels. Loading does not infer levels
+from a class name. This adds no experience, training or level advancement.
 Optional age is stored in years; older saves without age remain unknown.
 Creation rules supply the ability names/count, option labels, race/gender bounds, legal
 classes/alignments, class minima, percentile policy and party/name limits.
@@ -276,6 +284,14 @@ including word writes crossing a boundary. They never fall back to stale RAM
 or modify normalized characters. Current/natural abilities share the same
 read-only values; HP, race/class codes, equipment and mutable effects are not
 implemented. Ordinary addresses retain existing RAM/string behavior.
+
+Optional `partyMemory.levels` entries bind `{offset,class}` to individual base
+classes from the configured rules. Pool binds cleric/fighter/magic-user/thief at
+0x96/0x98/0x9B/0x9C. For known complete level state, a nonparticipating class
+reads zero; unknown state fails explicitly. A level above 255 fails a byte-field
+read rather than truncating. Duplicate classes/offsets, compound-class bindings,
+out-of-window fields and overlaps with other character fields are rejected.
+These fields use the existing loaded-character selection and read-only checks.
 
 Adapter-enabled engine saves preserve `loadedCharacter`; legacy saves default
 to index zero. Restore validates the index against the restored roster before

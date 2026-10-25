@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Add rules-configured starting levels for each active class component, saved
+  class-level state and profile-bound read-only ECL level fields. Preserve unknown
+  levels in legacy saves; verify native single/multiclass initialization separately.
+
 - Verify Pool's PARTY_STRENGTH handler in 205 bounded original-code checks.
   Document its weighted numeric formula and the missing combat/level state
   required for a faithful host implementation; execution remains unsupported.

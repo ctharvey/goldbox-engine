@@ -71,6 +71,7 @@ struct CreationRules {
     std::optional<int> percentile_roll_maximum;
     std::vector<std::uint16_t> initial_random_bounds{};
     std::optional<CreationPortrait> portrait{};
+    std::optional<std::uint16_t> starting_level{};
 };
 struct AbilityValue { int value{}, percentile{}; };
 struct HitPoints { int base{}, current{}, maximum{}; };
@@ -87,6 +88,8 @@ struct Character {
     std::optional<Spellbook> spellbook{};
     std::map<std::string,Spellbook> spellbooks{};
     std::optional<CharacterPortrait> portrait{};
+    // Empty means unknown; known levels contain every active class component.
+    std::map<std::string,std::uint16_t> levels{};
 };
 using Party = std::vector<Character>;
 CreationRules read_creation_rules(const std::filesystem::path& path);

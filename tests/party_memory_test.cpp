@@ -56,6 +56,28 @@ int main(int argc, char** argv) {
     assert(!run({9,0,8,1,0xff,0x6a,0}).exited);
     assert(session.state.memory[0x6aff] == 0);
     session.sound_call.reset();
+    assert(layout.levels.size() == 4);
+    assert(!run({9,1,0x96,0x6b,1,0x10,0x4a,0}).exited);
+    rejects([&] { (void)party_memory_byte(layout,rules,session.party,0,0x6b96); });
+    session.party[0].levels = {{"cleric",1}};
+    session.party[1].levels = {{"cleric",3}};
+    assert(run({9,1,0x96,0x6b,1,0x10,0x4a,9,1,0x9b,0x6b,1,0x11,0x4a,0}).exited);
+    assert(session.state.memory[0x4a10] == 1 && session.state.memory[0x4a11] == 0);
+    assert(run({0x0a,0,1,9,1,0x96,0x6b,1,0x10,0x4a,0}).exited && session.state.memory[0x4a10] == 3);
+    session.party[1].levels["cleric"] = 256;
+    assert(!run({9,1,0x96,0x6b,1,0x10,0x4a,0}).exited);
+    session.party[1].levels["cleric"] = 3;
+    assert(!run({9,0,2,1,0x96,0x6b,0}).exited && session.party[1].levels.at("cleric") == 3);
+    for (int i = 0; i < 5; ++i) {
+        auto bad = layout;
+        if (i == 0) bad.levels.push_back(bad.levels.front());
+        if (i == 1) bad.levels[0].offset = bad.abilities[0].offset;
+        if (i == 2) bad.levels[0].character_class = "unknown";
+        if (i == 3) bad.levels[0].character_class = "cleric-fighter";
+        if (i == 4) bad.levels[0].offset = bad.record_size;
+        rejects([&] { validate_party_memory_layout(bad,rules); });
+    }
+    assert(run({0x0a,0,0,0}).exited);
     session.state.memory[0x6e3e] = 255;
     assert(run({9,1,0x3e,0x6e,1,0,0x4a,0x0a,0,1,0x11,0x81,0,0x6b,
         9,1,0x10,0x6b,1,1,0x4a,9,3,0x10,0x6b,3,2,0x4a,

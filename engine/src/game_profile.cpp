@@ -332,7 +332,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     if (const auto* value = root.if_contains("partyMemory")) {
         if (!profile.character_rules) throw std::runtime_error("Party memory requires character creation rules");
         const auto& o = j::object(*value,"party memory");
-        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities","selectedAddress","status"},"party memory");
+        j::fields_only(o,{"dialect","recordBase","recordSize","countAddress","abilities","selectedAddress","status",
+            "levels"},"party memory");
         const auto address = [&](const char* key) {
             const auto n = j::integer(j::field(o,key,"party memory"),key);
             if (n < 0 || n > 65535) throw std::runtime_error("Invalid party memory address");
@@ -367,6 +368,18 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
                 throw std::runtime_error("Invalid party ability binding");
             layout.abilities.push_back({static_cast<std::uint16_t>(offset),
                 j::string(j::field(item,"ability","party ability binding"),"party ability"),percentile.as_bool()});
+        }
+        if (const auto* value = o.if_contains("levels")) {
+            const auto& fields = j::array(*value,"party level bindings");
+            if (fields.size() > 64) throw std::runtime_error("Too many party level bindings");
+            for (const auto& field : fields) {
+                const auto& item = j::object(field,"party level binding");
+                j::fields_only(item,{"offset","class"},"party level binding");
+                const auto offset = j::integer(j::field(item,"offset","party level binding"),"party level offset");
+                if (offset < 0 || offset > 65535) throw std::runtime_error("Invalid party level offset");
+                layout.levels.push_back({static_cast<std::uint16_t>(offset),
+                    j::string(j::field(item,"class","party level binding"),"party level class")});
+            }
         }
         validate_party_memory_layout(layout,*profile.character_rules);
         profile.party_memory = std::move(layout);

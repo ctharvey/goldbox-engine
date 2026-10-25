@@ -57,6 +57,8 @@
     "recordSize": 511,
     "countAddress": 28222,
     "selectedAddress": 28081,
+    "levels": [{"offset": 150, "class": "cleric"}, {"offset": 152, "class": "fighter"},
+      {"offset": 155, "class": "magic-user"}, {"offset": 156, "class": "thief"}],
     "status": {
       "offset": 256,
       "values": {"okay": 1, "animated": 0, "temporarily-gone": 0, "running": 0,
