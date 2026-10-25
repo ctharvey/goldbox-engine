@@ -1442,8 +1442,8 @@ private. Public startup observations now include the two word-buffer values,
 with synthetic address, width, truncation and pointer-bound regressions.
 The updated public capture path also passed a second live run at
 `.cache/goldbox-validation/startup-reference-x96jmvsn/comparison.json`, reproducing
-the same position, facing, flags and return PCs. Capture hashes differ because
-the native party rolls are clock-seeded and are outside this comparison.
+the same position, facing, flags and return PCs. Capture hashes differed;
+clock-seeded native party rolls and timing are outside this comparison.
 
 The serialized two-worker build and full CTest run passed 30 suites; the native
 Windows RNG integration suite skipped under WSL. The original-resource opening
