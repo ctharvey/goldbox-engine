@@ -211,8 +211,16 @@ validates that program, then invokes initialize/move/search with a shared step
 budget and a 32-transfer limit. No byte-pattern instruction search is involved.
 Saves with a program resolver contain `programRecord` and `programSource` as a
 required pair. Restore validates both source and resolved code before publishing
-any saved state. Per-title temporary-memory resets on NEW_ECL remain unverified;
-the original opening validation stays in program zero.
+any saved state. Optional `eventDispatch.transferClearRanges` contains numeric RAM
+`[start,length]` pairs cleared after successful program resolution and before
+initialize/move/search. Ranges must be nonempty, bounded and nonoverlapping;
+host/context and program-memory overlaps fail before clearing. An absent list
+preserves the prototype behavior. Pool selects 0x4A00..0x4A1F and
+0x6E79..0x6E82, verified against its complete original interpreter reset routine.
+The original's nonzero native preserve guard skips these clears once and resets
+itself. Engine save restoration already preserves saved RAM without invoking
+program initialization; native save-file loading and its guard are not emulated.
+This policy changes numeric RAM only; string-storage parity is not established.
 
 `goldbox_campaign_startup_tests` is an opt-in original-resource check, enabled by
 `GOLDBOX_POOL_INSTALLATION` pointing to the authorized GAME/POOLRAD directory.

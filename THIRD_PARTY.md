@@ -332,6 +332,12 @@ dispatch resolver and bounded VM were written independently without Java/Vavr
 dependencies. The numeric code-base and square-info configuration facts are
 recorded in the unverified game profiles. No title checks enter the runtime.
 
+Transfer reset research additionally consulted `VirtualMemory.clearTemps` at
+that revision. Pool's two numeric ranges were independently checked using the
+complete original reset routine with synthetic headers and sentinel buffers,
+including its preserve guard. The shared C++ implementation uses validated
+profile ranges; no Java loops or memory layout implementation were translated.
+
 Gold Box Explorer at `eac30abaa6ee66aea6f5d65ebe6d676b10015a8f` (MIT,
 Bil Simser) was consulted for `src/Common/Plugins/Dax/DaxFile.cs` and
 `src/Common/Plugins/DaxEcl/Program.cs`. Both it and SSI Engine agree that the

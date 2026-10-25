@@ -1521,3 +1521,40 @@ run matched the unchanged opening position, facing, three flags and return PC:
 process cleanup confirmed. That comparison does not include the unsupported
 engine boundary probe. Hygiene and attribution checks passed. Private captures,
 original bytes and user saves remain outside the checkout and unchanged.
+
+## Original interpreter transfer reset (2026-10-25)
+
+The complete installed interpreter reset routine (overlay 0x2B, entry 0x01B6)
+was executed under bounded Unicorn with a synthetic five-entry header and
+sentinel word buffers. Four checks used native preserve-guard values 0, 1, 2
+and 255. With zero, the routine cleared exactly the virtual numeric ranges
+0x4A00..0x4A1F and 0x6E79..0x6E82; adjacent words remained unchanged. Each
+nonzero guard preserved both ranges and reset itself to zero. No instruction
+callbacks replaced original code. Private script/report:
+`.cache/goldbox-validation/probe_original_transfer_reset.py` and
+`original-transfer-reset-report.json`. Existing native movement snapshots have
+the guard zero before and after the program-zero to program-20 transfer.
+
+The shared session now clears profile-defined numeric ranges after successful
+NEW_ECL resolution and validation, before initialize/move/search. Failed
+resolution retains them; an absent binding retains prototype behavior. Pool's
+profile supplies the two verified ranges. Synthetic tests cover exact bounds,
+follow-up execution, invalid ranges, protected-memory overlaps and save restore.
+Engine restore preserves saved RAM without executing a program reset; the
+native save format and its one-shot preservation path are not implemented.
+This does not establish string-buffer or all interpreter-scratch parity.
+
+The original-resource replay still completes the 761-instruction opening.
+Its boundary probe now has 0x4A17=0, matching the original later checkpoint;
+global flags 0x4AC4=0 and 0x4AC5=1 remain unchanged. It still stops at imported
+map/program 20, (15,4), west, bytecode offset 421, unsupported PARTY_STRENGTH.
+Checkpoint: `.cache/goldbox-validation/transfer-reset-engine-checkpoint.json`.
+The prior flag mismatch is resolved; complete boundary, party-strength and
+graphics-group parity remain unfinished. No proprietary bytes were added to
+the repository or modified in the installed game.
+
+The serialized two-worker full build/CTest run passed 30 suites, with the native
+Windows RNG integration suite skipped under WSL. The authorized original-resource
+test ran, including the corrected boundary-flag regression. Log:
+`.cache/goldbox-validation/transfer-reset-full-tests.log`. Hygiene and attribution
+checks passed. The four native-reset checks are separate from full-game parity.

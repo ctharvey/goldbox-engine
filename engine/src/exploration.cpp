@@ -40,6 +40,32 @@ class SessionHost final : public EclHost {
     EclHost& delegate;
 public:
     SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {
+        if (session.transfer_clear_ranges.size() > 32) throw std::runtime_error("Too many transfer clear ranges");
+        for (std::size_t i = 0; i < session.transfer_clear_ranges.size(); ++i) {
+            const auto [start,length] = session.transfer_clear_ranges[i];
+            const auto end = std::size_t(start)+length;
+            if (!length || end > session.state.memory.size()) throw std::runtime_error("Invalid transfer clear range");
+            const auto contains = [&](std::uint16_t address) { return start <= address && address < end; };
+            if (contains(session.dialect.square_info_address) ||
+                (start < std::size_t(session.dialect.code_base)+session.ecl_record.size() &&
+                    session.dialect.code_base < end) ||
+                (session.party_memory && party_memory_intersects(*session.party_memory,start,length)) ||
+                (session.position_advance_call && contains(session.position_advance_call->wall_type_address)) ||
+                (session.sound_call && (contains(session.sound_call->selector_address) ||
+                    contains(session.sound_call->selector_address+1))))
+                throw std::runtime_error("Transfer clear range overlaps host memory");
+            if (session.dialect.position_addresses)
+                for (const auto address : *session.dialect.position_addresses)
+                    if (contains(address)) throw std::runtime_error("Transfer clear range overlaps position memory");
+            if (session.movement_addresses)
+                for (const auto address : *session.movement_addresses)
+                    if (contains(address)) throw std::runtime_error("Transfer clear range overlaps movement memory");
+            for (std::size_t j = 0; j < i; ++j) {
+                const auto& previous = session.transfer_clear_ranges[j];
+                if (start < std::size_t(previous[0])+previous[1] && previous[0] < end)
+                    throw std::runtime_error("Overlapping transfer clear ranges");
+            }
+        }
         if (session.position_advance_call) {
             const auto& call = *session.position_advance_call;
             if (!session.dialect.position_addresses || (session.position_refresh_call &&
@@ -379,6 +405,8 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
                 (void)SessionHost(candidate,host); // Validate bindings before publishing the new program.
                 ecl_record = std::move(program.bytes); current_program_record = program.record_id;
                 ++result.program_transfers;
+                for (const auto& [start,length] : transfer_clear_ranges)
+                    std::fill_n(state.memory.begin()+start,length,0);
                 if (movement_addresses) {
                     state.memory[(*movement_addresses)[0]] = 0;
                     state.memory[(*movement_addresses)[1]] = 0;

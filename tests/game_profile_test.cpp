@@ -43,6 +43,9 @@ int main(int argc, char** argv) {
     assert((pool.event_dispatch->movement_addresses ==
         std::array<std::uint16_t,4>{0x6dc9,0x6dd5,0x49f0,0x49f1}));
     assert(!curse.event_dispatch->movement_addresses);
+    assert((pool.event_dispatch->transfer_clear_ranges ==
+        std::vector<std::array<std::uint16_t,2>>{{0x4a00,32},{0x6e79,10}}));
+    assert(curse.event_dispatch->transfer_clear_ranges.empty());
     assert(pool.campaign_startup->position_advance_call &&
         pool.campaign_startup->position_advance_call->function == 0xc01e &&
         pool.campaign_startup->position_advance_call->wall_type_address == 0xc04e);
@@ -75,6 +78,18 @@ int main(int argc, char** argv) {
     fs::remove(path);
     if (!rejected) return 1;
     const std::string prefix = R"({"schemaVersion":1,"id":"test","title":"Test","formatFamily":"goldbox-dos","archiveFormat":"dax-v1","eventDialect":"unverified","rulesProfile":"test","validationStatus":"unverified","resourcePatterns":[],"colorBackdrop":)";
+    auto reset_prefix = prefix;
+    reset_prefix.replace(reset_prefix.find("colorBackdrop"),13,"eventDispatch");
+    reset_prefix += R"({"dialect":"ssi-five-entry-v1","codeBase":39168,"squareInfoAddress":49231,"transferClearRanges":)";
+    for (const std::string ranges : {R"([[1]])",R"([[-1,1]])",R"([[65535,2]])",R"([[1,0]])",
+        R"([[1,65536]])",R"([[1,2],[2,1]])",R"([[1,"2"]])"}) {
+        { std::ofstream o(path); o << reset_prefix << ranges << "}}"; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path);
+        assert(rejected);
+    }
     for (const std::string field : {R"({"skyColorAddresses":[1]})", R"({"skyColorAddresses":[-1,2]})",
         R"({"skyColorAddresses":[1,65536]})", R"({"skyColorAddresses":[1,"2"]})",
         R"({"skyColorAddresses":[1,2],"unknown":0})"}) {

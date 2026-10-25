@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-25
+
+- Clear profile-defined numeric temporary ranges on validated ECL program
+  transfers, before initialize/move/search. Verify Pool's ranges with the complete
+  original reset routine and retain saved temporaries during engine restore.
+  Add reset-boundary, invalid-binding and failed-resolution regressions.
+
 ## 2026-10-24
 
 - Add profile-selected source-cell movement events, exit/block/previous-position

@@ -96,6 +96,7 @@ int main(int argc, char** argv) {
         const auto& dispatch = *profile.event_dispatch;
         session.dialect = {dispatch.dialect,dispatch.code_base,dispatch.square_info_address,true,dispatch.position_addresses};
         session.movement_addresses = dispatch.movement_addresses;
+        session.transfer_clear_ranges = dispatch.transfer_clear_ranges;
         session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::load_character);
         session.campaign_start = std::array<std::uint8_t,2>{config.map_record,config.program_record};
         session.position_refresh_call = config.position_refresh_call;
@@ -134,6 +135,8 @@ int main(int argc, char** argv) {
             "Boundary probe's unsupported-operation gate changed; investigate before claiming parity");
         check(move.moved && walked.column == 15 && walked.row == 4 && walked.facing == Direction::west,
             "Boundary probe did not reach the verified forced-step position");
+        check(walked.state.memory[0x4a17] == 0 && walked.state.memory[0x4ac4] == 0 &&
+            walked.state.memory[0x4ac5] == 1,"Boundary transfer temporary/global flags differ");
         std::cout << "{\"status\":\"original-resource-replay\",\"steps\":" << run.steps
             << ",\"texts\":" << host.texts << ",\"menus\":" << host.menus
             << ",\"column\":" << unsigned(session.column) << ",\"row\":" << unsigned(session.row)

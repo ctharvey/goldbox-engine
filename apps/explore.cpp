@@ -483,6 +483,7 @@ int main(int argc, char** argv) {
         session.sound_call = profile.sound_call;
         session.script_delay_ms = profile.script_delay_ms;
         session.movement_addresses = config.movement_addresses;
+        session.transfer_clear_ranges = config.transfer_clear_ranges;
         if (profile.campaign_startup) {
             session.position_refresh_call = profile.campaign_startup->position_refresh_call;
             session.position_advance_call = profile.campaign_startup->position_advance_call;
@@ -558,6 +559,8 @@ int main(int argc, char** argv) {
         }
         if (session.position_advance_call)
             identity << ":advance:" << session.position_advance_call->function << ':' << session.position_advance_call->wall_type_address;
+        for (const auto& range : config.transfer_clear_ranges)
+            identity << ":clear:" << range[0] << ':' << range[1];
         if (session.programs) identity << ':' << session.maps->source_identity << ':' << session.programs->source_identity;
         const auto source_identity = identity.str();
         const auto save = fs::absolute(argv[6]);

@@ -162,7 +162,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     }
     if (const auto* value = root.if_contains("eventDispatch")) {
         const auto& dispatch = j::object(*value, "eventDispatch");
-        j::fields_only(dispatch, {"dialect", "codeBase", "squareInfoAddress", "positionAddresses", "movementAddresses"}, "eventDispatch");
+        j::fields_only(dispatch, {"dialect", "codeBase", "squareInfoAddress", "positionAddresses", "movementAddresses",
+            "transferClearRanges"}, "eventDispatch");
         const auto dialect = j::string(j::field(dispatch, "dialect", "eventDispatch"), "dispatch.dialect");
         const auto base = j::integer(j::field(dispatch, "codeBase", "eventDispatch"), "dispatch.codeBase");
         const auto square = j::integer(j::field(dispatch, "squareInfoAddress", "eventDispatch"), "dispatch.squareInfoAddress");
@@ -170,7 +171,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
             throw std::runtime_error("unsupported or invalid ECL dispatch configuration");
         }
         profile.event_dispatch = GameProfile::EventDispatch{dialect,
-            static_cast<std::uint16_t>(base), static_cast<std::uint16_t>(square), std::nullopt};
+            static_cast<std::uint16_t>(base), static_cast<std::uint16_t>(square), std::nullopt,std::nullopt,{}};
         if (const auto* positions = dispatch.if_contains("positionAddresses")) {
             const auto& values = j::array(*positions, "positionAddresses");
             if (values.size() != 3) throw std::runtime_error("positionAddresses requires X/Y/direction");
@@ -200,6 +201,23 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
                 addresses[i] = static_cast<std::uint16_t>(n); used.push_back(addresses[i]);
             }
             profile.event_dispatch->movement_addresses = addresses;
+        }
+        if (const auto* ranges = dispatch.if_contains("transferClearRanges")) {
+            const auto& entries = j::array(*ranges,"transferClearRanges");
+            if (entries.size() > 32) throw std::runtime_error("Too many transfer clear ranges");
+            for (const auto& entry : entries) {
+                const auto& pair = j::array(entry,"transfer clear range");
+                if (pair.size() != 2) throw std::runtime_error("Transfer clear range requires start and length");
+                const auto start = j::integer(pair[0],"transfer clear start");
+                const auto length = j::integer(pair[1],"transfer clear length");
+                if (start < 0 || start > 65535 || length < 1 || length > 65535 || start+length > 65536)
+                    throw std::runtime_error("Invalid transfer clear range");
+                for (const auto& previous : profile.event_dispatch->transfer_clear_ranges)
+                    if (start < previous[0]+previous[1] && previous[0] < start+length)
+                        throw std::runtime_error("Overlapping transfer clear ranges");
+                profile.event_dispatch->transfer_clear_ranges.push_back({static_cast<std::uint16_t>(start),
+                    static_cast<std::uint16_t>(length)});
+            }
         }
     }
     if (const auto* images = root.if_contains("imageDialect")) {

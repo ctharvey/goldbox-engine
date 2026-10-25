@@ -114,6 +114,33 @@ void movement_lifecycle() {
         {9,0,5,1,0,0x71,9,0,6,1,1,0x71,0});
     transfer.programs = ProgramResources{[&](std::uint8_t id) { assert(id == 42); return ProgramResource{id,next}; },"fixture"};
     transfer.current_program_record = 7;
+    auto clearing_transfer = transfer;
+    clearing_transfer.transfer_clear_ranges = {{0x4a00,32},{0x6e79,10}};
+    for (const auto address : {0x49ff,0x4a00,0x4a10,0x4a17,0x4a1f,0x4a20,
+        0x6e78,0x6e79,0x6e82,0x6e83}) clearing_transfer.state.memory[address] = 7;
+    auto unresolved = clearing_transfer;
+    unresolved.programs->resolve = [](std::uint8_t) -> ProgramResource { throw std::runtime_error("Missing program"); };
+    auto reset_move = unresolved.move(Direction::east,host);
+    assert(!reset_move.execution->exited && unresolved.state.memory[0x4a17] == 7);
+    reset_move = clearing_transfer.move(Direction::east,host);
+    assert(reset_move.execution->exited && reset_move.execution->program_transfers == 1);
+    assert(clearing_transfer.state.memory[0x4a10] == 1 && clearing_transfer.state.memory[0x4a11] == 1);
+    for (const auto address : {0x4a00,0x4a17,0x4a1f,0x6e79,0x6e82})
+        assert(clearing_transfer.state.memory[address] == 0);
+    for (const auto address : {0x49ff,0x4a20,0x6e78,0x6e83}) assert(clearing_transfer.state.memory[address] == 7);
+    clearing_transfer.state.memory[0x4a17] = 9;
+    const auto transfer_save = serialize_exploration(clearing_transfer,"transfer-clear-fixture");
+    auto transfer_restore = clearing_transfer;
+    restore_exploration(transfer_restore,transfer_save,"transfer-clear-fixture");
+    assert(transfer_restore.state.memory[0x4a17] == 9); // Restore preserves saved temporaries.
+    assert(transfer_restore.trigger(EclEventKind::search,host).exited && transfer_restore.state.memory[0x4a17] == 9);
+    for (const auto& ranges : std::vector<std::vector<std::array<std::uint16_t,2>>>{
+        {{0x4a00,0}},{{65535,2}},{{0x4a00,2},{0x4a01,1}},{{0x7100,1}},{{0x7200,1}},{{0x9900,1}}}) {
+        auto invalid_reset = clearing_transfer;
+        invalid_reset.transfer_clear_ranges = ranges;
+        const auto attempt = invalid_reset.move(Direction::east,host);
+        assert(!attempt.execution->exited && invalid_reset.state.memory[0x4a17] == 9);
+    }
     move = transfer.move(Direction::east,host);
     assert(move.execution->exited && move.execution->program_transfers == 1 && move.moved);
     assert(transfer.row == 6 && transfer.column == 5); // No duplicate physical step/search.

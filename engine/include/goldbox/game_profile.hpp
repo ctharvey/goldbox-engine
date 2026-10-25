@@ -31,6 +31,8 @@ struct GameProfile {
         std::optional<std::array<std::uint16_t, 3>> position_addresses;
         // Block, exit attempt, previous X, previous Y; opts into source-cell MOVE.
         std::optional<std::array<std::uint16_t, 4>> movement_addresses{};
+        // Numeric RAM ranges [start, length] cleared before transferred-program initialization.
+        std::vector<std::array<std::uint16_t, 2>> transfer_clear_ranges;
     };
     std::optional<EventDispatch> event_dispatch;
     std::string image_dialect{"disabled"};
