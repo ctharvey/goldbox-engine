@@ -71,7 +71,14 @@ until a new seeded session is started. See the
 for the generator formula, tested operand forms and remaining parity limits.
 
 `ExplorationSession` supplies map coordinates, facing and raw square info via
-profile-selected addresses. Version-1 local saves preserve position/facing,
+profile-selected addresses. Successful movement runs the active program's move
+entry even when the GEO selector is zero; the script can test X/Y, facing and
+quest state. Blocked moves and save restoration do not automatically run a move
+event. Map and ECL record selection remain explicit adapter responsibilities.
+The static nonzero-selector inventory can use known X/Y for its supported
+GOTO/AND/WRITE_MEM routes, but cannot infer arrival facing, quest flags or
+arbitrary conditional code. It is not an exhaustive list of runtime events.
+Version-1 local saves preserve position/facing,
 numeric memory and string state. Invalid loads are rejected before publishing
 state. The terminal identifies its source pair using game/archive/record IDs,
 configuration and non-cryptographic content checksums; the separate installation
@@ -108,8 +115,8 @@ campaign can provide a different resolver rather than adding title branches.
 
 Lookup, returned record identity and position/direction are validated before
 publishing a transition. Configured position bytes can supply script-written
-coordinates at the load. The ECL program remains unchanged; NEW_ECL is a separate
-unsupported operation. Earlier VM writes retain partial-progress semantics on
+coordinates at the load. The ECL program remains unchanged; NEW_ECL selects a
+program separately through the configured resolver. Earlier VM writes retain partial-progress semantics on
 failure. Successful decoration loading refreshes current square-info context.
 
 After a map load, prototype saves also contain `area`, `mapRecord`, and

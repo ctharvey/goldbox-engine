@@ -2,6 +2,11 @@
 
 ## 2026-10-24
 
+- Resolve supported static ECL routes using profile-bound GEO coordinates as
+  well as selectors. Keep arrival facing unknown and reject overlapping context
+  bindings. Test location-only events on zero-selector cells through real CLI
+  movement, blocked input, re-entry and save/load.
+
 - Use SDL's built-in readable font for enhanced menus and labels while retaining
   imported SSI glyphs in original mode. Add rendered-pixel checks across F11
   round trips for font selection and original glyph orientation.

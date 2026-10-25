@@ -10,6 +10,11 @@ namespace goldbox::formats {
 namespace {
 void validate(const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes) {
     if (dialect.id != "ssi-five-entry-v1") throw EclDecodeError("Unsupported ECL dispatch dialect: " + dialect.id);
+    if (dialect.position_addresses) {
+        std::set<std::uint16_t> addresses{dialect.square_info_address};
+        for (const auto address : *dialect.position_addresses)
+            if (!addresses.insert(address).second) throw EclDecodeError("Conflicting ECL event context addresses");
+    }
     std::set<std::uint8_t> seen;
     for (const auto& spec : opcodes) {
         if (!seen.insert(spec.opcode).second) throw EclDecodeError("Conflicting ECL opcode definitions");
@@ -120,6 +125,11 @@ std::vector<ResolvedGeoEvent> resolve_geo_events(const GeoMap& map, const DaxArc
     for (const auto& ref : refs) {
         ResolvedGeoEvent resolved{ref, kind, dialect.id, {}, {}, {}};
         std::map<std::uint32_t, std::uint8_t> memory{{dialect.square_info_address, ref.raw_event}};
+        if (dialect.position_addresses) {
+            memory[(*dialect.position_addresses)[0]] = ref.column;
+            memory[(*dialect.position_addresses)[1]] = ref.row;
+            // A GEO cell has no fixed arrival direction. Keep facing unknown.
+        }
         std::size_t offset = entries.instruction_offsets[kind_index];
         try {
             for (std::size_t step = 0; ; ++step) {

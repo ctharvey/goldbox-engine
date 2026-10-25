@@ -54,8 +54,9 @@ EclDispatchTable decode_ecl_dispatch_table(std::span<const std::uint8_t> code,
     std::size_t offset, const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes,
     std::size_t minimum_target_offset);
 
-// Resolve a selector only through constant GOTO/AND/WRITE_MEM routing. A route
-// depending on other game state is explicitly unresolved, never guessed.
+// Resolve through constant GOTO/AND/WRITE_MEM routing with the raw selector and
+// profile-bound GEO X/Y. Facing and other game state remain unknown. This
+// inventory covers nonzero GEO selectors, not every possible runtime event.
 std::vector<ResolvedGeoEvent> resolve_geo_events(const GeoMap& map, const DaxArchive& ecl,
     std::uint8_t ecl_record, EclEventKind kind, const EclDispatchDialect& dialect,
     std::span<const EclOpcodeSpec> opcodes);

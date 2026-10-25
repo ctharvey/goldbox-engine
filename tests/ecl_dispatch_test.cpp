@@ -55,6 +55,28 @@ int main() {
     assert(refs[0].source.row == 2 && refs[0].source.column == 3 && refs[0].source.ecl_record_id == 7);
     assert(geo_event_id("synthetic.game", "GEO1.DAX", refs[0].source) == "synthetic.game:geo:GEO1.DAX:27:2:3");
     assert(resolve_geo_events(map, archive(prefixed), 7, EclEventKind::search, dialect, opcodes)[0].bytecode_offset == 49);
+    // Identical GEO selectors can route differently by location. Coordinates
+    // come from the configured adapter, never fixed Pool memory addresses.
+    auto positioned = dialect;
+    positioned.position_addresses = std::array<std::uint16_t,3>{0x7100,0x7101,0x7102};
+    auto locations = map;
+    locations.cells[35].raw_event = 0;
+    locations.cells[1].raw_event = locations.cells[16].raw_event = 0x81;
+    auto coordinate_route = bytes;
+    coordinate_route[22] = 0; coordinate_route[23] = 0x71;
+    auto routes = resolve_geo_events(locations,archive(coordinate_route),7,EclEventKind::move,positioned,opcodes);
+    assert(routes.size() == 2 && routes[0].bytecode_offset == 49 && routes[1].bytecode_offset == 48);
+    coordinate_route[22] = 1;
+    routes = resolve_geo_events(locations,archive(coordinate_route),7,EclEventKind::move,positioned,opcodes);
+    assert(routes[0].bytecode_offset == 48 && routes[1].bytecode_offset == 49);
+    coordinate_route[22] = 2; // Arrival facing is not a property of the cell.
+    routes = resolve_geo_events(locations,archive(coordinate_route),7,EclEventKind::move,positioned,opcodes);
+    assert(!routes[0].bytecode_offset && routes[0].diagnostic == "Dispatch depends on unknown game state");
+    for (const auto addresses : {std::array<std::uint16_t,3>{0x7100,0x7100,0x7102},
+        std::array<std::uint16_t,3>{dialect.square_info_address,0x7101,0x7102}}) {
+        auto conflicting = positioned; conflicting.position_addresses = addresses;
+        rejects([&] { (void)resolve_geo_events(locations,archive(coordinate_route),7,EclEventKind::move,conflicting,opcodes); });
+    }
     rejects([&] { (void)resolve_geo_events(map, archive(bytes), 8, EclEventKind::move, dialect, opcodes); });
     map.cells[35].raw_event = 3;
     assert(!resolve_geo_events(map, archive(bytes), 7, EclEventKind::move, dialect, opcodes)[0].bytecode_offset);

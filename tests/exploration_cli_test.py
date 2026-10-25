@@ -35,3 +35,26 @@ with tempfile.TemporaryDirectory() as temp:
     (root / "GEO.DAX").write_bytes(dax(changed))
     mismatch = subprocess.run(command, input="load\n", text=True, capture_output=True, timeout=30)
     assert mismatch.returncode != 0 and "source/dialect mismatch" in mismatch.stderr
+
+    # Location-only events still run on cells with selector zero. CMP2 checks
+    # X=1/Y=0; IF_NE exits elsewhere. Movement, blocked input, re-entry and save
+    # restoration use the real CLI rather than invoking the VM directly.
+    (root / "GEO.DAX").write_bytes(dax(bytes(1026)))
+    location_event = bytes([1, 1, 20, 0x99] * 5 + [
+        0x14, 1, 0x4b, 0xc0, 0, 1, 1, 0x4c, 0xc0, 0, 0,
+        0x17, 0,
+        4, 1, 0, 0x4a, 0, 1, 1, 0, 0x4a,
+        0x11, 0x80, 1, 4, 0])
+    (root / "ECL.DAX").write_bytes(dax(location_event))
+    location_save = root / "location.json"
+    location_command = command[:-1] + [str(location_save)]
+    walked = subprocess.run(location_command, input="east\nnorth\neast\nwest\nsave\nquit\n",
+                            text=True, capture_output=True, timeout=30)
+    assert walked.returncode == 0, walked.stdout + walked.stderr
+    assert walked.stdout.count("> A\n") == 2, walked.stdout
+    location = json.loads(location_save.read_text())
+    assert location["row"] == 0 and location["column"] == 1 and location["memory"][0x4a00] == 2
+    assert location["memory"][0xc04f] == 0
+    reloaded = subprocess.run(location_command, input="load\neast\nwest\nquit\n",
+                              text=True, capture_output=True, timeout=30)
+    assert reloaded.returncode == 0 and reloaded.stdout.count("> A\n") == 1, reloaded.stdout + reloaded.stderr
