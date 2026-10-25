@@ -433,3 +433,9 @@ configuration. Original resource-group selection was independently verified in
 bounded private native-code probes. The explicit C++ profile bindings, program
 notification, immutable SDL resources and save rebind are independently written;
 no Java resource loader or filename-search code was copied or translated.
+
+The dialogue-wrap correction also consults the pinned SSI Engine
+`AbstractStateRenderer.java` as a research reference. Its strict overflow
+comparison does not reproduce the native exact-fit boundary observed here.
+The independent C++ correction follows matched original screen evidence and
+synthetic color/fragment regressions; no Java wrapping code was adopted.

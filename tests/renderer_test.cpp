@@ -119,6 +119,19 @@ int main(int argc, char** argv) {
     assert((colored_pages.back().ink[1] == std::vector<std::uint8_t>{3,3,4,4}));
     assert(styled.lines == std::deque<std::string>{"IJ"});
     assert(styled.ink[0] == std::vector<std::uint8_t>(2,5));
+    // Appended words that exactly fill a row wrap; one spare column fits.
+    append_dialogue(styled,"%0ALPHA %CXY Z",true,8,3,colored_page);
+    assert((styled.lines == std::deque<std::string>{"ALPHA","XY Z"}));
+    assert(styled.ink[0] == std::vector<std::uint8_t>(5,10));
+    assert(styled.ink[1] == std::vector<std::uint8_t>(4,12));
+    append_dialogue(styled,"%0ALPH %CXY",true,8,3,colored_page);
+    assert(styled.lines == std::deque<std::string>{"ALPH XY"});
+    append_dialogue(styled,"%0ALPHA ",true,8,3,colored_page);
+    append_dialogue(styled,"%CXY",false,8,3,colored_page);
+    assert((styled.lines == std::deque<std::string>{"ALPHA","XY"}));
+    assert(styled.ink[1] == std::vector<std::uint8_t>(2,12));
+    append_dialogue(styled,"ABCDEFGH",true,8,3,colored_page);
+    assert(styled.lines == std::deque<std::string>{"ABCDEFGH"});
     append_dialogue(styled,"%A\n\n%FX",true,8,3,colored_page);
     assert((styled.lines == std::deque<std::string>{"","","X"}));
     assert(styled.ink[0].empty() && styled.ink[1].empty() && styled.ink[2][0] == 15);

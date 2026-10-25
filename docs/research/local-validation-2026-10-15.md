@@ -1826,3 +1826,43 @@ under WSL. The installed-resource window test ran successfully. Logs are
 `parity-window-fixed.log` and `parity-window-full-tests.log` in the private
 validation cache. Hygiene and attribution checks passed. No user saves or
 installed resources were modified, and no user-owned windows were closed.
+
+## Boundary dialogue exact-width wrap (2026-10-25)
+
+A temporary private capture of the actual SDL test frame localized the mismatch.
+The first two dialogue rows matched native text and color. Native trimmed row
+lengths were 37, 35, 34 and 30 characters; the engine produced 37, 35, 38 and 26.
+The last word on the engine's third row exactly filled column 38. The native
+formatter moved it to the fourth row, while retaining the already matching
+37-character first row. Colors and the configured 38-column region were correct.
+
+The shared formatter now wraps a word appended to an occupied row on an exact
+fit as well as overflow. It retains existing bounded handling of a full-width
+initial word and long unbroken tokens; native behavior for every such case is
+not claimed. Synthetic regressions cover exact-fit wrapping, one spare column,
+inline colors, split PRINT continuation and avoiding an empty initial row.
+The pinned SSI Engine AbstractStateRenderer was consulted as a research-only
+reference; its strict-overflow comparison does not establish this native edge
+case. No upstream wrapping implementation was adopted.
+
+The actual SDL boundary dialogue region now matches native RGB FNV-1a 64
+fingerprint `3056256239859949209`. The installed-resource test asserts it along
+with the existing scene, top-border, party-header, name and AC fingerprints.
+The temporary capture instrumentation was removed; public tests output only
+numeric fingerprints. Native text reconstructed from glyph cells and private
+captures remain outside the checkout in `.cache/goldbox-validation`:
+`dialogue-cell-text-private.json`, `parity-dialogue-engine.bmp` (before fix) and
+`parity-dialogue-engine.json` (corrected fingerprints). The native reference is
+still `startup-reference-2rec5fm3/boundary-03.png`; no new original session or
+synchronized-party comparison was needed for this presentation correction.
+
+The two focused suites passed. Remaining confirmed screen differences are the
+command bar and position/clock line; HP still has unsynchronized party inputs.
+Other dialogues, pagination, typewriter pacing and audio/timing remain open.
+This verifies the captured boundary dialogue rather than complete game text
+compatibility. User saves, artwork and installed game resources were unchanged.
+
+The final serialized two-worker run passed 30 suites; the Windows-only original
+RNG suite was skipped under WSL. The installed-resource renderer check ran and
+asserted the corrected dialogue fingerprint. Hygiene and attribution passed.
+Private logs: `parity-dialogue-focused.log` and `parity-dialogue-full-tests.log`.

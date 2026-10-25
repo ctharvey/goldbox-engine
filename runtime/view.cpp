@@ -87,7 +87,9 @@ void append_page(std::deque<std::string>& lines, std::deque<std::vector<std::uin
                 }
             }
         } else {
-            if (length <= columns && length > columns-lines.back().size()) newline();
+            // A word appended to an occupied row wraps on an exact fit, too.
+            // Do not create an empty row for an initial full-width word.
+            if (length <= columns && !lines.back().empty() && length >= columns-lines.back().size()) newline();
             while (at < end) {
                 if (lines.back().size() == columns) newline();
                 const auto count = std::min(end-at,columns-lines.back().size());

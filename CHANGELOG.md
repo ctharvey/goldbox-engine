@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Match the native boundary dialogue by wrapping appended words on exact-width
+  fits. Preserve inline colors and split PRINT continuation; assert the rendered
+  dialogue fingerprint against the original capture.
+
 - Render known current armor class in original mode, right aligned, retaining
   `?` for unknown legacy state. Compare actual SDL boundary-frame regions with
   native fingerprints and test positive, zero, negative and unknown AC rendering.

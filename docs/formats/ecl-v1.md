@@ -240,8 +240,13 @@ software backend. It fingerprints logical-pixel regions read from the actual
 rendered frame. The top border, dungeon scene, party headings, selected TEST name
 and AC now match native capture fingerprints. Original mode displays known
 normalized current AC with right alignment; unknown legacy combat state remains
-`?`. These region checks do not establish whole-screen parity: dialogue, command
-labels and the position/clock line still differ, and HP rolls are not synchronized.
+`?`. The boundary dialogue region also matches after correcting exact-width word
+wrapping: an appended word wraps when it would exactly fill an occupied row.
+Initial full-width words retain the existing bounded handling without creating
+empty rows. Inline colors and continuation across PRINT calls are preserved.
+These region checks do not establish whole-screen parity: command labels and
+the position/clock line still differ, and HP rolls are not synchronized. Other
+dialogues, paging sequences and their native timing remain unverified.
 
 ADD stores through the existing typed memory interface with byte/word wrapping.
 DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and
