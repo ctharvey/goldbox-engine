@@ -514,6 +514,57 @@ int main(int argc, char** argv) {
     assert(session.state.memory[0x4a20] == 7 && session.party[0].name == "TEST");
     SDL_Quit();
 
+    // Program changes select immutable art sources; restore selects them again.
+    {
+        const auto code = [](bool transfer) {
+            std::vector<std::uint8_t> bytes(20);
+            const std::vector<std::uint8_t> bodies[]{transfer ? std::vector<std::uint8_t>{0x20,0,42} :
+                std::vector<std::uint8_t>{0},{0},{0},{0},{0x0e,0,7,0}};
+            for (unsigned i = 0; i < 5; ++i) {
+                const auto address = 0x9900+bytes.size();
+                bytes[i*4]=1; bytes[i*4+1]=1; bytes[i*4+2]=address&255; bytes[i*4+3]=address>>8;
+                bytes.insert(bytes.end(),bodies[i].begin(),bodies[i].end());
+            }
+            return bytes;
+        };
+        ExplorationSession changing;
+        changing.dialect = session.dialect; changing.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3);
+        changing.ecl_record = code(true); changing.current_program_record = 0;
+        changing.maps = session.maps;
+        changing.programs = ProgramResources{[&](std::uint8_t id) { return ProgramResource{id,code(id == 0)}; },"art-programs"};
+        auto first = std::make_shared<CampaignGraphics>(campaign_assets);
+        auto next = std::make_shared<CampaignGraphics>(campaign_assets);
+        auto red = dax; red[12+22] = 0x44;
+        next->images.pictures = formats::DaxArchive::parse(red);
+        next->images.picture_archive = "OTHER.DAX";
+        std::vector<std::uint8_t> requests;
+        CampaignGraphicsResources sources{[&](std::uint8_t id) -> std::shared_ptr<const CampaignGraphics> {
+            requests.push_back(id); assert(id == 0 || id == 42); return id == 0 ? first : next;
+        }};
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+        std::vector<std::array<Uint8,3>> pixels;
+        observe_frame = [&](SDL_Renderer* renderer) {
+            float x,y; assert(SDL_RenderCoordinatesToWindow(renderer,layout.scene[0]+0.5f,layout.scene[1]+0.5f,&x,&y));
+            const SDL_Rect point{int(x),int(y),1,1}; auto* sample = SDL_RenderReadPixels(renderer,&point); assert(sample);
+            Uint8 r,g,b,a; assert(SDL_ReadSurfacePixel(sample,0,0,&r,&g,&b,&a)); SDL_DestroySurface(sample);
+            pixels.push_back({r,g,b});
+        };
+#endif
+        assert(SDL_Init(SDL_INIT_VIDEO));
+        key(SDLK_I); key(SDLK_RIGHT); key(SDLK_UP); key(SDLK_F5);
+        key(SDLK_F10); key(SDLK_F9); key(SDLK_I); key(SDLK_ESCAPE);
+        assert(run_exploration_window(changing,"program-art-synthetic",save,nullptr,&first->images,nullptr,font,
+            nullptr,nullptr,{},nullptr,{},0,nullptr,nullptr,&original,false,&sources) == 0);
+        assert((requests == std::vector<std::uint8_t>{42,42}));
+        assert(changing.current_program_record == 42 && changing.column == 1);
+#ifdef GOLDBOX_RENDER_CALL_TESTS
+        observe_frame = {};
+        assert((pixels.back() == std::array<Uint8,3>{170,0,0}));
+        assert(std::find(pixels.begin(),pixels.end(),std::array<Uint8,3>{0,0,170}) != pixels.end());
+#endif
+        SDL_Quit(); std::filesystem::remove(save);
+    }
+
     // Navigation dismisses old event art, exposing the dungeon, while a new
     // movement event may supply fresh art. Capture only this synthetic SDL frame.
     const auto navigation = [&](SDL_Keycode input, bool blocked, bool fresh_picture, bool native, bool lifecycle = false) {

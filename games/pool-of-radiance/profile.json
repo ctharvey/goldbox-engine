@@ -32,6 +32,8 @@
   },
   "campaignStartup": {"mapRecord": 0, "programRecord": 0, "positionRefreshCall": 11408,
     "positionAdvanceCall": {"function": 49182, "wallTypeAddress": 49230},
+    "programGraphics": [{"programRecord": 20, "graphicsArchives": ["PIC2.DAX", "SPRIT2.DAX", "HEAD2.DAX",
+      "BODY2.DAX", "WALLDEF2.DAX", "8X8D2.DAX", "8X8D1.DAX"]}],
     "graphicsArchives": ["PIC3.DAX", "SPRIT3.DAX", "HEAD3.DAX", "BODY3.DAX", "WALLDEF3.DAX", "8X8D3.DAX", "8X8D1.DAX"],
     "mapArchives": ["GEO1.DAX", "GEO2.DAX", "GEO3.DAX", "GEO4.DAX", "GEO5.DAX", "GEO6.DAX", "GEO7.DAX", "GEO8.DAX"],
     "programArchives": ["ECL1.DAX", "ECL2.DAX", "ECL3.DAX", "ECL4.DAX", "ECL5.DAX", "ECL6.DAX", "ECL7.DAX", "ECL8.DAX"]},

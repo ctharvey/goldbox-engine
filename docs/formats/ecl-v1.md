@@ -175,8 +175,15 @@ Its optional seven-entry `graphicsArchives` array binds pictures, sprites, heads
 bodies, wall definitions, wall tiles and shared tiles, in that order. Begin/load
 select these campaign resources; creation/party previews retain their selected
 portrait sources. Pool's opening uses group 3 and shared tiles from group 1.
-The graphical adapter rejects a program change without a corresponding graphics
-binding; later resource groups remain unfinished rather than reusing opening art.
+Optional `campaignStartup.programGraphics` entries bind a `programRecord` to
+another seven-entry `graphicsArchives` array in the same order. IDs are unique,
+exclude the initial program, and require safe archive filenames. Pool explicitly
+binds program 20 to group 2, retaining shared tiles from group 1. No filename
+suffix inference is performed. Other unbound programs fail explicitly.
+The host resolves graphics before publishing a program transfer or running its
+initialize event. The SDL adapter retains immutable bundles and resets image and
+wall presentation when switching. Save restore resolves its saved program and
+decodes/validates saved wall banks before publishing the restored session.
 The startup window uses this adapter for Begin; explicit map/ECL preview and
 JSONL prototype modes retain their explicit launch bindings. Begin resolves both inputs
 before publishing, resets script RAM/strings, preserves the created party and
@@ -212,8 +219,9 @@ code. See the local-validation research for its formula and limits.
 The original-resource headless `boundaryProbe` now reports `executed`: map/program
 20, (15,4), west, EXIT at offset 615. Its opening remains unchanged. This is
 supported original-bytecode execution with an engine-created party; equivalent
-native party state, UI pacing, graphics rebinding and full boundary parity
-remain unverified. The graphical program/graphics binding guard still applies.
+native party state, UI pacing and full boundary parity remain unverified.
+Program 20 graphics rebinding is implemented and its original wall banks decode;
+matched original-scene pixel parity and additional program bindings remain open.
 
 ADD stores through the existing typed memory interface with byte/word wrapping.
 DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and

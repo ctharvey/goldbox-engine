@@ -372,6 +372,7 @@ EclExecution ExplorationSession::begin_campaign(EclHost& host, EclLimits limits)
     candidate.row = candidate.column = candidate.loaded_character = 0;
     candidate.facing = Direction::north; candidate.area.reset(); candidate.wall_banks.reset();
     (void)SessionHost(candidate,host);
+    host.program_changed(*candidate.current_program_record);
     *this = std::move(candidate);
     return trigger(formats::EclEventKind::initialize,host,limits);
 }
@@ -411,6 +412,7 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
                 auto program = resolve_program(programs,*run.next_program,dialect,opcodes);
                 auto candidate = *this; candidate.ecl_record = program.bytes;
                 (void)SessionHost(candidate,host); // Validate bindings before publishing the new program.
+                host.program_changed(program.record_id);
                 ecl_record = std::move(program.bytes); current_program_record = program.record_id;
                 ++result.program_transfers;
                 for (const auto& [start,length] : transfer_clear_ranges)

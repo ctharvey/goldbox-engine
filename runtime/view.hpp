@@ -11,6 +11,9 @@
 namespace goldbox {
 struct WallArchives { formats::DaxArchive definitions, tiles, shared; };
 struct CampaignGraphics { ImageArchives images; WallArchives walls; };
+struct CampaignGraphicsResources {
+    std::function<std::shared_ptr<const CampaignGraphics>(std::uint8_t)> resolve;
+};
 struct OriginalPresentation { GameProfile::OriginalDisplay layout; formats::IndexedImage frame; };
 formats::IndexedImage compose_original_frame(const GameProfile::OriginalDisplay& layout,
     std::span<const formats::IndexedImage> symbols);
@@ -67,5 +70,5 @@ int run_exploration_window(ExplorationSession& session, std::string_view source_
     std::function<formats::SpeakerClip(std::uint16_t)> sounds = {},
     std::uint32_t startup_title_period_ms = 0, const formats::TandyClip* startup_music = nullptr,
     const CampaignGraphics* campaign_graphics = nullptr, const OriginalPresentation* original = nullptr,
-    bool start_enhanced = false);
+    bool start_enhanced = false, const CampaignGraphicsResources* program_graphics = nullptr);
 } // namespace goldbox

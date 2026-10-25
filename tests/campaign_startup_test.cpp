@@ -54,7 +54,22 @@ struct Host : EclHost {
 };
 struct MovementHost : EclHost {
     ExplorationSession& session;
-    explicit MovementHost(ExplorationSession& value) : session(value) {}
+    const GameProfile& profile;
+    std::filesystem::path game;
+    std::optional<ImageArchives> assets;
+    std::optional<DaxArchive> definitions, tiles, shared;
+    std::vector<std::uint8_t> bound_programs;
+    MovementHost(ExplorationSession& value, const GameProfile& p, std::filesystem::path root)
+        : session(value), profile(p), game(std::move(root)) {}
+    void program_changed(std::uint8_t id) override {
+        const auto& startup = *profile.campaign_startup;
+        const auto& names = id == startup.program_record ? startup.graphics_archives : startup.program_graphics.at(id);
+        const auto read = [&](unsigned i) { return DaxArchive::from_file(game/names.at(i)); };
+        ImageArchives next{read(0),read(1)}; next.portraits = PortraitArchives{read(2),read(3)};
+        auto defs = read(4), wall_tiles = read(5), common = read(6);
+        assets = std::move(next); definitions = std::move(defs); tiles = std::move(wall_tiles); shared = std::move(common);
+        bound_programs.push_back(id);
+    }
     void text(std::string_view, bool) override {}
     std::size_t menu(std::span<const std::string>, std::string_view, bool) override { return 0; }
     void picture(std::uint8_t) override {}
@@ -66,7 +81,14 @@ struct MovementHost : EclHost {
     void native_call(std::uint16_t token) override {
         throw std::runtime_error("Unsupported boundary native call " + std::to_string(token));
     }
-    void wall_banks(std::array<std::uint8_t,3> banks) override { session.wall_banks = banks; }
+    void wall_banks(std::array<std::uint8_t,3> banks) override {
+        check(definitions && tiles && shared,"Boundary graphics were not bound before wall loading");
+        const auto walls = load_wall_graphics(*definitions,*tiles,*shared,banks);
+        if (session.has_dungeon_map())
+            for (const auto& cell : session.map.cells) for (const auto id : {cell.north,cell.east,cell.south,cell.west})
+                check(!id || (id <= 15 && walls.present[id-1]),"Boundary wall bank missing");
+        session.wall_banks = banks;
+    }
 };
 }
 int main(int argc, char** argv) {
@@ -127,11 +149,12 @@ int main(int argc, char** argv) {
         auto repeated = initial; Host second(repeated,profile,assets,game);
         check(repeated.begin_campaign(second).exited,"Repeated startup failed");
         check(serialize_exploration(repeated,"private-opening-check") == saved,"Deterministic startup differs");
-        auto walked = session; MovementHost movement_host(walked);
+        auto walked = session; MovementHost movement_host(walked,profile,game);
         const auto move = walked.move(Direction::west,movement_host);
         check(move.execution.has_value(),"Boundary event did not run");
         // Complete headless execution is separate from matched native party/UI parity.
         check(move.execution->exited,move.execution->diagnostic.c_str());
+        check(movement_host.bound_programs == std::vector<std::uint8_t>{20},"Boundary program graphics selection differs");
         check(move.execution->bytecode_offset == 615 && walked.current_program_record == 20 &&
             walked.map.dax_record_id == 20,"Boundary execution checkpoint changed");
         check(move.moved && walked.column == 15 && walked.row == 4 && walked.facing == Direction::west,

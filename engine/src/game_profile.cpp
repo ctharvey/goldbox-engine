@@ -111,7 +111,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     if (const auto* value = root.if_contains("campaignStartup")) {
         const auto& config = j::object(*value,"campaignStartup");
         j::fields_only(config,{"mapRecord","programRecord","mapArchives","programArchives","positionRefreshCall",
-            "positionAdvanceCall","graphicsArchives"},
+            "positionAdvanceCall","graphicsArchives","programGraphics"},
             "campaignStartup");
         const auto byte = [&](const char* name, std::int64_t maximum) {
             const auto n = j::integer(j::field(config,name,"campaignStartup"),name);
@@ -148,6 +148,28 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         if (config.if_contains("graphicsArchives")) {
             archives("graphicsArchives",startup.graphics_archives);
             if (startup.graphics_archives.size() != 7) throw std::runtime_error("Startup graphics requires seven archives");
+        }
+        if (const auto* value = config.if_contains("programGraphics")) {
+            const auto& entries = j::array(*value,"programGraphics");
+            if (startup.graphics_archives.empty() || entries.size() > 32)
+                throw std::runtime_error("Invalid program graphics bindings");
+            for (const auto& entry : entries) {
+                const auto& binding = j::object(entry,"program graphics binding");
+                j::fields_only(binding,{"programRecord","graphicsArchives"},"program graphics binding");
+                const auto id = j::integer(j::field(binding,"programRecord","program graphics"),"programRecord");
+                if (id < 0 || id > 255 || id == startup.program_record || startup.program_graphics.contains(id))
+                    throw std::runtime_error("Invalid or duplicate graphics program ID");
+                std::vector<std::string> names;
+                for (const auto& name : j::array(j::field(binding,"graphicsArchives","program graphics"),"graphicsArchives")) {
+                    const auto filename = j::string(name,"graphics archive");
+                    if (!std::regex_match(filename,std::regex(R"([A-Za-z0-9_-]+\.[A-Za-z0-9]+)")) ||
+                        std::find(names.begin(),names.end(),filename) != names.end())
+                        throw std::runtime_error("Invalid or duplicate graphics archive name");
+                    names.push_back(filename);
+                }
+                if (names.size() != 7) throw std::runtime_error("Program graphics requires seven archives");
+                startup.program_graphics.emplace(static_cast<std::uint8_t>(id),std::move(names));
+            }
         }
         profile.campaign_startup = std::move(startup);
     }

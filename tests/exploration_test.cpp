@@ -11,6 +11,12 @@ using namespace goldbox;
 using namespace goldbox::formats;
 namespace {
 struct Host : EclHost {
+    std::vector<std::uint8_t> programs;
+    bool reject_program{};
+    void program_changed(std::uint8_t id) override {
+        if (reject_program) throw std::runtime_error("Missing graphics binding");
+        programs.push_back(id);
+    }
     std::string output;
     std::vector<std::uint16_t> sounds;
     unsigned clears{};
@@ -114,6 +120,11 @@ void movement_lifecycle() {
         {9,0,5,1,0,0x71,9,0,6,1,1,0x71,0});
     transfer.programs = ProgramResources{[&](std::uint8_t id) { assert(id == 42); return ProgramResource{id,next}; },"fixture"};
     transfer.current_program_record = 7;
+    auto refused = transfer;
+    host.reject_program = true;
+    const auto rejected = refused.move(Direction::east,host);
+    assert(!rejected.execution->exited && refused.current_program_record == 7);
+    host.reject_program = false;
     auto clearing_transfer = transfer;
     clearing_transfer.transfer_clear_ranges = {{0x4a00,32},{0x6e79,10}};
     for (const auto address : {0x49ff,0x4a00,0x4a10,0x4a17,0x4a1f,0x4a20,
@@ -143,6 +154,7 @@ void movement_lifecycle() {
     }
     move = transfer.move(Direction::east,host);
     assert(move.execution->exited && move.execution->program_transfers == 1 && move.moved);
+    assert(!host.programs.empty() && host.programs.back() == 42);
     assert(transfer.row == 6 && transfer.column == 5); // No duplicate physical step/search.
     assert(transfer.state.memory[0x4a10] == 1 && transfer.state.memory[0x4a11] == 1);
     assert(transfer.state.memory[0x7201] == 0);

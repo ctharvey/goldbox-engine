@@ -1701,3 +1701,45 @@ run found the alternate-rules fixture's removed-ability configuration; this was
 corrected before the full green run. Hygiene and attribution checks passed.
 Private original bytes and captures remain outside the public checkout; the
 installed game and user saves were not modified.
+
+## Program graphics rebinding (2026-10-25)
+
+Private native snapshots show the active resource-group byte at DS:0x5376
+changing from 3 before the opening boundary to 2 afterward. The latter snapshot
+contains ECL2/WALLDEF2/8x8d2 filenames; stale group-3 strings elsewhere in memory
+are not treated as active bindings. Archive inventory places program/map 20 in
+ECL2/GEO2 and opening program/map 0 in ECL3/GEO3.
+
+Twelve bounded original-code checks executed the common graphics filename
+builder (overlay 0x3D0, entry 0xA2), stopping at 0x16A before archive I/O.
+Synthetic PIC, SPRIT, HEAD, BODY, WALLDEF and 8x8d family prefixes each selected
+the exact group-2 or group-3 stem according to DS:0x5376. Each call had a
+5,000-instruction/100 ms bound; no instructions were substituted. Report:
+`.cache/goldbox-validation/original-graphics-group-report.json`. Original bytes
+and disassembly remain private. This verifies the common selection mechanism
+without guessing from numbered filenames. Shared 8X8D1 remains the existing
+common-tile configuration.
+
+The Pool profile now explicitly binds program 20 to PIC2, SPRIT2, HEAD2, BODY2,
+WALLDEF2 and 8X8D2, with shared 8X8D1. The shared engine has no title-specific
+resource search: it notifies the host after candidate validation and before
+publishing the new program. The application preloads explicit immutable bundles;
+SDL switches pictures, portraits and wall sources and clears stale presentation.
+Save restore selects its saved program and validates decoded wall banks before
+publishing. Unconfigured programs continue to fail explicitly.
+
+Synthetic tests cover malformed/duplicate bindings, failed host notification,
+transfer selection, SDL blue-to-red picture pixels, restart and saved-program
+rebinding. The first renderer fixture tried to overwrite its own earlier save;
+the existing refusal policy correctly rejected that. The corrected fixture saves
+only the destination before restart/reload; save-overwrite behavior is unchanged.
+The authorized-resource test parses all seven group-2 archives and decodes the
+selected wall banks, checking active-map wall references. The original boundary
+still reaches EXIT 615 in program/map 20 with the established flags. This does
+not establish equivalent native party state, matched original scene pixels,
+UI/timing parity or support for further resource groups.
+
+The serialized two-worker build passed all 30 runnable CTest suites; the native
+Windows RNG suite was skipped under WSL. Four focused suites also passed. Log:
+`.cache/goldbox-validation/program-graphics-full-tests.log`. Installed assets
+and user saves were not modified; public tests contain synthetic graphics only.

@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Bind graphics explicitly by campaign program, including Pool program 20 after
+  the opening boundary. Rebind immutable image/wall sources on transfers and save
+  restore; verify original group selection and add SDL pixel regressions.
+
 - Add rules-defined unequipped starting AC/THAC0 and persisted current combat
   stats. Implement profile-selected PARTY_STRENGTH through a read-only VM host,
   including native per-member rounding and byte wrapping. The imported opening

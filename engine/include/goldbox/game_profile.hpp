@@ -75,6 +75,7 @@ struct GameProfile {
         // Pictures, sprites, heads, bodies, wall definitions, wall tiles, shared tiles.
         std::vector<std::string> graphics_archives;
         std::optional<EclPositionAdvanceCall> position_advance_call{};
+        std::map<std::uint8_t,std::vector<std::string>> program_graphics{};
     };
     std::optional<CampaignStartup> campaign_startup{};
     std::uint32_t script_delay_ms{}, sprite_replacement_ms{};

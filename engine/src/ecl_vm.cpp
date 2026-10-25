@@ -67,6 +67,7 @@ void EclHost::load_area(std::array<std::uint8_t,3>) { throw EclDecodeError("Map 
 void EclHost::load_character(std::uint8_t) { throw EclDecodeError("Party host unavailable"); }
 void EclHost::select_character(std::string_view) { throw EclDecodeError("Party selection host unavailable"); }
 std::uint8_t EclHost::party_strength() { throw EclDecodeError("Party strength host unavailable"); }
+void EclHost::program_changed(std::uint8_t) {}
 std::optional<std::uint8_t> EclHost::memory_byte(std::uint16_t) { return std::nullopt; }
 bool EclHost::write_memory(std::uint16_t, std::uint32_t, std::size_t) { return false; }
 std::optional<std::string> EclHost::string_at(std::uint16_t) { return std::nullopt; }

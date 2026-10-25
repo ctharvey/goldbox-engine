@@ -20,6 +20,7 @@ void checked(bool ok) {
     if (!ok) throw std::runtime_error(SDL_GetError());
 }
 void require_wall_bindings(const ExplorationSession& session, const formats::WallGraphics& graphics) {
+    if (!session.has_dungeon_map()) return;
     for (const auto& cell : session.map.cells)
         for (const auto id : {cell.north,cell.east,cell.south,cell.west})
             if (id && (id > 15 || !graphics.present[id-1]))
@@ -33,6 +34,8 @@ public:
     const GameProfile::ColorBackdrop* backdrop;
     const GameProfile::Portrait* portrait_config;
     const WallArchives* wall_archives;
+    const CampaignGraphicsResources* program_graphics{};
+    std::shared_ptr<const CampaignGraphics> active_program_graphics;
     std::optional<formats::WallGraphics> selected_graphics;
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture{nullptr,SDL_DestroyTexture};
     std::optional<ImagePresentation> images;
@@ -178,10 +181,36 @@ public:
         install_walls(load_banks(session,banks));
         session.wall_banks = banks;
     }
+    void bind_program(std::uint8_t id, const ExplorationSession* restored = nullptr) {
+        if (!program_graphics || !program_graphics->resolve) throw std::runtime_error("Missing program graphics resolver");
+        auto next = program_graphics->resolve(id);
+        if (!next) throw std::runtime_error("Program graphics binding unavailable");
+        std::optional<formats::WallGraphics> walls;
+        if (restored && restored->wall_banks) {
+            walls = formats::load_wall_graphics(next->walls.definitions,next->walls.tiles,next->walls.shared,
+                *restored->wall_banks);
+            require_wall_bindings(*restored,*walls);
+        } else if (restored && session.wall_banks)
+            throw std::runtime_error("Save lacks wall banks; cannot restore its graphics selection");
+        // Resolve/decode first. Publishing the immutable sources does not touch game state.
+        if (walls) install_walls(std::move(*walls));
+        else { graphics = nullptr; selected_graphics.reset(); }
+        images.reset();
+        active_program_graphics = std::move(next);
+        wall_archives = &active_program_graphics->walls;
+        images.emplace(active_program_graphics->images);
+        image_texture.reset(); replacement_texture.reset(); image_clock = SDL_GetTicks();
+    }
+    void program_changed(std::uint8_t id) override {
+        if (program_graphics) bind_program(id);
+    }
     void restore(std::string_view json, std::string_view identity) {
         auto candidate = session;
         restore_exploration(candidate,json,identity);
-        if (candidate.wall_banks) install_walls(load_banks(candidate,*candidate.wall_banks));
+        if (program_graphics) {
+            if (!candidate.current_program_record) throw std::runtime_error("Save lacks graphics program binding");
+            bind_program(*candidate.current_program_record,&candidate);
+        } else if (candidate.wall_banks) install_walls(load_banks(candidate,*candidate.wall_banks));
         else if (wall_archives && session.wall_banks)
             throw std::runtime_error("Save lacks wall banks; cannot restore its graphics selection");
         session = std::move(candidate);
@@ -881,7 +910,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
     std::span<const formats::IndexedImage> startup_screens, const formats::SpeakerClip* preview_audio,
     std::function<formats::SpeakerClip(std::uint16_t)> sounds, std::uint32_t startup_title_period_ms,
     const formats::TandyClip* startup_music, const CampaignGraphics* campaign_graphics,
-    const OriginalPresentation* original, bool start_enhanced) {
+    const OriginalPresentation* original, bool start_enhanced, const CampaignGraphicsResources* program_graphics) {
     if (graphics) require_wall_bindings(session,*graphics);
     if (startup_title_period_ms > 60000) throw std::runtime_error("Invalid startup title period");
     if (startup_screens.size() > 64) throw std::runtime_error("Too many startup screens");
@@ -916,6 +945,7 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
         auto host = std::make_unique<WindowHost>(session,raw_renderer,active ? nullptr : graphics,
             active ? &active->images : images,backdrop,font,portrait,active ? &active->walls : wall_archives,original,enhanced_display);
         host->character_assets = images;
+        host->program_graphics = program_graphics;
         host->audio = &audio;
         host->preview_audio = preview_audio;
         host->startup_music = startup_music;

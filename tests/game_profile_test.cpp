@@ -49,6 +49,8 @@ int main(int argc, char** argv) {
     assert(pool.campaign_startup->position_advance_call &&
         pool.campaign_startup->position_advance_call->function == 0xc01e &&
         pool.campaign_startup->position_advance_call->wall_type_address == 0xc04e);
+    assert(pool.campaign_startup->program_graphics.at(20) ==
+        (std::vector<std::string>{"PIC2.DAX","SPRIT2.DAX","HEAD2.DAX","BODY2.DAX","WALLDEF2.DAX","8X8D2.DAX","8X8D1.DAX"}));
     assert(pool.event_dialect == "unverified" && curse.event_dialect == "unverified");
     assert(pool.validation_status == "unverified");
     assert(pool.resource_patterns.size() == 4);
@@ -216,6 +218,20 @@ int main(int argc, char** argv) {
         catch (const std::runtime_error&) { rejected = true; }
         fs::remove(path);
         if (!rejected) return 1;
+    }
+    const std::string seven = R"(["PIC.DAX","SPRIT.DAX","HEAD.DAX","BODY.DAX","WALL.DAX","TILE.DAX","SHARED.DAX"])";
+    const std::string graphics_prefix = campaign_prefix +
+        R"({"mapRecord":0,"programRecord":0,"positionRefreshCall":1,"mapArchives":["GEO.DAX"],"programArchives":["ECL.DAX"],"graphicsArchives":)" + seven +
+        R"(,"programGraphics":)";
+    for (const auto& entries : std::vector<std::string>{
+        "[{\"programRecord\":0,\"graphicsArchives\":"+seven+"}]",
+        "[{\"programRecord\":256,\"graphicsArchives\":"+seven+"}]",
+        "[{\"programRecord\":20,\"graphicsArchives\":[]}]",
+        "[{\"programRecord\":20,\"graphicsArchives\":"+seven+"},{\"programRecord\":20,\"graphicsArchives\":"+seven+"}]"}) {
+        { std::ofstream output(path); output << graphics_prefix << entries << "}}"; }
+        rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
     }
     auto display_prefix = prefix;
     display_prefix.replace(display_prefix.find("colorBackdrop"),13,"originalDisplay");

@@ -307,6 +307,7 @@ int main(int argc, char** argv) {
         std::optional<std::array<std::uint8_t,3>> initial_banks;
         std::optional<goldbox::ImageArchives> images;
         std::optional<goldbox::CampaignGraphics> campaign_graphics;
+        std::optional<goldbox::CampaignGraphicsResources> program_graphics;
         std::optional<goldbox::PortraitArchives> portraits;
         std::vector<goldbox::formats::IndexedImage> font;
         std::optional<goldbox::formats::DaxArchive> startup_archive;
@@ -524,8 +525,9 @@ int main(int argc, char** argv) {
                 return goldbox::formats::decode_geo16_record(maps->records.at(id),id);
             },maps->identity};
             session.programs = goldbox::ProgramResources{[programs, bound = !start.graphics_archives.empty(),
-                initial = start.program_record](std::uint8_t id) {
-                if (bound && id != initial) throw std::runtime_error("Campaign graphics binding unavailable for program");
+                initial = start.program_record, bindings = start.program_graphics](std::uint8_t id) {
+                if (bound && id != initial && !bindings.contains(id))
+                    throw std::runtime_error("Campaign graphics binding unavailable for program");
                 return goldbox::ProgramResource{id,programs->records.at(id)};
             },programs->identity};
             session.current_program_record = ecl_id;
@@ -533,19 +535,32 @@ int main(int argc, char** argv) {
             session.campaign_start = std::array<std::uint8_t,2>{start.map_record,start.program_record};
 #ifdef GOLDBOX_RENDERER
             if (!start.graphics_archives.empty()) {
-                const auto read = [&](std::size_t index) {
-                    return goldbox::formats::DaxArchive::from_file(fs::path(argv[4]).parent_path()/start.graphics_archives[index]);
+                const auto load = [&](const std::vector<std::string>& names) {
+                    const auto read = [&](std::size_t index) {
+                        return goldbox::formats::DaxArchive::from_file(fs::path(argv[4]).parent_path()/names[index]);
+                    };
+                    goldbox::ImageArchives art{read(0),read(1)};
+                    art.game_id = profile.id; art.library = image_library;
+                    art.picture_archive = names[0];
+                    art.sprite_archive = names[1];
+                    art.portraits = goldbox::PortraitArchives{read(2),read(3)};
+                    art.portraits->head_archive = fs::path(names[2]).filename().string();
+                    art.portraits->body_archive = fs::path(names[3]).filename().string();
+                    art.picture_period_ms = profile.picture_period_ms;
+                    art.sprite_replacement_ms = profile.sprite_replacement_ms;
+                    return std::make_shared<const goldbox::CampaignGraphics>(
+                        goldbox::CampaignGraphics{std::move(art),{read(4),read(5),read(6)}});
                 };
-                goldbox::ImageArchives art{read(0),read(1)};
-                art.game_id = profile.id; art.library = image_library;
-                art.picture_archive = start.graphics_archives[0];
-                art.sprite_archive = start.graphics_archives[1];
-                art.portraits = goldbox::PortraitArchives{read(2),read(3)};
-                art.portraits->head_archive = fs::path(start.graphics_archives[2]).filename().string();
-                art.portraits->body_archive = fs::path(start.graphics_archives[3]).filename().string();
-                art.picture_period_ms = profile.picture_period_ms;
-                art.sprite_replacement_ms = profile.sprite_replacement_ms;
-                campaign_graphics.emplace(goldbox::CampaignGraphics{std::move(art),{read(4),read(5),read(6)}});
+                std::map<std::uint8_t,std::shared_ptr<const goldbox::CampaignGraphics>> bindings;
+                bindings.emplace(start.program_record,load(start.graphics_archives));
+                for (const auto& [id,names] : start.program_graphics) {
+                    (void)programs->records.at(id);
+                    bindings.emplace(id,load(names));
+                }
+                campaign_graphics = *bindings.at(start.program_record);
+                program_graphics.emplace(goldbox::CampaignGraphicsResources{[bindings](std::uint8_t id) {
+                    return bindings.at(id);
+                }});
             }
 #endif
         }
@@ -580,7 +595,8 @@ int main(int argc, char** argv) {
             wall_archives ? &*wall_archives : nullptr,
             startup_screens,preview_audio ? &*preview_audio : nullptr,sounds,profile.startup_title_period_ms,
             startup_music && !startup_screens.empty() ? &*startup_music : nullptr,
-            campaign_graphics ? &*campaign_graphics : nullptr,original ? &*original : nullptr,start_enhanced);
+            campaign_graphics ? &*campaign_graphics : nullptr,original ? &*original : nullptr,start_enhanced,
+            program_graphics ? &*program_graphics : nullptr);
 #endif
         TerminalHost host;
         const auto report = [&](const goldbox::EclExecution& result) {

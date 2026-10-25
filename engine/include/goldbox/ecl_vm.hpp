@@ -52,6 +52,8 @@ public:
     virtual void load_character(std::uint8_t index);
     virtual void select_character(std::string_view prompt);
     virtual std::uint8_t party_strength();
+    // Prepare host resources before a validated program is published and initialized.
+    virtual void program_changed(std::uint8_t record);
     // Optional virtual memory overlays. Unhandled accesses retain ordinary RAM/string semantics.
     virtual std::optional<std::uint8_t> memory_byte(std::uint16_t address);
     virtual bool write_memory(std::uint16_t address, std::uint32_t value, std::size_t width);

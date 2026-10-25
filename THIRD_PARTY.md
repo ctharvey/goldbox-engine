@@ -426,3 +426,10 @@ Its device framework is unnecessary for the existing SDL output path; the
 independent preview approximates three square waves and omits noise and analog
 filtering. SSI score commands come from private static interoperability analysis;
 no original music data, frequency tables or instruments are redistributed.
+
+Campaign graphics switching additionally consults the pinned SSI Engine
+`Engine.java`, `EngineConfiguration.java` and Pool properties for resource-family
+configuration. Original resource-group selection was independently verified in
+bounded private native-code probes. The explicit C++ profile bindings, program
+notification, immutable SDL resources and save rebind are independently written;
+no Java resource loader or filename-search code was copied or translated.
