@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from pool_startup_reference import matches, movement_flags, read_checkpoint, verify
+from pool_startup_reference import matches, matches_boundary, movement_flags, read_checkpoint, verify
 
 
 class CheckpointTest(unittest.TestCase):
@@ -78,6 +78,31 @@ class CheckpointTest(unittest.TestCase):
                     path.write_text(json.dumps(dict(self.expected, **{key: value})))
                     with self.assertRaises(ValueError):
                         read_checkpoint(path)
+
+    def test_boundary_comparison_rejects_each_divergence(self):
+        boundary = dict(status="executed", column=15, row=4, facing=3, bytecodeOffset=615,
+                        programRecord=20, mapRecord=20, movementBlock=0, triedToLeaveMap=0,
+                        mapActive=True, flags={"18967": 0, "19140": 0, "19141": 1})
+        expected = dict(self.expected, column=0, row=4, facing=3, boundaryProbe=boundary)
+        observed = {key: boundary[key] for key in ("column", "row", "facing", "flags")}
+        observed.update(programCounter=0x9900+616, resourceGroup=2,
+                        movementFlags={"28105": 0, "28117": 0})
+        self.assertTrue(matches_boundary(expected, observed))
+        for key in ("column", "row", "facing", "programCounter", "resourceGroup"):
+            self.assertFalse(matches_boundary(expected, dict(observed, **{key: observed[key]+1})))
+        for address in ("28105", "28117"):
+            self.assertFalse(matches_boundary(expected, dict(observed,
+                movementFlags=dict(observed["movementFlags"], **{address: 1}))))
+        self.assertFalse(matches_boundary(expected, dict(observed, flags=self.expected["flags"])))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"checkpoint.json"
+            path.write_text(json.dumps(expected))
+            self.assertEqual(read_checkpoint(path), expected)
+            for key, value in (("status", "unsupported"), ("column", True), ("mapActive", False),
+                               ("movementBlock", -1), ("bytecodeOffset", 65535), ("flags", [])):
+                path.write_text(json.dumps(dict(expected, boundaryProbe=dict(boundary, **{key: value}))))
+                with self.assertRaises(ValueError):
+                    read_checkpoint(path)
 
 
 if __name__ == "__main__":

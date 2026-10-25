@@ -220,8 +220,19 @@ The original-resource headless `boundaryProbe` now reports `executed`: map/progr
 20, (15,4), west, EXIT at offset 615. Its opening remains unchanged. This is
 supported original-bytecode execution with an engine-created party; equivalent
 native party state, UI pacing and full boundary parity remain unverified.
-Program 20 graphics rebinding is implemented and its original wall banks decode;
-matched original-scene pixel parity and additional program bindings remain open.
+Program 20 graphics rebinding is implemented and its original wall banks decode.
+A matched native boundary checkpoint verifies position, facing, tracked flags,
+movement words and return PC. Its 88x88 dungeon-scene RGB fingerprint matches the
+shared wall compositor; the optional original-resource test asserts that fingerprint
+when the view library is built. Party statistics, full-screen UI, dialogue pacing,
+timing and additional program bindings remain outside this verification.
+
+The bounded native startup harness accepts an optional completed `boundaryProbe`
+in the engine checkpoint. From the verified opening at (0,4), west, it sends one
+forward keypad input and bounded dialogue acknowledgements, requiring two stable
+matching boundary observations. A boundary mismatch makes the overall run fail
+even if the opening matches. Its live comparison covers state and resource group;
+scene fingerprints are checked separately by the original-resource view test.
 
 ADD stores through the existing typed memory interface with byte/word wrapping.
 DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and

@@ -1702,6 +1702,48 @@ corrected before the full green run. Hygiene and attribution checks passed.
 Private original bytes and captures remain outside the public checkout; the
 installed game and user saves were not modified.
 
+## Matched boundary state and scene checkpoint (2026-10-25)
+
+Fresh bounded native runs now compare the same westward boundary input, without
+the subsequent turn used in the earlier exploratory capture. From the matched
+opening at (0,4), west, keypad-forward and dialogue acknowledgements reach
+(15,4), west. The tracked flags match the engine: 0x4A17=0, 0x4AC4=0, 0x4AC5=1.
+Both movement-control words are zero. The native return PC is 39784, matching
+39168 + EXIT offset 615 + one. The native resource-group byte is 2. These are
+matching observations; native map/program record IDs are not independently read
+by this capture adapter.
+
+The native 320x200 capture's rectangle (24,24,88,88), converted to RGB in row-major
+channel order, has FNV-1a 64 fingerprint `15040589715104877255`. The shared C++
+wall compositor produces that same fingerprint from the engine boundary state,
+group-2 wall banks, original palette and configured backdrop. The optional
+original-resource CTest now asserts this numeric fingerprint when the view
+library is available. No original pixels are embedded in public fixtures.
+This checks the composed dungeon view, not an entire SDL window or full screen.
+
+Private evidence: `startup-reference-96srs_fp/comparison.json`,
+`parity-scene-engine.json` and `boundary-parity-2026-10-25.json`, under
+`.cache/goldbox-validation`. The updated public reference harness was then run
+separately: `startup-reference-2rec5fm3/comparison.json` reports openingMatched,
+boundaryMatched, matched and cleanupVerified all true. Its two stable boundary
+captures at return PC 39784 have the same scene fingerprint. The live harness
+continues to compare state only; the screenshot fingerprint comparison is a
+separate private check plus the original-resource compositor regression.
+
+Completed engine boundary probes now cause that harness to send one forward
+input, acknowledge dialogue within ten observations and require two stable
+matches. An opening-only match cannot pass a requested boundary comparison.
+Synthetic tests reject divergent coordinates, facing, flags, movement words,
+resource group, return PC and malformed boundary checkpoints. The five Python
+tests and three focused CTest suites passed; hygiene and attribution passed.
+Build log: `.cache/goldbox-validation/parity-final-focused.log`.
+
+Party rolls/stats were not synchronized with the native runtime. Full-screen
+UI, dialogue pacing, input scheduling, sound/timing, other locations and native
+save formats remain unverified; `fullParityVerified` stays false. No installed
+game files or user saves were changed. Only owned private reference processes
+were launched and cleaned up.
+
 ## Program graphics rebinding (2026-10-25)
 
 Private native snapshots show the active resource-group byte at DS:0x5376

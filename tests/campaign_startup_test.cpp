@@ -2,6 +2,9 @@
 // Optional, read-only original-resource check. No game bytes or text are output.
 #include "goldbox/game_profile.hpp"
 #include "goldbox/image_presentation.hpp"
+#ifdef GOLDBOX_CAMPAIGN_VIEW_TESTS
+#include "view.hpp"
+#endif
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -161,6 +164,19 @@ int main(int argc, char** argv) {
             "Boundary probe did not reach the verified forced-step position");
         check(walked.state.memory[0x4a17] == 0 && walked.state.memory[0x4ac4] == 0 &&
             walked.state.memory[0x4ac5] == 1,"Boundary transfer temporary/global flags differ");
+#ifdef GOLDBOX_CAMPAIGN_VIEW_TESTS
+        const auto walls = load_wall_graphics(*movement_host.definitions,*movement_host.tiles,
+            *movement_host.shared,*walked.wall_banks);
+        const auto scene = compose_wall_view(walked,walls,profile.color_backdrop ? &*profile.color_backdrop : nullptr);
+        const auto palette = ega_palette();
+        std::uint64_t scene_hash = 14695981039346656037ull;
+        for (const auto pixel : scene.pixels) for (unsigned channel = 0; channel < 3; ++channel) {
+            scene_hash ^= palette.at(pixel)[channel]; scene_hash *= 1099511628211ull;
+        }
+        // Native 320x200 capture cropped to (24,24,88,88), RGB order, FNV-1a 64.
+        // Only the fingerprint is public; original pixels remain private.
+        check(scene_hash == 15040589715104877255ull,"Native boundary scene fingerprint differs");
+#endif
         std::cout << "{\"status\":\"original-resource-replay\",\"steps\":" << run.steps
             << ",\"texts\":" << host.texts << ",\"menus\":" << host.menus
             << ",\"column\":" << unsigned(session.column) << ",\"row\":" << unsigned(session.row)
@@ -178,6 +194,9 @@ int main(int argc, char** argv) {
             << ",\"movementBlock\":" << unsigned(walked.state.memory[0x6dc9])
             << ",\"triedToLeaveMap\":" << unsigned(walked.state.memory[0x6dd5])
             << ",\"mapActive\":" << (walked.has_dungeon_map() ? "true" : "false")
+#ifdef GOLDBOX_CAMPAIGN_VIEW_TESTS
+            << ",\"sceneRgbFnv1a64\":\"" << scene_hash << "\""
+#endif
             << ",\"flags\":{\"18967\":" << unsigned(walked.state.memory[0x4a17])
             << ",\"19140\":" << unsigned(walked.state.memory[0x4ac4])
             << ",\"19141\":" << unsigned(walked.state.memory[0x4ac5]) << "}}}\n";

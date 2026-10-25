@@ -4,6 +4,7 @@
 Compares position, facing, three opening flags and the interpreter return PC.
 This is deliberately a partial parity check: party rolls, pixels, sound, timing,
 all memory and the original save format are outside its comparison coverage.
+An optional completed boundaryProbe also checks one westward area transition.
 All captures and copied original resources stay in the supplied private folder.
 """
 import argparse
@@ -52,12 +53,35 @@ def read_checkpoint(path):
         raise ValueError("Missing opening flags")
     if any(type(n) is not int or not 0 <= n <= 255 for n in value["flags"].values()):
         raise ValueError("Invalid opening flag value")
+    if "boundaryProbe" in value:
+        boundary = value["boundaryProbe"]
+        if not isinstance(boundary, dict) or boundary.get("status") != "executed":
+            raise ValueError("Expected a completed boundary probe")
+        for key, maximum in dict(column=15, row=15, facing=3, bytecodeOffset=65534,
+                                 programRecord=255, mapRecord=255, movementBlock=65535,
+                                 triedToLeaveMap=65535).items():
+            if type(boundary.get(key)) is not int or not 0 <= boundary[key] <= maximum:
+                raise ValueError("Invalid boundary checkpoint: " + key)
+        flags = boundary.get("flags", {})
+        if (boundary.get("mapActive") is not True or not isinstance(flags, dict)
+                or set(flags) != {str(a) for a in FLAGS}
+                or any(type(n) is not int or not 0 <= n <= 255 for n in flags.values())
+                or value["codeBase"] + boundary["bytecodeOffset"] + 1 > 65535
+                or (value["column"], value["row"], value["facing"]) != (0, 4, 3)):
+            raise ValueError("Unsupported boundary replay checkpoint")
     return value
 
 
 def matches(expected, observed):
     return (all(observed[key] == expected[key] for key in ("column", "row", "facing", "flags"))
             and observed["programCounter"] == expected["codeBase"] + expected["bytecodeOffset"] + 1)
+
+
+def matches_boundary(expected, observed):
+    boundary = dict(expected["boundaryProbe"], codeBase=expected["codeBase"])
+    return (matches(boundary, observed) and observed.get("resourceGroup") == 2
+            and observed.get("movementFlags") == {str(0x6dc9): boundary["movementBlock"],
+                                                   str(0x6dd5): boundary["triedToLeaveMap"]})
 
 
 def movement_flags(data, read, guest_base):
@@ -141,10 +165,11 @@ def run(installation, private_parent, resident_image, checkpoint):
     owned = None
     observations = []
     matched = False
+    boundary_matched = None
     try:
         owned = OwnedProcess.launch([str(root / "DOSBox.exe"), "-conf", str(config), "-noconsole"], root,
                                     env=dict(os.environ, SDL_VIDEODRIVER="windib"))
-        deadline = time.monotonic() + 120
+        deadline = time.monotonic() + (150 if "boundaryProbe" in expected else 120)
         reader = WindowsMemory(owned.process)
         candidates = []
         while time.monotonic() < deadline - 105 and not candidates:
@@ -184,6 +209,7 @@ def run(installation, private_parent, resident_image, checkpoint):
             observation = dict(label=label, column=data[0x6aad], row=data[0x6aae], facing=data[0x6aaf] // 2,
                                flags=flags, programCounter=int.from_bytes(data[0x49ed:0x49ef], "little"),
                                movementFlags=movement_flags(data, reader.read, guest_base),
+                               resourceGroup=data[0x5376],
                                captureSha256=hashlib.sha256(fresh[0].read_bytes()).hexdigest())
             observations.append(observation)
             return observation
@@ -224,13 +250,32 @@ def run(installation, private_parent, resident_image, checkpoint):
             if stable >= 2:
                 matched = True
                 break
+        if matched and "boundaryProbe" in expected:
+            boundary_matched = False
+            sender.send(["KP_8"], deadline)
+            stable = 0
+            for index in range(10):
+                if time.monotonic() + 3 >= deadline:
+                    break
+                time.sleep(0.5)
+                observation = observe(f"boundary-{index:02}")
+                stable = stable + 1 if matches_boundary(expected, observation) else 0
+                if stable >= 2:
+                    boundary_matched = True
+                    break
+                if stable == 0:
+                    sender.send(["ENTER"], deadline)
     finally:
         try:
             if owned is not None:
                 owned.kill_tree()
         finally:
             lock.release()
-    report = dict(matched=matched, coverage=["position", "facing", "opening-flags", "return-PC"],
+    report = dict(matched=matched and boundary_matched is not False,
+                  openingMatched=matched, boundaryMatched=boundary_matched,
+                  coverage=["position", "facing", "opening-flags", "return-PC"] +
+                  (["boundary-position-facing-flags-return-PC", "boundary-movement-words", "resource-group"]
+                   if boundary_matched is not None else []),
                   fullParityVerified=False, expected=expected, observations=observations, cleanupVerified=True,
                   privateRoot=str(root), originalInstallationModified=False)
     (root / "comparison.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
