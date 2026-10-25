@@ -35,6 +35,25 @@ DaxArchive archive(const std::vector<std::uint8_t>& raw) {
     bytes.insert(bytes.end(), raw.begin(), raw.end());
     return DaxArchive::parse(bytes);
 }
+
+std::vector<std::uint8_t> conditional_route(std::uint8_t condition, std::uint8_t right,
+    std::optional<std::uint8_t> mask = {}) {
+    std::vector<std::uint8_t> code;
+    for (int i = 0; i < 5; ++i) code.insert(code.end(), {1,1,20,0x99});
+    code.insert(code.end(), {3,1,0,0x71,0,right}); // COMPARE profile X with constant.
+    if (mask) code.insert(code.end(), {0x2f,0,*mask,0,1,1,0,0x4a});
+    code.push_back(condition);
+    const auto jump = code.size();
+    code.insert(code.end(), {1,1,0,0x99});
+    const auto no = code.size();
+    code.insert(code.end(), {0x25,0,0,0,1,1,0,0x99});
+    const auto yes = code.size();
+    code.insert(code.end(), {0x25,0,0,0,1,1,0,0x99});
+    code[jump+2] = static_cast<std::uint8_t>(yes);
+    code[no+6] = static_cast<std::uint8_t>(code.size()); code.push_back(0);
+    code[yes+6] = static_cast<std::uint8_t>(code.size()); code.push_back(0);
+    return code;
+}
 } // namespace
 
 int main() {
@@ -71,7 +90,41 @@ int main() {
     assert(routes[0].bytecode_offset == 48 && routes[1].bytecode_offset == 49);
     coordinate_route[22] = 2; // Arrival facing is not a property of the cell.
     routes = resolve_geo_events(locations,archive(coordinate_route),7,EclEventKind::move,positioned,opcodes);
-    assert(!routes[0].bytecode_offset && routes[0].diagnostic == "Dispatch depends on unknown game state");
+    assert(!routes[0].bytecode_offset && routes[0].diagnostic ==
+        "Dispatch depends on unknown game state at address 28930");
+    // Each IF condition follows the VM's skip-one-instruction semantics.
+    // Equal GEO selectors can choose different tables using only known X/Y.
+    for (std::uint8_t condition = 0x16; condition <= 0x1b; ++condition) {
+        for (std::uint8_t right = 0; right <= 2; ++right) {
+            const auto code = conditional_route(condition,right);
+            const auto resolved = resolve_geo_events(locations,archive(code),7,EclEventKind::move,positioned,opcodes);
+            for (const auto& route : resolved) {
+                const int x = route.source.column;
+                const bool expected[]{x == right,x != right,x < right,x > right,x <= right,x >= right};
+                assert(route.bytecode_offset == code.size() - (expected[condition-0x16] ? 1 : 2));
+            }
+        }
+    }
+    for (const std::uint8_t mask : {0,1}) {
+        const auto code = conditional_route(0x16,0,mask);
+        const auto resolved = resolve_geo_events(locations,archive(code),7,EclEventKind::move,positioned,opcodes);
+        for (const auto& route : resolved) // AND replaces the earlier COMPARE flag.
+            assert(route.bytecode_offset == code.size() - (mask == 0 ? 1 : 2));
+    }
+    auto state_route = conditional_route(0x16,0);
+    state_route[22] = 0xd5; state_route[23] = 0x6d;
+    routes = resolve_geo_events(locations,archive(state_route),7,EclEventKind::move,positioned,opcodes);
+    assert(!routes[0].bytecode_offset && routes[0].diagnostic ==
+        "Dispatch depends on unknown game state at address 28117");
+    auto truncated_skip = conditional_route(0x17,1); truncated_skip.resize(28);
+    routes = resolve_geo_events(locations,archive(truncated_skip),7,EclEventKind::move,positioned,opcodes);
+    assert(!routes[0].bytecode_offset && !routes[0].diagnostic.empty());
+    for (auto& spec : opcodes) if (spec.opcode == 3) spec.operand_count = 1;
+    rejects([&] { (void)decode_ecl_program_entries(state_route,positioned,opcodes); });
+    opcodes = routing_ecl_opcodes();
+    for (auto& spec : opcodes) if (spec.opcode == 0x16) spec.operand_count = 1;
+    rejects([&] { (void)decode_ecl_program_entries(state_route,positioned,opcodes); });
+    opcodes = routing_ecl_opcodes();
     for (const auto addresses : {std::array<std::uint16_t,3>{0x7100,0x7100,0x7102},
         std::array<std::uint16_t,3>{dialect.square_info_address,0x7101,0x7102}}) {
         auto conflicting = positioned; conflicting.position_addresses = addresses;

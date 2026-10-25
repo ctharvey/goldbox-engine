@@ -8,10 +8,36 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from pool_startup_reference import matches, read_checkpoint, verify
+from pool_startup_reference import matches, movement_flags, read_checkpoint, verify
 
 
 class CheckpointTest(unittest.TestCase):
+    def test_movement_flags_use_the_separate_word_buffer(self):
+        data = bytearray(65536)
+        data[0x49d6:0x49da] = bytes([0x20,0,0,0x30])
+        reads = []
+
+        def read(address, size):
+            reads.append((address, size))
+            return bytes([1,2])
+
+        self.assertEqual(movement_flags(data,read,0x10000000), {"28105": 513,"28117": 513})
+        self.assertEqual(reads, [(0x10030020 + 2*(0x6dc9-0x6b00),2),
+                                (0x10030020 + 2*(0x6dd5-0x6b00),2)])
+        with self.assertRaises(RuntimeError):
+            movement_flags(data,lambda address,size: b"\0",0)
+        data[0x49d6:0x49da] = bytes([0xff,0xff,0,0x30])
+        with self.assertRaises(ValueError):
+            movement_flags(data,read,0)
+        data[0x49d6:0x49da] = bytes([0,0,0xff,0xff])
+        with self.assertRaises(ValueError):
+            movement_flags(data,read,0)
+        with self.assertRaises(ValueError):
+            movement_flags(data[:100],read,0)
+        reads.clear()
+        self.assertEqual(movement_flags(bytes(65536),read,0), {})
+        self.assertEqual(reads, [])
+
     def test_oversized_reference_is_rejected_before_reading(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "oversized.exe"

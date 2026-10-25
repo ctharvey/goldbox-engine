@@ -32,6 +32,13 @@ F11 cutover and the retained text views reuse the project's own renderer and
 the separately installed SDL3 API; no additional upstream implementation was
 copied or translated for runtime switching.
 
+SSI Engine's pinned `DungeonMovementHandler.java`, `DungeonMap.java` and Pool
+properties were also consulted for movement-event ordering and the 0x6DC9/0x6DD5
+control-word names. Native flag preparation and an opening boundary transition
+were checked independently using private authorized resources. Static COMPARE/IF
+routing and reference-harness observations are independently authored; no Java
+movement handler was copied or translated. Full movement parity remains open.
+
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`, particularly
 Pool properties, `FrameRendererSymbols.java`, `DungeonRenderer.java`,
 `ProgramMenuRenderer.java` and `AbstractRenderer.java`, was consulted for symbol

@@ -60,6 +60,26 @@ def matches(expected, observed):
             and observed["programCounter"] == expected["codeBase"] + expected["bytecodeOffset"] + 1)
 
 
+def movement_flags(data, read, guest_base):
+    """Read the fingerprinted build's separate, word-backed ECL globals."""
+    if len(data) != 65536:
+        raise ValueError("Incomplete native data segment")
+    offset = int.from_bytes(data[0x49d6:0x49d8], "little")
+    segment = int.from_bytes(data[0x49d8:0x49da], "little")
+    if not segment:  # Not allocated before the original has initialized ECL.
+        return {}
+    last = offset + 2 * (0x6dd5 - 0x6b00) + 2
+    if last > 65536 or segment * 16 + last > 0x100000:
+        raise ValueError("Native movement flags outside guest memory")
+    flags = {}
+    for address in (0x6dc9, 0x6dd5):
+        raw = read(guest_base + segment * 16 + offset + 2 * (address - 0x6b00), 2)
+        if len(raw) != 2:
+            raise RuntimeError("Incomplete native movement flag snapshot")
+        flags[str(address)] = int.from_bytes(raw, "little")
+    return flags
+
+
 def verify(path, expected):
     if (path.is_symlink() or not path.is_file() or path.stat().st_size > 8 * 1024 * 1024
             or hashlib.sha256(path.read_bytes()).hexdigest() != expected):
@@ -163,6 +183,7 @@ def run(installation, private_parent, resident_image, checkpoint):
                     flags[str(address)] = int.from_bytes(raw, "little")
             observation = dict(label=label, column=data[0x6aad], row=data[0x6aae], facing=data[0x6aaf] // 2,
                                flags=flags, programCounter=int.from_bytes(data[0x49ed:0x49ef], "little"),
+                               movementFlags=movement_flags(data, reader.read, guest_base),
                                captureSha256=hashlib.sha256(fresh[0].read_bytes()).hexdigest())
             observations.append(observation)
             return observation

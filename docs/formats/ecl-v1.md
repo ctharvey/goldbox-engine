@@ -76,8 +76,11 @@ entry even when the GEO selector is zero; the script can test X/Y, facing and
 quest state. Blocked moves and save restoration do not automatically run a move
 event. Map and ECL record selection remain explicit adapter responsibilities.
 The static nonzero-selector inventory can use known X/Y for its supported
-GOTO/AND/WRITE_MEM routes, but cannot infer arrival facing, quest flags or
-arbitrary conditional code. It is not an exhaustive list of runtime events.
+GOTO/AND/WRITE_MEM routes and numeric COMPARE/IF conditions. IF skips exactly
+one decoded instruction when false; AND replaces the comparison flag, as in the
+VM. Unknown reads report the required address rather than assuming zero.
+Arrival facing, live flags and arbitrary code remain unresolved. This inventory
+is not an exhaustive list of runtime events or proof of movement parity.
 Version-1 local saves preserve position/facing,
 numeric memory and string state. Invalid loads are rejected before publishing
 state. The terminal identifies its source pair using game/archive/record IDs,
@@ -184,3 +187,7 @@ save round-trip. `scripts/pool_startup_reference.py` compares the resulting JSON
 checkpoint with a bounded, privately copied DOS session. Its coverage is position,
 facing, three opening flags and the original interpreter return address. It does
 not establish complete party, pixel, timing, sound or original-save parity.
+Observations also record the installed build's movement-block (0x6DC9) and
+exit-attempt (0x6DD5) words from its separate 0x6B00 memory buffer. These are
+diagnostic reference values; the opening comparison does not yet validate
+engine movement against them.

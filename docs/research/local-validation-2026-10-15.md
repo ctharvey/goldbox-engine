@@ -1399,3 +1399,62 @@ party scores/RNG streams, all remaining RAM, text pagination, pixels, sound,
 timing and original SSI saves are outside this comparison. Per-title temporary
 memory resets on NEW_ECL and later campaign transitions remain unverified.
 Automatic graphics changes for later programs/resource groups are also pending.
+
+## Location routing and boundary dependency (2026-10-24)
+
+The static scanner now follows numeric COMPARE and all six IF conditions using
+known profile-bound coordinates. False conditions skip one decoded instruction;
+AND refreshes the comparison flag. Synthetic coverage includes equal selectors
+at different locations, all condition outcomes, stale comparison flags, truncated
+skipped instructions and conflicting opcode definitions. No byte-pattern search
+is used. Unknown memory remains unknown and its address is reported.
+
+Scanning the authorized GEO1/ECL1 record 18 identifies 179 selector-bearing cells.
+Their move routes reach COMPARE at code offset 185, reading logical 0x6DD5
+against zero. SSI Engine's pinned Pool configuration names this TRIED_TO_LEAVE_MAP;
+its DungeonMovementHandler prepares the flag and runs MOVE before movement,
+then SEARCH afterward. This is research-only evidence, not a copied adapter.
+
+The installed original WRITE_MEM handlers independently establish that 0x6DD5
+uses the separate word buffer at DS:0x49D6, offset 0x5AA. The original routine at
+GAME.OVR 0x16D58 (overlay 0x72, entry 0x68D) clears this flag, queries the source
+edge, and sets it if a nonzero door result would step outside 0..15. A bounded
+Unicorn probe passed 32 cases: four directions, boundary/interior positions and
+four synthetic door-query results. Only the door query was mocked; original
+instructions prepared the flag and retained the clamped source coordinates.
+The probe does not establish original door decoding or complete movement order.
+
+A separate code-driven DOSBox run reproduced the existing opening checkpoint,
+then pressed forward while facing west at (0,4). The original reached (15,4),
+west, displayed the next area's description, changed 0x4A17 from 1 to 0, and
+returned at native PC 39716. Movement-block and exit-attempt words were both zero
+at the settled checkpoint. This does not imply the flag stayed zero during the
+transition. The run used a private installation copy and cleaned up its own
+process; it did not modify the installed game or user saves.
+
+Private evidence lives outside the checkout at
+`.cache/goldbox-validation/startup-reference-nqg4qhrk/comparison.json` and
+`.cache/goldbox-validation/original-boundary-flag-report.json`. The private
+`probe_movement_lifecycle.py` replays the fingerprinted startup adapter and its
+fixed keypad sequence; `probe_original_boundary_flag.py` repeats the 32 native
+routine checks. Images, memory snapshots and original executable bytes remain
+private. Public startup observations now include the two word-buffer values,
+with synthetic address, width, truncation and pointer-bound regressions.
+The updated public capture path also passed a second live run at
+`.cache/goldbox-validation/startup-reference-x96jmvsn/comparison.json`, reproducing
+the same position, facing, flags and return PCs. Capture hashes differ because
+the native party rolls are clock-seeded and are outside this comparison.
+
+The serialized two-worker build and full CTest run passed 30 suites; the native
+Windows RNG integration suite skipped under WSL. The original-resource opening
+suite ran with the authorized installation. Focused Python tests also passed
+on Windows using a workspace-local temporary directory. Attribution and hygiene
+checks passed. The private build/test log is
+`.cache/goldbox-validation/location-routing-20261024-tests.log`.
+
+The remaining runtime gap is explicit: the engine currently rejects boundary
+movement before ECL, executes MOVE at the destination after successful movement,
+and does not automatically invoke SEARCH. It therefore cannot reproduce this
+original boundary transition. A profile-selected lifecycle fix must account for
+movement blocking, program/map changes, subsequent search and the outstanding
+graphics-group binding; this evidence does not establish full map-18 parity.

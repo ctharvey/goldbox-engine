@@ -23,7 +23,8 @@ void validate(const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> 
         // Routing opcodes must have their exact arity, regardless of mnemonic.
         const int expected = spec.opcode == 0 ? 0 :
             (spec.opcode == 1 || spec.opcode == 2) ? 1 :
-            spec.opcode == 9 ? 2 : spec.opcode == 0x2f ? 3 :
+            (spec.opcode == 3 || spec.opcode == 9) ? 2 : spec.opcode == 0x2f ? 3 :
+            (spec.opcode >= 0x16 && spec.opcode <= 0x1b) ? 0 :
             (spec.opcode == 0x25 || spec.opcode == 0x26) ? 2 : -1;
         if (expected >= 0 && (spec.operand_count != expected || spec.variable_count_operand !=
             ((spec.opcode == 0x25 || spec.opcode == 0x26) ? 1 : -1))) {
@@ -47,10 +48,12 @@ std::uint32_t numeric(const EclOperand& operand, const std::map<std::uint32_t, s
     if (operand.type == 0 || operand.type == 2 || operand.type == 4) return operand.value;
     if (operand.type == 1 || operand.type == 3 || operand.type == 5) {
         const auto low = memory.find(operand.value);
-        if (low == memory.end()) throw EclDecodeError("Dispatch depends on unknown game state");
+        if (low == memory.end()) throw EclDecodeError("Dispatch depends on unknown game state at address " +
+            std::to_string(operand.value));
         if (operand.type != 3) return low->second;
         const auto high = memory.find(operand.value + 1);
-        if (high == memory.end()) throw EclDecodeError("Dispatch depends on unknown game state");
+        if (high == memory.end()) throw EclDecodeError("Dispatch depends on unknown game state at address " +
+            std::to_string(operand.value + 1));
         return low->second | (static_cast<std::uint32_t>(high->second) << 8);
     }
     throw EclDecodeError("Non-numeric dispatch operand");
@@ -131,6 +134,7 @@ std::vector<ResolvedGeoEvent> resolve_geo_events(const GeoMap& map, const DaxArc
             // A GEO cell has no fixed arrival direction. Keep facing unknown.
         }
         std::size_t offset = entries.instruction_offsets[kind_index];
+        int comparison = 0; // Same fresh-invocation state as the VM.
         try {
             for (std::size_t step = 0; ; ++step) {
                 if (step == 128) throw EclDecodeError("Dispatch routing step limit exceeded");
@@ -150,11 +154,26 @@ std::vector<ResolvedGeoEvent> resolve_geo_events(const GeoMap& map, const DaxArc
                     (void)decode_ecl_instruction(code, *resolved.bytecode_offset, opcodes);
                     break;
                 }
-                if (instruction.opcode == 9) {
+                if (instruction.opcode == 3) {
+                    const auto left = numeric(instruction.operands[0], memory);
+                    const auto right = numeric(instruction.operands[1], memory);
+                    comparison = left < right ? -1 : left > right ? 1 : 0;
+                } else if (instruction.opcode >= 0x16 && instruction.opcode <= 0x1b) {
+                    const bool conditions[]{comparison == 0, comparison != 0, comparison < 0,
+                        comparison > 0, comparison <= 0, comparison >= 0};
+                    if (!conditions[instruction.opcode - 0x16]) {
+                        // IF skips one decoded instruction, never a guessed byte span.
+                        offset += instruction.size;
+                        offset += decode_ecl_instruction(code, offset, opcodes).size;
+                        continue;
+                    }
+                } else if (instruction.opcode == 9) {
                     write(instruction.operands[1], numeric(instruction.operands[0], memory), memory);
                 } else if (instruction.opcode == 0x2f) {
-                    write(instruction.operands[2], numeric(instruction.operands[0], memory) &
-                        numeric(instruction.operands[1], memory), memory);
+                    const auto value = numeric(instruction.operands[0], memory) &
+                        numeric(instruction.operands[1], memory);
+                    write(instruction.operands[2], value, memory);
+                    comparison = value == 0 ? 0 : 1;
                 } else throw EclDecodeError("Unsupported/state-dependent ECL dispatch route at offset " + std::to_string(offset));
                 offset += instruction.size;
             }

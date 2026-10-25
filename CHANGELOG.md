@@ -2,6 +2,13 @@
 
 ## 2026-10-24
 
+- Follow numeric COMPARE/IF routes in the static map-event scanner, including
+  AND comparison flags; identify unknown memory dependencies by address. Add
+  synthetic condition, malformed-instruction and dialect-conflict regressions.
+- Capture original movement-control words in the private startup harness.
+  Verify the native boundary flag in 32 bounded cases and reproduce the original
+  opening's westward area transition; document the remaining engine lifecycle gap.
+
 - Resolve supported static ECL routes using profile-bound GEO coordinates as
   well as selectors. Keep arrival facing unknown and reject overlapping context
   bindings. Test location-only events on zero-selector cells through real CLI
