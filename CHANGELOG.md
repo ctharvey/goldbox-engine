@@ -6,6 +6,8 @@
   well as selectors. Keep arrival facing unknown and reject overlapping context
   bindings. Test location-only events on zero-selector cells through real CLI
   movement, blocked input, re-entry and save/load.
+- Pass profile coordinate bindings through the read-only GEO/ECL scanners;
+  verify coordinate-based routes through the actual scanner executable.
 
 - Use SDL's built-in readable font for enhanced menus and labels while retaining
   imported SSI glyphs in original mode. Add rendered-pixel checks across F11

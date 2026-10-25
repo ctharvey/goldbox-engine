@@ -134,7 +134,8 @@ int main(int argc, char** argv) {
             if (!opts.scan_ecl.empty()) {
                 if (!selected_profile->event_dispatch) throw std::runtime_error("profile has no ECL dispatch configuration");
                 const auto& config = *selected_profile->event_dispatch;
-                const goldbox::formats::EclDispatchDialect dialect{config.dialect, config.code_base, config.square_info_address};
+                const goldbox::formats::EclDispatchDialect dialect{config.dialect, config.code_base,
+                    config.square_info_address,true,config.position_addresses};
                 const auto opcodes = goldbox::formats::routing_ecl_opcodes();
                 const auto archive = goldbox::formats::DaxArchive::from_file(opts.scan_ecl);
                 std::size_t failed = 0;
@@ -174,7 +175,8 @@ int main(int argc, char** argv) {
                         std::cout << ", paired ECL #" << static_cast<unsigned>(*opts.ecl_record);
                         if (selected_profile && selected_profile->event_dispatch) {
                             const auto& config = *selected_profile->event_dispatch;
-                            const goldbox::formats::EclDispatchDialect dialect{config.dialect, config.code_base, config.square_info_address};
+                            const goldbox::formats::EclDispatchDialect dialect{config.dialect, config.code_base,
+                                config.square_info_address,true,config.position_addresses};
                             const auto resolved = goldbox::formats::resolve_geo_events(map, *ecl_archive,
                                 *opts.ecl_record, goldbox::formats::EclEventKind::move, dialect,
                                 goldbox::formats::routing_ecl_opcodes());
