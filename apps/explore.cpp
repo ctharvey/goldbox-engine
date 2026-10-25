@@ -232,11 +232,8 @@ int run_harness(goldbox::ExplorationSession& session, const std::string& source_
                 const auto direction = action == "north" ? goldbox::Direction::north :
                     action == "east" ? goldbox::Direction::east :
                     action == "south" ? goldbox::Direction::south : goldbox::Direction::west;
-                if (session.move(direction)) {
-                    complete("ok", session.trigger(goldbox::formats::EclEventKind::move, host));
-                } else {
-                    complete("blocked", std::nullopt);
-                }
+                auto move = session.move(direction,host);
+                complete(move.moved ? "ok" : "blocked",std::move(move.execution));
             } else if (action == "search") {
                 complete("ok", session.trigger(goldbox::formats::EclEventKind::search, host));
             } else if (action == "rest") {
@@ -485,6 +482,11 @@ int main(int argc, char** argv) {
         goldbox::ExplorationSession session;
         session.sound_call = profile.sound_call;
         session.script_delay_ms = profile.script_delay_ms;
+        session.movement_addresses = config.movement_addresses;
+        if (profile.campaign_startup) {
+            session.position_refresh_call = profile.campaign_startup->position_refresh_call;
+            session.position_advance_call = profile.campaign_startup->position_advance_call;
+        }
         session.character_rules = profile.character_rules;
         session.initial_random = profile.random;
         if (seed) {
@@ -550,6 +552,12 @@ int main(int argc, char** argv) {
                  << checksum(raw_map) << ':' << checksum(session.ecl_record) << ':'
                  << config.code_base << ':' << config.square_info_address;
         if (config.position_addresses) for (const auto address : *config.position_addresses) identity << ':' << address;
+        if (config.movement_addresses) {
+            identity << ":source-move-v1";
+            for (const auto address : *config.movement_addresses) identity << ':' << address;
+        }
+        if (session.position_advance_call)
+            identity << ":advance:" << session.position_advance_call->function << ':' << session.position_advance_call->wall_type_address;
         if (session.programs) identity << ':' << session.maps->source_identity << ':' << session.programs->source_identity;
         const auto source_identity = identity.str();
         const auto save = fs::absolute(argv[6]);
@@ -570,11 +578,11 @@ int main(int argc, char** argv) {
             campaign_graphics ? &*campaign_graphics : nullptr,original ? &*original : nullptr,start_enhanced);
 #endif
         TerminalHost host;
-        const auto trigger = [&](goldbox::formats::EclEventKind kind) {
-            const auto result = session.trigger(kind, host);
+        const auto report = [&](const goldbox::EclExecution& result) {
             if (!result.exited) std::cout << "Event stopped at offset " << result.bytecode_offset << ": " << result.diagnostic << "\n";
             else std::cout << "Event exited after " << result.steps << " steps\n";
         };
+        const auto trigger = [&](goldbox::formats::EclEventKind kind) { report(session.trigger(kind,host)); };
         std::cout << "Unverified exploration pilot. Starts at (0,0); use init explicitly if supported.\n"
                      "Commands: north east south west search rest init save load quit\n";
         std::string command;
@@ -607,8 +615,9 @@ int main(int argc, char** argv) {
                 if (command == "south") direction = goldbox::Direction::south;
                 if (command == "west") direction = goldbox::Direction::west;
                 if (!direction) { std::cout << "Unknown command\n"; continue; }
-                if (session.move(*direction)) trigger(goldbox::formats::EclEventKind::move);
-                else std::cout << "Movement blocked\n";
+                const auto move = session.move(*direction,host);
+                if (move.execution) report(*move.execution);
+                if (!move.moved) std::cout << "Movement blocked\n";
             }
         }
         return 0;

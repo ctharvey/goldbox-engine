@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from compare_game_test import Fixture
-from harness_test import dax
+from harness_test import dax, prototype_profile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from compare_common import ControlledError
@@ -44,7 +44,8 @@ class ScriptedHarnessTests(unittest.TestCase):
             [1, 1, 20, 0x99] * 5 + [9, 1, 0x4f, 0xc0, 1, 0, 0x4a, 0x11, 0x80, 1, 4, 0])))
         self.config = self.fixture.config('rich', timeout=5)
         settings = json.loads(self.config.read_text())
-        settings['engine']['command'] = [ENGINE, '--harness', PROFILE, str(self.root / 'GEO.DAX'),
+        settings['engine']['command'] = [ENGINE, '--harness', prototype_profile(PROFILE,self.root),
+                                         str(self.root / 'GEO.DAX'),
                                          '7', str(self.root / 'ECL.DAX'), '7', str(self.root / 'state.json')]
         self.config.write_text(json.dumps(settings))
         self.scenario = dict(schemaVersion=1, commands=['east', 'save', 'west', 'load', 'quit'], expect=[

@@ -13,6 +13,8 @@ namespace {
 struct Host : EclHost {
     std::string output;
     std::vector<std::uint16_t> sounds;
+    unsigned clears{};
+    void clear_images() override { ++clears; }
     void sound(std::uint16_t id) override { sounds.push_back(id); }
     void text(std::string_view value, bool) override { output += value; }
 };
@@ -21,9 +23,156 @@ void rejects(const std::function<void()>& fn) {
     try { fn(); } catch (const std::exception&) { failed = true; }
     assert(failed);
 }
+std::vector<std::uint8_t> lifecycle(std::vector<std::uint8_t> move, std::vector<std::uint8_t> search,
+    std::vector<std::uint8_t> init = {0}) {
+    std::vector<std::uint8_t> code(20);
+    const std::vector<std::uint8_t> bodies[]{move,search,{0},{0},init};
+    for (std::size_t i = 0; i < 5; ++i) {
+        const auto address = 0x9900+code.size();
+        code[i*4] = 1; code[i*4+1] = 1;
+        code[i*4+2] = address & 255; code[i*4+3] = address >> 8;
+        code.insert(code.end(),bodies[i].begin(),bodies[i].end());
+    }
+    return code;
+}
+ExplorationSession native_session(std::vector<std::uint8_t> code) {
+    ExplorationSession session;
+    session.dialect = {"ssi-five-entry-v1",0x9900,0x7103,true,
+        std::array<std::uint16_t,3>{0x7100,0x7101,0x7102}};
+    session.movement_addresses = std::array<std::uint16_t,4>{0x7200,0x7201,0x7202,0x7203};
+    session.opcodes = minimal_vm_opcodes(); session.ecl_record = std::move(code);
+    return session;
+}
+void movement_lifecycle() {
+    Host host;
+    const auto source = std::vector<std::uint8_t>{9,1,0,0x71,1,0,0x4a,
+        9,1,3,0x71,1,2,0x4a,9,1,1,0x72,1,4,0x4a,0};
+    const auto destination = std::vector<std::uint8_t>{9,1,0,0x71,1,1,0x4a,9,1,3,0x71,1,3,0x4a,0};
+    auto session = native_session(lifecycle(source,destination));
+    session.map.cells[0].raw_event = 0x81; session.map.cells[1].raw_event = 0x82;
+    session.map.cells[1].west = 7; // The native lifecycle checks the source edge only.
+    auto move = session.move(Direction::east,host);
+    assert(move.moved && move.execution->exited && session.column == 1);
+    assert(session.state.memory[0x4a00] == 0 && session.state.memory[0x4a01] == 1);
+    assert(session.state.memory[0x4a02] == 0x81 && session.state.memory[0x4a03] == 0x82);
+    assert(session.state.memory[0x7202] == 0 && session.state.memory[0x7203] == 0);
+    session.map.cells[1].east = 1;
+    session.state.memory[0x4a03] = 0;
+    move = session.move(Direction::east,host);
+    assert(!move.moved && move.execution->exited && session.column == 1);
+    assert(session.state.memory[0x4a00] == 1 && session.state.memory[0x4a03] == 0x82);
+    const auto saved = serialize_exploration(session,"movement-fixture");
+    auto restored = native_session(session.ecl_record); restored.map = session.map;
+    restore_exploration(restored,saved,"movement-fixture");
+    assert(serialize_exploration(restored,"movement-fixture") == saved);
+    for (unsigned direction = 0; direction < 4; ++direction) for (unsigned door : {1,2,3}) {
+        auto edge = native_session(lifecycle(source,destination));
+        edge.row = direction == 0 ? 0 : direction == 2 ? 15 : 8;
+        edge.column = direction == 1 ? 15 : direction == 3 ? 0 : 8;
+        auto& cell = edge.map.cells[edge.row*16+edge.column];
+        std::uint8_t* walls[]{&cell.north,&cell.east,&cell.south,&cell.west};
+        *walls[direction] = 1; cell.door_flags = door << (direction*2);
+        const auto old_row = edge.row, old_column = edge.column;
+        const auto step = edge.move(static_cast<Direction>(direction),host);
+        assert(step.execution->exited && step.moved == (door == 1));
+        assert(edge.state.memory[0x4a04] == 1);
+        if (door == 1) {
+            assert(edge.row == (direction == 0 ? 15 : direction == 2 ? 0 : old_row));
+            assert(edge.column == (direction == 1 ? 0 : direction == 3 ? 15 : old_column));
+        } else assert(edge.row == old_row && edge.column == old_column);
+    }
+    auto blocked = native_session(lifecycle({9,0,255,1,0,0x72,0},{9,1,0,0x72,1,0,0x4a,0}));
+    auto open_edge = native_session(lifecycle(source,destination));
+    move = open_edge.move(Direction::west,host);
+    assert(move.moved && move.execution->exited && open_edge.column == 15 && open_edge.state.memory[0x4a04] == 1);
+    move = blocked.move(Direction::east,host);
+    assert(!move.moved && move.execution->exited && blocked.state.memory[0x4a00] == 0);
+    auto reposition = native_session(lifecycle({9,0,7,1,0,0x71,9,0,8,1,1,0x71,0},destination));
+    move = reposition.move(Direction::east,host);
+    assert(move.moved && move.execution->exited && reposition.column == 8 && reposition.row == 8);
+    assert(reposition.state.memory[0x7202] == 7 && reposition.state.memory[0x7203] == 8);
+    auto invalid = native_session(lifecycle({9,0,16,1,0,0x71,0},destination));
+    move = invalid.move(Direction::east,host);
+    assert(!move.moved && !move.execution->exited && invalid.column == 0);
+    for (const auto bad_address : {0x7100,0x7201,0x9900}) {
+        auto conflict = native_session(lifecycle(source,destination));
+        (*conflict.movement_addresses)[0] = bad_address;
+        conflict.state.memory[0x7201] = 17;
+        move = conflict.move(Direction::east,host);
+        assert(!move.moved && !move.execution->exited && conflict.state.memory[0x7201] == 17);
+    }
+    auto failure = native_session(lifecycle({0xff},destination));
+    move = failure.move(Direction::east,host);
+    assert(!move.moved && !move.execution->exited);
+    auto limited = native_session(lifecycle(source,destination));
+    const auto exact = limited.trigger(EclEventKind::move,host).steps;
+    move = limited.move(Direction::east,host,{exact,64});
+    assert(move.moved && !move.execution->exited && move.execution->steps == exact);
+    auto transfer = native_session(lifecycle({0x20,0,42},destination));
+    const auto increment = std::vector<std::uint8_t>{4,1,0x10,0x4a,0,1,1,0x10,0x4a,0};
+    const auto next = lifecycle(increment,{4,1,0x11,0x4a,0,1,1,0x11,0x4a,0},
+        {9,0,5,1,0,0x71,9,0,6,1,1,0x71,0});
+    transfer.programs = ProgramResources{[&](std::uint8_t id) { assert(id == 42); return ProgramResource{id,next}; },"fixture"};
+    transfer.current_program_record = 7;
+    move = transfer.move(Direction::east,host);
+    assert(move.execution->exited && move.execution->program_transfers == 1 && move.moved);
+    assert(transfer.row == 6 && transfer.column == 5); // No duplicate physical step/search.
+    assert(transfer.state.memory[0x4a10] == 1 && transfer.state.memory[0x4a11] == 1);
+    assert(transfer.state.memory[0x7201] == 0);
+    const auto self_code = lifecycle({3,1,0,0x4a,0,0,0x16,0x20,0,42,0},
+        {4,1,0x11,0x4a,0,1,1,0x11,0x4a,0},{9,0,1,1,0,0x4a,0});
+    auto self = native_session(self_code); self.current_program_record = 42;
+    self.programs = ProgramResources{[&](std::uint8_t id) { return ProgramResource{id,self_code}; },"self"};
+    move = self.move(Direction::east,host);
+    assert(move.execution->exited && move.execution->program_transfers == 1 && self.column == 0 &&
+        self.state.memory[0x4a11] == 1);
+    auto load = native_session(lifecycle({9,0,7,1,0,0x71,9,0,8,1,1,0x71,0x21,0,9,0,2,0,0,0},destination));
+    load.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::map3);
+    load.maps = MapResources{[](std::uint8_t id) { GeoMap map; map.dax_record_id = id; return map; },"maps"};
+    move = load.move(Direction::east,host);
+    assert(move.execution->exited && load.map.dax_record_id == 9 && load.column == 8 && load.row == 8);
+    load.load_area({255,255,127});
+    assert(!load.has_dungeon_map() && !load.move(Direction::east));
+    const auto inactive = serialize_exploration(load,"inactive-fixture");
+    auto resumed = load;
+    restore_exploration(resumed,inactive,"inactive-fixture");
+    assert(!resumed.has_dungeon_map() && serialize_exploration(resumed,"inactive-fixture") == inactive);
+    move = resumed.move(Direction::east,host);
+    assert(!move.moved && !move.execution->exited && resumed.column == 8);
+    resumed.load_area({9,2,0});
+    assert(resumed.has_dungeon_map() && resumed.move(Direction::east,host).execution->exited);
+    auto clearing = native_session(lifecycle({0x21,0,255,0,255,0,127,0},{0}));
+    clearing.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::map3);
+    clearing.maps = load.maps;
+    const auto old_clears = host.clears;
+    move = clearing.move(Direction::east,host);
+    assert(!move.moved && !move.execution->exited && !clearing.has_dungeon_map() && host.clears == old_clears+1);
+    auto cycle = native_session(lifecycle({1,1,20,0x99},destination));
+    move = cycle.move(Direction::east,host,{16,64});
+    assert(!move.moved && !move.execution->exited && move.execution->steps == 16);
+    for (const auto [x,y] : {std::pair{0,0},std::pair{15,0},std::pair{0,15},std::pair{15,15},std::pair{7,8}}) {
+        for (unsigned dir = 0; dir < 4; ++dir) {
+            auto forced = native_session(lifecycle({0x2d,1,0x56,0x34,0},{0}));
+            forced.position_advance_call = EclPositionAdvanceCall{0x3456,0x7104};
+            forced.column = x; forced.row = y; forced.facing = static_cast<Direction>(dir);
+            for (auto& cell : forced.map.cells) {
+                cell.north = cell.east = cell.south = cell.west = 7; cell.raw_event = 37;
+            }
+            const auto run = forced.trigger(EclEventKind::move,host);
+            const int dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
+            assert(run.exited && forced.column == (x+dx[dir]+16)%16 && forced.row == (y+dy[dir]+16)%16);
+            assert(forced.state.memory[0x7103] == 37 && forced.state.memory[0x7104] == 7);
+            forced.position_refresh_call = 0x3456;
+            assert(!forced.trigger(EclEventKind::move,host).exited);
+            forced.position_refresh_call.reset(); forced.position_advance_call->wall_type_address = 0x7200;
+            assert(!forced.trigger(EclEventKind::move,host).exited);
+        }
+    }
+}
 } // namespace
 
 int main() {
+    movement_lifecycle();
     // Every GEO16 direction permits an ordinary door, in both directions,
     // while closed states, inconsistent opposing walls and boundaries stay solid.
     for (unsigned direction = 0; direction < 4; ++direction) {

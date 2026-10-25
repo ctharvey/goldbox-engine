@@ -71,10 +71,21 @@ until a new seeded session is started. See the
 for the generator formula, tested operand forms and remaining parity limits.
 
 `ExplorationSession` supplies map coordinates, facing and raw square info via
-profile-selected addresses. Successful movement runs the active program's move
-entry even when the GEO selector is zero; the script can test X/Y, facing and
-quest state. Blocked moves and save restoration do not automatically run a move
-event. Map and ECL record selection remain explicit adapter responsibilities.
+profile-selected addresses. Without a movement binding, the original prototype
+still invokes MOVE only after successful geometric movement, including cells
+whose GEO selector is zero. An optional `eventDispatch.movementAddresses` array
+selects the source-cell lifecycle: block, exit-attempt, previous-X and previous-Y
+registers, in that order. Position bindings are required; overlapping context,
+party, program or native-call registers are rejected at their adapter boundary.
+Each attempt prepares block/exit state, invokes MOVE at the source, applies the
+permitted step, then invokes SEARCH even when blocked. Native GEO16 traversal
+uses the source edge and wraps at 16 cells. Solid walls and closed doors remain
+blocked; opening/bashing prompts are not implemented. A program transfer replaces
+the pending physical step/search with its own initialize/move/search continuation,
+including self-transfers. Compound execution shares one step budget. Scripts may
+reposition or load maps; their successful resulting coordinates are validated
+before the continuation. Save restoration does not trigger an event.
+Map and ECL selection remain explicit adapter responsibilities.
 The static nonzero-selector inventory can use known X/Y for its supported
 GOTO/AND/WRITE_MEM routes and numeric COMPARE/IF conditions. IF skips exactly
 one decoded instruction when false; AND replaces the comparison flag, as in the
@@ -122,6 +133,14 @@ coordinates at the load. The ECL program remains unchanged; NEW_ECL selects a
 program separately through the configured resolver. Earlier VM writes retain partial-progress semantics on
 failure. Successful decoration loading refreshes current square-info context.
 
+The observed no-resource selector `(255,255,127)` deactivates the dungeon and
+clears presentation images without discarding its cached normalized map. The
+active/inactive state derives from the existing `area` tuple and survives saves;
+no additional save field is required. Inactive geometry is hidden and movement
+is rejected. Event context supplies zero square info until a dungeon is loaded.
+Other unsupported area modes still fail explicitly; this is not an overland map
+implementation.
+
 After a map load, prototype saves also contain `area`, `mapRecord`, and
 `mapSource`. All three are required together. Restore resolves/validates the map
 and checks the source identity before publishing state; changed sources, missing
@@ -159,11 +178,26 @@ portrait sources. Pool's opening uses group 3 and shared tiles from group 1.
 The graphical adapter rejects a program change without a corresponding graphics
 binding; later resource groups remain unfinished rather than reusing opening art.
 The startup window uses this adapter for Begin; explicit map/ECL preview and
-JSONL prototype modes retain their previous behavior. Begin resolves both inputs
+JSONL prototype modes retain their explicit launch bindings. Begin resolves both inputs
 before publishing, resets script RAM/strings, preserves the created party and
 its RNG continuation, and runs the initialize entry. Window errors restore the
 pre-Begin session. Pool starts program/map zero; its opening script selects
 (15,1), west, and the chosen city-tour route ends at (0,4), west.
+
+Optional `campaignStartup.positionAdvanceCall` binds a native function token and
+`wallTypeAddress`. Pool v1.3 selects 0xC01E and 0xC04E. The independent shared host
+advances one cell in the current facing, wraps coordinates, and refreshes raw
+square/wall context without collision checks. No events are triggered inside
+this call; the surrounding script/lifecycle owns continuation. Function conflicts
+and overlapping wall registers are rejected. Call tokens and addresses come from
+the profile, with no title checks in the engine.
+
+The boundary route next reaches opcode 0x1D, which Pool's pinned profile names
+PARTY_STRENGTH (one operand). It remains unsupported; the corresponding SSI Engine
+handler is empty and is not evidence for its calculation. Another title's
+zero-operand INPUT_RETURN meaning must not be substituted. The opt-in original
+test reports this as an unsupported `boundaryProbe`, separate from its successful
+opening checkpoint. It does not claim a completed boundary transition.
 
 ADD stores through the existing typed memory interface with byte/word wrapping.
 DELAY invokes the host; the VM never sleeps. `scriptDelayMs` and

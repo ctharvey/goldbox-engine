@@ -614,7 +614,7 @@ public:
         const auto& r = layout.scene;
         const SDL_Rect clip{r[0],r[1],r[2],r[3]};
         checked(SDL_SetRenderClipRect(renderer,&clip));
-        if (graphics) {
+        if (graphics && session.has_dungeon_map()) {
             const auto frame = compose_wall_view(session,*graphics,backdrop);
             const auto palette = formats::ega_palette();
             std::vector<formats::Rgba> rgba;
@@ -725,7 +725,8 @@ public:
         color(49,43,37); rectangle(24,252,600,180);
         const double dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
         const auto facing = static_cast<unsigned>(session.facing);
-        if (graphics) {
+        if (!session.has_dungeon_map()) { color(0,0,0); rectangle(24,72,600,360); }
+        else if (graphics) {
             const auto frame = compose_wall_view(session,*graphics,backdrop);
             const auto palette = formats::ega_palette();
             std::vector<formats::Rgba> rgba;
@@ -762,7 +763,7 @@ public:
                 nullptr,&destination));
         }
         color(207,176,112); label(664,72,"MAP OVERVIEW (REVEALED)");
-        for (int row = 0; row < 16; ++row) for (int col = 0; col < 16; ++col) {
+        for (int row = 0; session.has_dungeon_map() && row < 16; ++row) for (int col = 0; col < 16; ++col) {
             const auto& cell = session.map.cell(row,col);
             const float x = 664 + col * 16, y = 94 + row * 16;
             color(28,37,45); rectangle(x,y,15,15);
@@ -772,9 +773,11 @@ public:
             if (cell.west || col == 0) rectangle(x,y,1,16);
             if (cell.east || col == 15) rectangle(x+15,y,1,16);
         }
-        const float px = 672 + session.column * 16, py = 102 + session.row * 16;
-        color(233,194,104); rectangle(px-3,py-3,6,6);
-        checked(SDL_RenderLine(renderer,px,py,float(px+dx[facing]*7),float(py+dy[facing]*7)));
+        if (session.has_dungeon_map()) {
+            const float px = 672 + session.column * 16, py = 102 + session.row * 16;
+            color(233,194,104); rectangle(px-3,py-3,6,6);
+            checked(SDL_RenderLine(renderer,px,py,float(px+dx[facing]*7),float(py+dy[facing]*7)));
+        }
         const char* directions[]{"NORTH","EAST","SOUTH","WEST"};
         label(664,370,"ROW " + std::to_string(session.row) + "  COL " + std::to_string(session.column));
         label(664,390,std::string("FACING ") + directions[facing]);
@@ -999,10 +1002,23 @@ int run_exploration_window(ExplorationSession& session, std::string_view identit
                         session.facing = static_cast<Direction>((unsigned(facing)+2)%4);
                         continue;
                     }
-                    const bool moved = session.move(static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4));
-                    session.facing = facing;
-                    if (moved) trigger(formats::EclEventKind::move);
-                    else if (!host.original) notify("Movement blocked.");
+                    const auto direction = static_cast<Direction>((unsigned(facing)+(backwards ? 2 : 0))%4);
+                    if (backwards && !session.movement_addresses) {
+                        const bool moved = session.move(direction);
+                        session.facing = facing;
+                        if (moved) trigger(formats::EclEventKind::move);
+                        else notify("Movement blocked.");
+                    } else {
+                        const auto move = session.move(direction,host);
+                        if (backwards) {
+                            session.facing = facing;
+                            if (session.dialect.position_addresses)
+                                session.state.memory[(*session.dialect.position_addresses)[2]] = static_cast<std::uint8_t>(facing);
+                        }
+                        if (move.execution && !move.execution->exited && !host.restart_requested)
+                            notify("Event stopped: " + move.execution->diagnostic);
+                        else if (!move.moved && !host.original) notify("Movement blocked.");
+                    }
                 } else if (key == SDLK_SPACE) trigger(formats::EclEventKind::search);
                 else if (key == SDLK_R) trigger(formats::EclEventKind::rest);
                 else if (key == SDLK_I) trigger(formats::EclEventKind::initialize);

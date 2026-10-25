@@ -110,7 +110,8 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     }
     if (const auto* value = root.if_contains("campaignStartup")) {
         const auto& config = j::object(*value,"campaignStartup");
-        j::fields_only(config,{"mapRecord","programRecord","mapArchives","programArchives","positionRefreshCall","graphicsArchives"},
+        j::fields_only(config,{"mapRecord","programRecord","mapArchives","programArchives","positionRefreshCall",
+            "positionAdvanceCall","graphicsArchives"},
             "campaignStartup");
         const auto byte = [&](const char* name, std::int64_t maximum) {
             const auto n = j::integer(j::field(config,name,"campaignStartup"),name);
@@ -121,6 +122,16 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         startup.map_record = static_cast<std::uint8_t>(byte("mapRecord",255));
         startup.program_record = static_cast<std::uint8_t>(byte("programRecord",255));
         startup.position_refresh_call = static_cast<std::uint16_t>(byte("positionRefreshCall",65535));
+        if (const auto* value = config.if_contains("positionAdvanceCall")) {
+            const auto& call = j::object(*value,"positionAdvanceCall");
+            j::fields_only(call,{"function","wallTypeAddress"},"positionAdvanceCall");
+            const auto token = j::integer(j::field(call,"function","positionAdvanceCall"),"advance function");
+            const auto address = j::integer(j::field(call,"wallTypeAddress","positionAdvanceCall"),"wallTypeAddress");
+            if (token < 0 || token > 65535 || address < 0 || address > 65535)
+                throw std::runtime_error("Invalid position advance binding");
+            startup.position_advance_call = EclPositionAdvanceCall{static_cast<std::uint16_t>(token),
+                static_cast<std::uint16_t>(address)};
+        }
         const auto archives = [&](const char* name, auto& destination) {
             const auto& values = j::array(j::field(config,name,"campaignStartup"),name);
             if (values.empty() || values.size() > 64) throw std::runtime_error("Invalid campaign archive count");
@@ -151,7 +162,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     }
     if (const auto* value = root.if_contains("eventDispatch")) {
         const auto& dispatch = j::object(*value, "eventDispatch");
-        j::fields_only(dispatch, {"dialect", "codeBase", "squareInfoAddress", "positionAddresses"}, "eventDispatch");
+        j::fields_only(dispatch, {"dialect", "codeBase", "squareInfoAddress", "positionAddresses", "movementAddresses"}, "eventDispatch");
         const auto dialect = j::string(j::field(dispatch, "dialect", "eventDispatch"), "dispatch.dialect");
         const auto base = j::integer(j::field(dispatch, "codeBase", "eventDispatch"), "dispatch.codeBase");
         const auto square = j::integer(j::field(dispatch, "squareInfoAddress", "eventDispatch"), "dispatch.squareInfoAddress");
@@ -170,6 +181,25 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
                 addresses[i] = static_cast<std::uint16_t>(address);
             }
             profile.event_dispatch->position_addresses = addresses;
+        }
+        if (const auto* movement = dispatch.if_contains("movementAddresses")) {
+            if (!profile.event_dispatch->position_addresses)
+                throw std::runtime_error("Movement lifecycle requires position bindings");
+            const auto& values = j::array(*movement,"movementAddresses");
+            if (values.size() != 4) throw std::runtime_error("movementAddresses requires block/exit/previous X/Y");
+            std::array<std::uint16_t,4> addresses{};
+            auto used = std::vector<std::uint16_t>{static_cast<std::uint16_t>(square)};
+            for (const auto address : *profile.event_dispatch->position_addresses) used.push_back(address);
+            std::sort(used.begin(),used.end());
+            if (std::adjacent_find(used.begin(),used.end()) != used.end())
+                throw std::runtime_error("Conflicting movement context bindings");
+            for (std::size_t i = 0; i < addresses.size(); ++i) {
+                const auto n = j::integer(values[i],"movement address");
+                if (n < 0 || n > 65535 || std::find(used.begin(),used.end(),n) != used.end())
+                    throw std::runtime_error("Invalid or conflicting movement address");
+                addresses[i] = static_cast<std::uint16_t>(n); used.push_back(addresses[i]);
+            }
+            profile.event_dispatch->movement_addresses = addresses;
         }
     }
     if (const auto* images = root.if_contains("imageDialect")) {

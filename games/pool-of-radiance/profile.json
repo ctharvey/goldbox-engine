@@ -31,6 +31,7 @@
     ]
   },
   "campaignStartup": {"mapRecord": 0, "programRecord": 0, "positionRefreshCall": 11408,
+    "positionAdvanceCall": {"function": 49182, "wallTypeAddress": 49230},
     "graphicsArchives": ["PIC3.DAX", "SPRIT3.DAX", "HEAD3.DAX", "BODY3.DAX", "WALLDEF3.DAX", "8X8D3.DAX", "8X8D1.DAX"],
     "mapArchives": ["GEO1.DAX", "GEO2.DAX", "GEO3.DAX", "GEO4.DAX", "GEO5.DAX", "GEO6.DAX", "GEO7.DAX", "GEO8.DAX"],
     "programArchives": ["ECL1.DAX", "ECL2.DAX", "ECL3.DAX", "ECL4.DAX", "ECL5.DAX", "ECL6.DAX", "ECL7.DAX", "ECL8.DAX"]},
@@ -44,7 +45,7 @@
   "portrait": {"headIdAddress": 28129, "width": 88, "height": 88,
     "headOffset": [0, 0], "bodyOffset": [0, 40]},
   "eventDispatch": {"dialect": "ssi-five-entry-v1", "codeBase": 39168, "squareInfoAddress": 49231,
-    "positionAddresses": [49227, 49228, 49229]},
+    "positionAddresses": [49227, 49228, 49229], "movementAddresses": [28105, 28117, 18928, 18929]},
   "rulesProfile": "adnd-first-edition-creation-v1",
   "characterCreationRules": "../../rules/adnd-first-edition-creation.json",
   "validationStatus": "unverified",

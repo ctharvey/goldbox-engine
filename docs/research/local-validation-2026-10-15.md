@@ -1458,3 +1458,66 @@ and does not automatically invoke SEARCH. It therefore cannot reproduce this
 original boundary transition. A profile-selected lifecycle fix must account for
 movement blocking, program/map changes, subsequent search and the outstanding
 graphics-group binding; this evidence does not establish full map-18 parity.
+
+## Profile-selected movement lifecycle (2026-10-24)
+
+The preceding movement-order gap is now addressed by an optional profile
+binding, shared by SDL, terminal and JSONL controls. Each attempt prepares block
+and exit state, runs source-cell MOVE, applies a permitted source-edge step,
+then runs destination SEARCH, including blocked attempts. A program transfer
+replaces the physical-step continuation; self-transfers are counted explicitly.
+Script repositioning and map loads are validated before continuation. The
+compound operation shares its instruction budget and retains the existing
+explicit partial-progress failure policy. Unconfigured sessions keep the older
+prototype behavior. Synthetic tests cover these paths, closed doors, all four
+boundary directions, malformed bindings, unsupported code, limits and saves.
+
+Independent native probes refined the exit flag: the original bounds, wall and
+door queries, running on synthetic GEO planes, passed 64 cases. An open boundary
+sets the flag even when its door bits are zero. A source wall with zero door
+bits does not. The probe used original code without callback mocks; its private
+script/report are `probe_original_boundary_edge.py` and
+`original-boundary-edge-report.json` under `.cache/goldbox-validation`.
+
+Pool's profile also binds native CALL 0xC01E and wall context 0xC04E. The original
+CALL/forced-step routines passed 36 bounded cases: advance in the facing direction,
+wrap at 16 cells and refresh square/wall context without collision checking.
+The two map lookups returned synthetic selector 37 and wall 7; presentation was
+disabled. Private script/report: `probe_original_forced_move.py` and
+`original-forced-move-report.json`. The independent host implementation gets its
+token/register from the profile. The original routine's coordinates and context
+writes were checked; this is not a graphics or timing comparison.
+
+The original route uses LOAD_AREA_MAP `(255,255,127)` as a temporary no-resource
+area. The shared adapter now derives inactivity from that existing area tuple,
+keeps the prior map cached, clears presentation images and hides/rejects traversal
+of inactive geometry. A later dungeon load reactivates it. Synthetic save and
+renderer checks cover this state. Other unsupported area modes still fail.
+
+The opt-in original-resource test still completes the same 761-instruction
+opening and exact deterministic engine save round-trip. Its additional boundary
+probe now reaches imported map/program 20 at (15,4), west, then stops at code
+offset 421 with `Unknown ECL opcode 29`. Pool's pinned configuration assigns
+0x1D to one-operand PARTY_STRENGTH; its SSI Engine handler is empty. Another
+title's zero-operand INPUT_RETURN meaning must not be substituted. No speculative
+party-strength implementation or input dialect was adopted.
+
+This stop is reported separately as `boundaryProbe.status=unsupported` in
+`.cache/goldbox-validation/movement-lifecycle-engine-checkpoint.json`. It is a
+regression for bounded execution and the known stop, not a successful original
+boundary comparison. The original later checkpoint has opening flag 0x4A17=0,
+while the engine's stopped probe retains 1. SSI Engine clears 0x4A00..0x4A1F and
+0x6E79..0x6E82 on transfers, but the original's clear/restore behavior and per-area
+persistence have not been established. Verify transfer-local memory before
+assuming the stopped PARTY_STRENGTH path is the correct next path; do not copy a
+blanket reset or invent a calculation. The graphical adapter also retains its
+explicit guard against changing programs without corresponding graphics bindings.
+
+The full serialized two-worker build and CTest run passed 30 suites; the native
+Windows RNG suite skipped under WSL. Its log is
+`.cache/goldbox-validation/movement-lifecycle-full-tests.log`. A fresh native DOS
+run matched the unchanged opening position, facing, three flags and return PC:
+`.cache/goldbox-validation/startup-reference-77qnernj/comparison.json`, with owned
+process cleanup confirmed. That comparison does not include the unsupported
+engine boundary probe. Hygiene and attribution checks passed. Private captures,
+original bytes and user saves remain outside the checkout and unchanged.

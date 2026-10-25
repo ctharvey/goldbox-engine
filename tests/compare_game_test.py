@@ -613,7 +613,9 @@ def test_no_writes_no_match_claim(fixture):
 
 
 def test_compiled_engine(fixture, executable, profile):
-    from harness_test import dax
+    from harness_test import dax, prototype_profile
+
+    profile = prototype_profile(profile,fixture.private)
 
     geo = bytearray(1026)
     geo[515] = 0x81

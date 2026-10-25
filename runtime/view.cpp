@@ -192,6 +192,7 @@ formats::IndexedImage compose_wall_view(const ExplorationSession& session, const
     const auto direction = static_cast<unsigned>(session.facing);
     if (direction > 3) throw std::runtime_error("Invalid graphics view direction");
     formats::IndexedImage frame{88,88,std::vector<std::uint8_t>(88*88,0)};
+    if (!session.has_dungeon_map()) return frame;
     std::fill(frame.pixels.begin()+44*88,frame.pixels.end(),6);
     if (backdrop) {
         // Independently implemented from SSI COLOR-mode format observations;

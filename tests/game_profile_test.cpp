@@ -40,6 +40,12 @@ int main(int argc, char** argv) {
     assert(pool.id != curse.id);
     assert(pool.archive_format == "dax-v1");
     assert(pool.archive_format == curse.archive_format);
+    assert((pool.event_dispatch->movement_addresses ==
+        std::array<std::uint16_t,4>{0x6dc9,0x6dd5,0x49f0,0x49f1}));
+    assert(!curse.event_dispatch->movement_addresses);
+    assert(pool.campaign_startup->position_advance_call &&
+        pool.campaign_startup->position_advance_call->function == 0xc01e &&
+        pool.campaign_startup->position_advance_call->wall_type_address == 0xc04e);
     assert(pool.event_dialect == "unverified" && curse.event_dialect == "unverified");
     assert(pool.validation_status == "unverified");
     assert(pool.resource_patterns.size() == 4);
@@ -208,6 +214,30 @@ int main(int argc, char** argv) {
         auto invalid = display;
         invalid.replace(invalid.find(change.first),std::string_view(change.first).size(),change.second);
         { std::ofstream output(path); output << display_prefix << invalid << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
+    auto movement_prefix = prefix;
+    movement_prefix.replace(movement_prefix.find("colorBackdrop"),13,"eventDispatch");
+    const std::string movement = R"({"dialect":"ssi-five-entry-v1","codeBase":39168,"squareInfoAddress":28931,"positionAddresses":[28928,28929,28930],"movementAddresses":)";
+    for (const std::string addresses : {"[]","[1,2,3]","[1,2,3,4,5]","[-1,2,3,4]",
+        "[65536,2,3,4]","[true,2,3,4]","[1,1,3,4]","[28928,2,3,4]","[28931,2,3,4]"}) {
+        { std::ofstream output(path); output << movement_prefix << movement << addresses << "}}"; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); }
+        catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
+    auto advance_prefix = prefix;
+    advance_prefix.replace(advance_prefix.find("colorBackdrop"),13,"campaignStartup");
+    const std::string advance_startup = R"({"mapRecord":0,"programRecord":0,"mapArchives":["MAP.DAX"],"programArchives":["ECL.DAX"],"positionRefreshCall":1,"positionAdvanceCall":)";
+    for (const std::string call : {"null",R"({"function":-1,"wallTypeAddress":2})",
+        R"({"function":65536,"wallTypeAddress":2})",R"({"function":1,"wallTypeAddress":65536})",
+        R"({"function":1,"wallTypeAddress":true})",R"({"function":1})",
+        R"({"function":1,"wallTypeAddress":2,"unknown":3})"}) {
+        { std::ofstream output(path); output << advance_prefix << advance_startup << call << "}}"; }
         bool rejected = false;
         try { (void)goldbox::read_game_profile(path); }
         catch (const std::runtime_error&) { rejected = true; }

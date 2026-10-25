@@ -23,6 +23,11 @@ struct ProgramResources {
     std::string source_identity;
 };
 
+struct ExplorationMove {
+    bool moved{};
+    std::optional<EclExecution> execution;
+};
+
 // Explicit initial map/ECL pairing and optional normalized-map resolver.
 // Map loading does not replace the ECL program or guess archive groups.
 struct ExplorationSession {
@@ -49,13 +54,23 @@ struct ExplorationSession {
     std::optional<ProgramResources> programs{};
     std::optional<std::uint8_t> current_program_record{};
     std::optional<std::uint16_t> position_refresh_call{};
+    std::optional<EclPositionAdvanceCall> position_advance_call{};
     // Normalized map/program IDs selected by the campaign adapter.
     std::optional<std::array<std::uint8_t,2>> campaign_start{};
     std::uint32_t script_delay_ms{};
+    // Profile-selected block, exit attempt and previous X/Y registers.
+    std::optional<std::array<std::uint16_t,4>> movement_addresses{};
 
     // Both GEO16 edges must permit traversal; boundaries remain solid.
     // Door state 1 is passable. Opening/bashing states 2/3 is not modeled.
     bool move(Direction direction);
+    // A no-resource area retains its cached map for later rebinding, never traversal.
+    bool has_dungeon_map() const {
+        return !area || *area != std::array<std::uint8_t,3>{255,255,127};
+    }
+    // Configured lifecycle: source MOVE, permitted step, destination SEARCH.
+    // Unconfigured sessions preserve the prototype move-then-event behavior.
+    ExplorationMove move(Direction direction, EclHost& host, EclLimits limits = {});
     void load_area(std::array<std::uint8_t,3> values);
     EclExecution trigger(formats::EclEventKind kind, EclHost& host, EclLimits limits = {});
     EclExecution begin_campaign(EclHost& host, EclLimits limits = {});

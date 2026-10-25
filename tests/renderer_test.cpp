@@ -262,6 +262,10 @@ int main(int argc, char** argv) {
     graphics.walls[1] = graphics.walls[0];
     for (auto& view : graphics.walls[1]) std::fill(view.pixels.begin(),view.pixels.end(),2);
     assert(compose_wall_view(session,graphics).pixels[44*88+44] == 2);
+    auto inactive_view = session;
+    inactive_view.area = std::array<std::uint8_t,3>{255,255,127};
+    const auto blank_view = compose_wall_view(inactive_view,graphics);
+    assert(std::all_of(blank_view.pixels.begin(),blank_view.pixels.end(),[](auto pixel) { return pixel == 0; }));
     graphics.walls[1][6].pixels[36*56+28] = 13;
     assert(compose_wall_view(session,graphics).pixels[44*88+44] == 4);
     origin.north = 1;
@@ -512,10 +516,14 @@ int main(int argc, char** argv) {
 
     // Navigation dismisses old event art, exposing the dungeon, while a new
     // movement event may supply fresh art. Capture only this synthetic SDL frame.
-    const auto navigation = [&](SDL_Keycode input, bool blocked, bool fresh_picture, bool native) {
+    const auto navigation = [&](SDL_Keycode input, bool blocked, bool fresh_picture, bool native, bool lifecycle = false) {
         ExplorationSession view;
         view.row = view.column = 5;
         view.dialect = {"ssi-five-entry-v1",0x9900,0xc04f,true,std::nullopt};
+        if (lifecycle) {
+            view.dialect.position_addresses = std::array<std::uint16_t,3>{0x7100,0x7101,0x7102};
+            view.movement_addresses = std::array<std::uint16_t,4>{0x7200,0x7201,0x7202,0x7203};
+        }
         view.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3);
         for (unsigned i = 0; i < 5; ++i) {
             const std::uint8_t target = i == static_cast<unsigned>(formats::EclEventKind::initialize) ||
@@ -574,6 +582,7 @@ int main(int argc, char** argv) {
         if (input == SDLK_DOWN || input == SDLK_S) {
             assert(view.row == (native ? 5 : 6) && view.column == 5);
             assert(view.facing == (native ? Direction::south : Direction::north));
+            if (lifecycle && !native) assert(view.state.memory[0x7102] == 0);
         }
         if (input == SDLK_UP) assert(view.row == (blocked ? 5 : 4) && view.column == 5);
     };
@@ -585,6 +594,9 @@ int main(int argc, char** argv) {
     navigation(SDLK_UP,true,false,true);
     navigation(SDLK_UP,false,true,true);
     navigation(SDLK_DOWN,false,false,false);
+    navigation(SDLK_UP,false,true,true,true);
+    navigation(SDLK_UP,true,true,true,true); // Source MOVE runs even against a wall.
+    navigation(SDLK_DOWN,false,false,false,true);
 
     const auto check_display = [&](bool start_enhanced, bool available) {
         auto view = original_session;

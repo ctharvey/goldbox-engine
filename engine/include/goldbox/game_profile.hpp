@@ -29,6 +29,8 @@ struct GameProfile {
         std::uint16_t code_base{};
         std::uint16_t square_info_address{};
         std::optional<std::array<std::uint16_t, 3>> position_addresses;
+        // Block, exit attempt, previous X, previous Y; opts into source-cell MOVE.
+        std::optional<std::array<std::uint16_t, 4>> movement_addresses{};
     };
     std::optional<EventDispatch> event_dispatch;
     std::string image_dialect{"disabled"};
@@ -69,6 +71,7 @@ struct GameProfile {
         std::uint16_t position_refresh_call{};
         // Pictures, sprites, heads, bodies, wall definitions, wall tiles, shared tiles.
         std::vector<std::string> graphics_archives;
+        std::optional<EclPositionAdvanceCall> position_advance_call{};
     };
     std::optional<CampaignStartup> campaign_startup{};
     std::uint32_t script_delay_ms{}, sprite_replacement_ms{};

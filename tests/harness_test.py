@@ -12,6 +12,20 @@ import threading
 TIMEOUT = 10.0
 
 
+def prototype_profile(path, root):
+    """Keep older protocol fixtures on their explicit move-then-event dialect."""
+    source = Path(path).resolve()
+    profile = json.loads(source.read_text())
+    profile["eventDispatch"].pop("movementAddresses", None)
+    if "characterCreationRules" in profile:
+        rules = (source.parent / profile["characterCreationRules"]).resolve()
+        (root / "prototype-rules.json").write_text(rules.read_text())
+        profile["characterCreationRules"] = "prototype-rules.json"
+    target = root / "prototype-profile.json"
+    target.write_text(json.dumps(profile))
+    return str(target)
+
+
 def dax(raw):
     packed = b"".join(bytes([len(raw[i:i + 128]) - 1]) + raw[i:i + 128] for i in range(0, len(raw), 128))
     return struct.pack("<HBIHH", 9, 7, 0, len(raw), len(packed)) + packed
@@ -100,6 +114,31 @@ def main():
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
         executable, profile = sys.argv[1], sys.argv[2]
+        # Exercise the selected lifecycle through both real code-driven adapters.
+        geo = bytearray(1026)
+        geo[3] = 0x10  # North wall at (1,0).
+        geo[258] = 7; geo[770] = 64  # Ordinary west-boundary door at (0,0).
+        (root / "NATIVE_GEO.DAX").write_bytes(dax(geo))
+        code = bytearray([1,1,20,0x99] * 5 + [9,1,0x4b,0xc0,1,0,0x4a,
+            9,1,0xd5,0x6d,1,4,0x4a,0])
+        code[6] = len(code)
+        code.extend([9,1,0x4b,0xc0,1,1,0x4a,0])
+        (root / "NATIVE_ECL.DAX").write_bytes(dax(code))
+        native = [executable,"--harness",profile,str(root / "NATIVE_GEO.DAX"),"7",
+                  str(root / "NATIVE_ECL.DAX"),"7",str(root / "native.json")]
+        finished, lines = run_lines(native,actions("east","north","save","quit"))
+        assert finished.returncode == 0, finished.stderr
+        first, blocked = lines[1:3]
+        assert first["state"]["memory"][0x4a00] == 0 and first["state"]["memory"][0x4a01] == 1
+        assert blocked["status"] == "blocked" and blocked["steps"] > 0 and blocked["column"] == 1
+        terminal = [native[0],*native[2:-1],str(root / "native-terminal.json")]
+        finished = subprocess.run(terminal,input="east\nnorth\nsave\nquit\n",text=True,capture_output=True,timeout=30)
+        assert finished.returncode == 0, finished.stderr
+        assert json.loads((root / "native.json").read_text()) == json.loads((root / "native-terminal.json").read_text())
+        finished, lines = run_lines(native,actions("west","quit"))
+        assert finished.returncode == 0 and lines[1]["column"] == 15
+        assert lines[1]["state"]["memory"][0x4a04] == 1
+        profile = prototype_profile(profile,root)
 
         geo = bytearray(1026)
         geo[515] = 0x81  # row 0, column 1
@@ -228,6 +267,7 @@ def main():
         menu.send({"id": 2, "action": "quit"})
         check_complete(menu.event(), 2, "ok", 0, 0, 0)
         assert menu.finish() == (0, "")
+
 
         # Wrong response ids, menu ids, types and out-of-range choices fail.
         for response in [

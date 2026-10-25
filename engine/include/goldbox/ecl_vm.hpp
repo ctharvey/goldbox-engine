@@ -28,6 +28,9 @@ struct EclSoundCall {
     std::uint16_t function{}, selector_address{};
     std::vector<Case> cases;
 };
+struct EclPositionAdvanceCall {
+    std::uint16_t function{}, wall_type_address{};
+};
 
 class EclHost {
 public:
@@ -74,6 +77,7 @@ struct EclExecution {
     std::vector<DispatchSelection> dispatches;
     // A program transfer ends this invocation; the session resolves it safely.
     std::optional<std::uint8_t> next_program;
+    std::size_t program_transfers{}; // Session-resolved transfers replace a move continuation.
 };
 
 // Headless, deterministic, bounded execution. Mutates only supplied state and

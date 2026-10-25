@@ -2,6 +2,13 @@
 
 ## 2026-10-24
 
+- Add profile-selected source-cell movement events, exit/block/previous-position
+  registers, bounded movement/search execution and transfer continuations.
+  Connect SDL, terminal and JSONL controls; retain the unconfigured prototype.
+- Support a profile-bound forced-step call and temporary no-resource map state.
+  Record the original-resource boundary probe's explicit unsupported stop at
+  Pool's PARTY_STRENGTH opcode 0x1D; no successful-transition parity claim.
+
 - Follow numeric COMPARE/IF routes in the static map-event scanner, including
   AND comparison flags; identify unknown memory dependencies by address. Add
   synthetic condition, malformed-instruction and dialect-conflict regressions.

@@ -6,6 +6,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+from harness_test import prototype_profile
 
 
 def dax(raw):
@@ -20,7 +21,8 @@ with tempfile.TemporaryDirectory() as temp:
     (root / "GEO.DAX").write_bytes(dax(geo))
     ecl = bytes([1, 1, 20, 0x99] * 5 + [9, 1, 0x4f, 0xc0, 1, 0, 0x4a, 0x11, 0x80, 1, 4, 0])
     (root / "ECL.DAX").write_bytes(dax(ecl))
-    command = [sys.argv[1], sys.argv[2], str(root / "GEO.DAX"), "7", str(root / "ECL.DAX"), "7", str(root / "state.json")]
+    command = [sys.argv[1], prototype_profile(sys.argv[2],root), str(root / "GEO.DAX"), "7",
+               str(root / "ECL.DAX"), "7", str(root / "state.json")]
     first = subprocess.run(command, input="east\r\nsave\r\nquit\r\n", text=True, capture_output=True, timeout=30)
     if first.returncode != 0 or "State saved" not in first.stdout or "Event exited" not in first.stdout:
         raise RuntimeError(first.stdout + first.stderr)

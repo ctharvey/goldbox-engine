@@ -39,6 +39,15 @@ were checked independently using private authorized resources. Static COMPARE/IF
 routing and reference-harness observations are independently authored; no Java
 movement handler was copied or translated. Full movement parity remains open.
 
+The same pinned Engine/VirtualMachine/configuration sources informed the
+source-MOVE/step/SEARCH lifecycle, native forced-step binding, no-resource area
+selector. Pool's opcode 0x1D is PARTY_STRENGTH, whose upstream handler is empty;
+that operation remains unsupported. Native private probes
+separately checked boundary preparation, the source-edge query and forced-step
+coordinates/context. The C++ implementation and regression fixtures are
+independently authored; no Java code was copied or translated. These narrow
+checks do not establish complete campaign or display parity.
+
 SSI Engine at `51d4b6d409fa798754f5ff2ccb249f3c0b6d029b`, particularly
 Pool properties, `FrameRendererSymbols.java`, `DungeonRenderer.java`,
 `ProgramMenuRenderer.java` and `AbstractRenderer.java`, was consulted for symbol

@@ -52,6 +52,22 @@ struct Host : EclHost {
         session.wall_banks = banks;
     }
 };
+struct MovementHost : EclHost {
+    ExplorationSession& session;
+    explicit MovementHost(ExplorationSession& value) : session(value) {}
+    void text(std::string_view, bool) override {}
+    std::size_t menu(std::span<const std::string>, std::string_view, bool) override { return 0; }
+    void picture(std::uint8_t) override {}
+    void sprite_start(EclSpriteRequest) override {}
+    void sprite_advance() override {}
+    void clear_images() override {}
+    void delay() override {}
+    void sound(std::uint16_t) override {}
+    void native_call(std::uint16_t token) override {
+        throw std::runtime_error("Unsupported boundary native call " + std::to_string(token));
+    }
+    void wall_banks(std::array<std::uint8_t,3> banks) override { session.wall_banks = banks; }
+};
 }
 int main(int argc, char** argv) {
     const char* installation = std::getenv("GOLDBOX_POOL_INSTALLATION");
@@ -79,9 +95,11 @@ int main(int argc, char** argv) {
         session.programs = ProgramResources{[&](auto id) { return ProgramResource{id,programs.at(id)}; },"local-test-programs"};
         const auto& dispatch = *profile.event_dispatch;
         session.dialect = {dispatch.dialect,dispatch.code_base,dispatch.square_info_address,true,dispatch.position_addresses};
+        session.movement_addresses = dispatch.movement_addresses;
         session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::load_character);
         session.campaign_start = std::array<std::uint8_t,2>{config.map_record,config.program_record};
         session.position_refresh_call = config.position_refresh_call;
+        session.position_advance_call = config.position_advance_call;
         session.sound_call = profile.sound_call; session.party_memory = profile.party_memory;
         session.character_rules = profile.character_rules; session.initial_random = profile.random;
         session.random_dialect = profile.random_dialect;
@@ -107,6 +125,15 @@ int main(int argc, char** argv) {
         auto repeated = initial; Host second(repeated,profile,assets,game);
         check(repeated.begin_campaign(second).exited,"Repeated startup failed");
         check(serialize_exploration(repeated,"private-opening-check") == saved,"Deterministic startup differs");
+        auto walked = session; MovementHost movement_host(walked);
+        const auto move = walked.move(Direction::west,movement_host);
+        check(move.execution.has_value(),"Boundary event did not run");
+        // This is an explicit compatibility stop, not a successful transition
+        // checkpoint. Pool's pinned dialect assigns 0x1D to PARTY_STRENGTH.
+        check(!move.execution->exited && move.execution->diagnostic == "Unknown ECL opcode 29",
+            "Boundary probe's unsupported-operation gate changed; investigate before claiming parity");
+        check(move.moved && walked.column == 15 && walked.row == 4 && walked.facing == Direction::west,
+            "Boundary probe did not reach the verified forced-step position");
         std::cout << "{\"status\":\"original-resource-replay\",\"steps\":" << run.steps
             << ",\"texts\":" << host.texts << ",\"menus\":" << host.menus
             << ",\"column\":" << unsigned(session.column) << ",\"row\":" << unsigned(session.row)
@@ -115,7 +142,18 @@ int main(int argc, char** argv) {
             << ",\"flags\":{\"18967\":" << unsigned(session.state.memory[0x4a17])
             << ",\"19140\":" << unsigned(session.state.memory[0x4ac4])
             << ",\"19141\":" << unsigned(session.state.memory[0x4ac5])
-            << "},\"saveRoundTrip\":true,\"deterministicReplay\":true,\"fullParityVerified\":false}\n";
+            << "},\"saveRoundTrip\":true,\"deterministicReplay\":true,\"fullParityVerified\":false"
+            << ",\"boundaryProbe\":{\"status\":\"unsupported\",\"diagnostic\":\"Unknown ECL opcode 29\",\"column\":"
+            << unsigned(walked.column) << ",\"row\":" << unsigned(walked.row)
+            << ",\"facing\":" << unsigned(walked.facing) << ",\"bytecodeOffset\":"
+            << move.execution->bytecode_offset << ",\"programRecord\":"
+            << unsigned(*walked.current_program_record) << ",\"mapRecord\":" << unsigned(walked.map.dax_record_id)
+            << ",\"movementBlock\":" << unsigned(walked.state.memory[0x6dc9])
+            << ",\"triedToLeaveMap\":" << unsigned(walked.state.memory[0x6dd5])
+            << ",\"mapActive\":" << (walked.has_dungeon_map() ? "true" : "false")
+            << ",\"flags\":{\"18967\":" << unsigned(walked.state.memory[0x4a17])
+            << ",\"19140\":" << unsigned(walked.state.memory[0x4ac4])
+            << ",\"19141\":" << unsigned(walked.state.memory[0x4ac5]) << "}}}\n";
         return 0;
     } catch (const std::exception& failure) { std::cerr << failure.what() << '\n'; return 1; }
 }

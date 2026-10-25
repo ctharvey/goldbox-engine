@@ -10,10 +10,12 @@ namespace goldbox {
 namespace {
 std::optional<std::uint8_t> area_record(std::array<std::uint8_t,3> values) {
     if (values == std::array<std::uint8_t,3>{0,0,0}) return 0;
+    if (values == std::array<std::uint8_t,3>{255,255,127}) return std::nullopt; // No active dungeon.
     if (values[0] != 127 && values[0] != 255 &&
         (values[1] == 2 || values[1] == 127 || values[1] == 255)) return values[0];
     if (values[0] == 255 && values[1] == 2) return std::nullopt; // Keep current dungeon.
-    throw std::runtime_error("Unsupported LOAD_AREA_MAP mode (dungeon GEO16 only)");
+    throw std::runtime_error("Unsupported LOAD_AREA_MAP mode (dungeon GEO16 only): " +
+        std::to_string(values[0]) + "," + std::to_string(values[1]) + "," + std::to_string(values[2]));
 }
 void require_maps(const std::optional<MapResources>& maps) {
     if (!maps || !maps->resolve || maps->source_identity.empty() || maps->source_identity.size() > 4096)
@@ -38,6 +40,46 @@ class SessionHost final : public EclHost {
     EclHost& delegate;
 public:
     SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {
+        if (session.position_advance_call) {
+            const auto& call = *session.position_advance_call;
+            if (!session.dialect.position_addresses || (session.position_refresh_call &&
+                call.function == *session.position_refresh_call) ||
+                (session.sound_call && call.function == session.sound_call->function))
+                throw std::runtime_error("Invalid or conflicting position advance call");
+            const auto address = call.wall_type_address;
+            const auto& positions = *session.dialect.position_addresses;
+            if (address == session.dialect.square_info_address ||
+                std::find(positions.begin(),positions.end(),address) != positions.end() ||
+                (session.movement_addresses && std::find(session.movement_addresses->begin(),
+                    session.movement_addresses->end(),address) != session.movement_addresses->end()) ||
+                (address >= session.dialect.code_base &&
+                    std::size_t(address) < std::size_t(session.dialect.code_base)+session.ecl_record.size()) ||
+                (session.party_memory && party_memory_intersects(*session.party_memory,address,1)) ||
+                (session.sound_call && (address == session.sound_call->selector_address ||
+                    address == std::size_t(session.sound_call->selector_address)+1)))
+                throw std::runtime_error("Position advance wall register overlaps host memory");
+        }
+        if (session.movement_addresses) {
+            if (!session.dialect.position_addresses) throw std::runtime_error("Movement requires position bindings");
+            std::vector<std::uint16_t> used{session.dialect.square_info_address};
+            const auto add = [&](std::uint16_t address) {
+                if (std::find(used.begin(),used.end(),address) != used.end())
+                    throw std::runtime_error("Conflicting movement context bindings");
+                used.push_back(address);
+            };
+            for (const auto address : *session.dialect.position_addresses) add(address);
+            for (const auto address : *session.movement_addresses) {
+                add(address);
+                if (address >= session.dialect.code_base &&
+                    std::size_t(address) < std::size_t(session.dialect.code_base)+session.ecl_record.size())
+                    throw std::runtime_error("Movement register overlaps ECL program");
+                if (session.party_memory && party_memory_intersects(*session.party_memory,address,1))
+                    throw std::runtime_error("Movement register overlaps party memory");
+                if (session.sound_call && (address == session.sound_call->selector_address ||
+                    address == std::size_t(session.sound_call->selector_address)+1))
+                    throw std::runtime_error("Movement register overlaps sound selector");
+            }
+        }
         if (session.position_refresh_call && session.sound_call &&
             *session.position_refresh_call == session.sound_call->function)
             throw std::runtime_error("Conflicting native call bindings");
@@ -125,6 +167,23 @@ public:
     }
     void combat(EclState& state) override { delegate.combat(state); }
     void native_call(std::uint16_t function) override {
+        if (session.position_advance_call && function == session.position_advance_call->function) {
+            const auto& addresses = *session.dialect.position_addresses;
+            const auto x = session.state.memory[addresses[0]], y = session.state.memory[addresses[1]];
+            const auto dir = session.state.memory[addresses[2]];
+            (void)session.map.cell(y,x);
+            if (dir > 3) throw std::runtime_error("Invalid forced-step direction");
+            const int dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
+            const auto column = static_cast<std::uint8_t>((int(x)+dx[dir]+16)%16);
+            const auto row = static_cast<std::uint8_t>((int(y)+dy[dir]+16)%16);
+            const auto& cell = session.map.cell(row,column);
+            session.column = column; session.row = row; session.facing = static_cast<Direction>(dir);
+            session.state.memory[addresses[0]] = column; session.state.memory[addresses[1]] = row;
+            session.state.memory[session.dialect.square_info_address] = session.has_dungeon_map() ? cell.raw_event : 0;
+            const std::uint8_t walls[]{cell.north,cell.east,cell.south,cell.west};
+            session.state.memory[session.position_advance_call->wall_type_address] = session.has_dungeon_map() ? walls[dir] : 0;
+            return;
+        }
         if (session.position_refresh_call && function == *session.position_refresh_call) {
             if (!session.dialect.position_addresses) throw std::runtime_error("Position refresh requires position bindings");
             const auto& addresses = *session.dialect.position_addresses;
@@ -133,7 +192,7 @@ public:
             const auto selector = session.map.cell(row,column).raw_event;
             if (direction > 3) throw std::runtime_error("Invalid refreshed direction");
             session.row = row; session.column = column; session.facing = static_cast<Direction>(direction);
-            session.state.memory[session.dialect.square_info_address] = selector;
+            session.state.memory[session.dialect.square_info_address] = session.has_dungeon_map() ? selector : 0;
             return;
         }
         if (!session.sound_call || function != session.sound_call->function) {
@@ -155,9 +214,17 @@ public:
     void clear_images() override { delegate.clear_images(); }
     void wall_banks(std::array<std::uint8_t,3> banks) override {
         delegate.wall_banks(banks);
-        session.state.memory[session.dialect.square_info_address] = session.map.cell(session.row,session.column).raw_event;
+        session.state.memory[session.dialect.square_info_address] = session.has_dungeon_map() ?
+            session.map.cell(session.row,session.column).raw_event : 0;
     }
-    void load_area(std::array<std::uint8_t,3> values) override { session.load_area(values); }
+    void load_area(std::array<std::uint8_t,3> values) override {
+        session.load_area(values);
+        if (!session.has_dungeon_map()) {
+            session.state.memory[session.dialect.square_info_address] = 0;
+            if (session.position_advance_call) session.state.memory[session.position_advance_call->wall_type_address] = 0;
+            delegate.clear_images();
+        }
+    }
 };
 } // namespace
 
@@ -184,6 +251,7 @@ void ExplorationSession::load_area(std::array<std::uint8_t,3> values) {
 }
 
 bool ExplorationSession::move(Direction direction) {
+    if (!has_dungeon_map()) return false;
     const auto& cell = map.cell(row, column);
     const auto index = static_cast<std::size_t>(direction);
     if (index > 3) throw std::runtime_error("Invalid exploration direction");
@@ -197,6 +265,61 @@ bool ExplorationSession::move(Direction direction) {
     row = static_cast<std::uint8_t>(next_row);
     column = static_cast<std::uint8_t>(next_column);
     return true;
+}
+
+ExplorationMove ExplorationSession::move(Direction direction, EclHost& host, EclLimits limits) {
+    if (!movement_addresses) {
+        if (!move(direction)) return {};
+        return {true,trigger(formats::EclEventKind::move,host,limits)};
+    }
+    const auto previous_row = row, previous_column = column, previous_map = map.dax_record_id;
+    EclExecution result;
+    try {
+        (void)SessionHost(*this,host); // Validate before publishing host registers.
+        if (!has_dungeon_map()) throw std::runtime_error("Dungeon movement requires an active map");
+        const auto index = static_cast<std::size_t>(direction);
+        if (index > 3) throw std::runtime_error("Invalid exploration direction");
+        const auto& bindings = *movement_addresses;
+        const auto& source = map.cell(row,column);
+        const std::uint8_t walls[]{source.north,source.east,source.south,source.west};
+        const int dy[]{-1,0,1,0}, dx[]{0,1,0,-1};
+        const int y = row+dy[index], x = column+dx[index];
+        facing = direction;
+        state.memory[bindings[0]] = 0;
+        state.memory[bindings[1]] = (walls[index] == 0 || source.door_state(index) != 0) &&
+            (x < 0 || x > 15 || y < 0 || y > 15);
+        result = trigger(formats::EclEventKind::move,host,limits);
+        if (result.exited && !result.program_transfers) {
+            if (!has_dungeon_map()) throw std::runtime_error("Movement continuation requires an active map");
+            // MOVE may reposition or load a map. Use its resulting source and facing.
+            const auto heading = static_cast<std::size_t>(facing);
+            state.memory[bindings[2]] = column; state.memory[bindings[3]] = row;
+            if (state.memory[bindings[0]] < 255 && !map.cell(row,column).blocks_movement(heading)) {
+                column = static_cast<std::uint8_t>((int(column)+dx[heading]+16)%16);
+                row = static_cast<std::uint8_t>((int(row)+dy[heading]+16)%16);
+            } else if (state.memory[bindings[0]] == 255) state.memory[bindings[0]] = 0;
+            const auto& positions = *dialect.position_addresses;
+            state.memory[positions[0]] = column; state.memory[positions[1]] = row;
+            state.memory[positions[2]] = static_cast<std::uint8_t>(facing);
+            state.memory[dialect.square_info_address] = map.cell(row,column).raw_event;
+            if (position_advance_call) {
+                const auto& cell = map.cell(row,column);
+                const std::uint8_t walls[]{cell.north,cell.east,cell.south,cell.west};
+                state.memory[position_advance_call->wall_type_address] = walls[static_cast<std::size_t>(facing)];
+            }
+            if (result.steps >= limits.steps) throw std::runtime_error("Movement ECL step limit exceeded");
+            auto remaining = limits; remaining.steps -= result.steps;
+            auto search = trigger(formats::EclEventKind::search,host,remaining);
+            result.steps += search.steps; result.bytecode_offset = search.bytecode_offset;
+            result.program_transfers += search.program_transfers;
+            result.dispatches.insert(result.dispatches.end(),search.dispatches.begin(),search.dispatches.end());
+            result.exited = search.exited; result.diagnostic = std::move(search.diagnostic);
+        }
+    } catch (const std::exception& error) {
+        result.exited = false; result.diagnostic = error.what();
+    }
+    return {row != previous_row || column != previous_column || map.dax_record_id != previous_map ||
+        result.program_transfers != 0,std::move(result)};
 }
 
 EclExecution ExplorationSession::begin_campaign(EclHost& host, EclLimits limits) {
@@ -221,7 +344,7 @@ EclExecution ExplorationSession::begin_campaign(EclHost& host, EclLimits limits)
 
 EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& host, EclLimits limits) {
     // The raw byte is the host context. Scripts perform their own masks.
-    state.memory[dialect.square_info_address] = map.cell(row, column).raw_event;
+    state.memory[dialect.square_info_address] = has_dungeon_map() ? map.cell(row, column).raw_event : 0;
     if (dialect.position_addresses) {
         const auto& addresses = *dialect.position_addresses;
         state.memory[addresses[0]] = column;
@@ -240,6 +363,14 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
             result.steps += run.steps; result.bytecode_offset = run.bytecode_offset;
             result.dispatches.insert(result.dispatches.end(),run.dispatches.begin(),run.dispatches.end());
             if (!run.exited) { result.diagnostic = std::move(run.diagnostic); return result; }
+            if (movement_addresses) {
+                const auto& addresses = *dialect.position_addresses;
+                const auto x = state.memory[addresses[0]], y = state.memory[addresses[1]], dir = state.memory[addresses[2]];
+                (void)map.cell(y,x);
+                if (dir > 3) throw std::runtime_error("Invalid event direction");
+                column = x; row = y; facing = static_cast<Direction>(dir);
+                state.memory[dialect.square_info_address] = has_dungeon_map() ? map.cell(row,column).raw_event : 0;
+            }
             events.pop_front();
             if (run.next_program) {
                 if (++transfers > 32) throw std::runtime_error("Campaign program transfer limit exceeded");
@@ -247,6 +378,11 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
                 auto candidate = *this; candidate.ecl_record = program.bytes;
                 (void)SessionHost(candidate,host); // Validate bindings before publishing the new program.
                 ecl_record = std::move(program.bytes); current_program_record = program.record_id;
+                ++result.program_transfers;
+                if (movement_addresses) {
+                    state.memory[(*movement_addresses)[0]] = 0;
+                    state.memory[(*movement_addresses)[1]] = 0;
+                }
                 events = {formats::EclEventKind::initialize,formats::EclEventKind::move,formats::EclEventKind::search};
             }
         }
