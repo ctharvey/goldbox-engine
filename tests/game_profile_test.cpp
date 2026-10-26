@@ -14,6 +14,9 @@ int main(int argc, char** argv) {
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
     assert(pool.party_class_check && !curse.party_class_check);
+    assert(pool.surprise && !curse.surprise);
+    assert(pool.surprise->dialect == goldbox::EclSurpriseDialect::signed_threshold2 &&
+        pool.surprise->result_address == 0x6dcb);
     assert(pool.party_class_check->classes == (std::vector<std::string>{"ranger","cleric-ranger"}));
     assert(pool.arithmetic_dialect == goldbox::EclArithmeticDialect::unsigned16);
     assert(curse.arithmetic_dialect == goldbox::EclArithmeticDialect::disabled);
@@ -86,6 +89,18 @@ int main(int argc, char** argv) {
     if (!rejected) return 1;
     const std::string prefix = R"({"schemaVersion":1,"id":"test","title":"Test","formatFamily":"goldbox-dos","archiveFormat":"dax-v1","eventDialect":"unverified","rulesProfile":"test","validationStatus":"unverified","resourcePatterns":[],"colorBackdrop":)";
     auto class_prefix = prefix;
+    auto surprise_prefix = prefix;
+    surprise_prefix.replace(surprise_prefix.find("colorBackdrop"),13,"surprise");
+    for (const auto value : {R"({"dialect":"unknown","resultAddress":1})",
+        R"({"dialect":"ssi-signed-threshold2-v1","resultAddress":-1})",
+        R"({"dialect":"ssi-signed-threshold2-v1","resultAddress":65536})",
+        R"({"dialect":"ssi-signed-threshold2-v1"})",
+        R"({"dialect":"ssi-signed-threshold2-v1","resultAddress":1,"extra":1})"}) {
+        { std::ofstream output(path); output << surprise_prefix << value << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
     class_prefix.replace(class_prefix.find("colorBackdrop"),13,"partyClassCheck");
     for (const auto value : {R"({"dialect":"unknown","classes":["ranger"]})",
         R"({"dialect":"ssi-class-presence2-v1","classes":[]})",

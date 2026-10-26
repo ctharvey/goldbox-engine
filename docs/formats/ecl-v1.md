@@ -78,6 +78,21 @@ zero HP and does not inspect status, level or ability scores. The reference name
 PARTY_SKILL_CHECK2 does not imply a random roll. Other dialects' yes/no and
 three-operand meanings remain unsupported by this adapter.
 
+Optional `surprise` selects `ssi-signed-threshold2-v1` with a `resultAddress`.
+It enables four-input opcode 0x23; other profiles leave this meaning disabled.
+Each numeric input is truncated to a byte. Thresholds are signed interpretations
+of the wrapped bytes `(fourth + 2 - first)` and `(second + 2 - third)`.
+Two successive `draw(6) + 1` rolls use the saved, profile-configured RNG stream.
+If the second roll meets its threshold, the result is 2; otherwise it is 1 if
+the first meets its threshold, 0 otherwise. Both-success therefore produces 2,
+matching the native overwrite rather than publishing a presumed bitmask 3.
+The configured logical byte register receives the result; adjacent memory and
+comparison are unchanged. Pool binds it to 0x6DCB. The original word-slot global
+buffer is represented by the existing normalized logical memory model.
+Conflicting definitions, absent adapters/RNG, invalid input types and writes
+into program memory fail explicitly. Failed result stores do not consume RNG.
+This implements surprise resolution only; it does not implement combat.
+
 State changes made before an error remain visible; execution is not
 transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations

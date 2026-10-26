@@ -400,7 +400,7 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
             SessionHost session_host(*this,host);
             auto remaining = limits; remaining.steps -= result.steps;
             auto run = execute_ecl(ecl_record,events.front(),dialect,opcodes,state,session_host,remaining,
-                random_dialect,arithmetic_dialect);
+                random_dialect,arithmetic_dialect,surprise);
             result.steps += run.steps; result.bytecode_offset = run.bytecode_offset;
             result.dispatches.insert(result.dispatches.end(),run.dispatches.begin(),run.dispatches.end());
             if (!run.exited) { result.diagnostic = std::move(run.diagnostic); return result; }

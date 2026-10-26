@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Implement profile-selected SURPRISE with signed-byte thresholds, two deterministic
+  dice rolls and the native second-check precedence. Keep the result address in
+  profile data and add native-observed golden regressions.
+
 - Implement profile-selected opcode 0x22 as the verified two-output class-presence
   check, rather than a random skill roll. Keep class IDs in profile data and
   preserve ordered typed stores, alias behavior and unchanged comparison state.

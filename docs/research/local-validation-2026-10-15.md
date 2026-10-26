@@ -2000,3 +2000,55 @@ RNG integration suite was skipped under WSL. The installed-resource opening,
 ordinary boundary, seven rendered regions and two new 0x23 stops were exercised.
 Hygiene and attribution checks passed. Full private log:
 `party-class-check-full-tests.log`.
+
+### Pool SURPRISE (0x23), 2026-10-25
+
+The pinned SSI Engine metadata names a four-input SURPRISE instruction, but its
+VM handler is empty. Reuse would not supply executable behavior. The independent
+implementation instead follows bounded observations of the authorized installed
+Pool handler (overlay 1F offset 0x16C9), its original operand decoder/writer,
+original overlay B0 dice helper and resident RNG. No original instructions or
+game content are included in the repository.
+
+512 native cases passed with synthetic operands: a Cartesian set of byte
+extremes, additional byte patterns and six initial RNG states. Alternating cases
+used immediate bytes or immediate words with nonzero high bytes. All runs
+returned within the per-call 100 ms / 20,000 instruction bounds and the 40-second
+batch limit. Four inputs are truncated to bytes. Both thresholds wrap to signed
+bytes: fourth + 2 - first, and second + 2 - third. Exactly two resident RNG calls
+with bound 6 produce one-based rolls. The second threshold test overwrites the
+earlier both-success result: final outcomes are 0, 1 or 2, never 3. The native
+result goes to logical global 0x6DCB; PC advances 9 or 13 bytes according to the
+synthetic operand encodings. Final RNG states were checked exactly.
+
+The shared engine selects this through `ssi-signed-threshold2-v1` and an explicit
+profile result address, rather than recognizing a title or private native memory
+layout. Existing saved RNG and logical globals carry its state. Synthetic golden
+tests exercise 12 native-observed cases with all six supported numeric operand
+forms, both-success precedence, signed wrapping, adjacent-memory preservation,
+comparison preservation and exact two-draw final states. Negative cases cover
+missing RNG/adapter, invalid operands, protected output and conflicting dialect
+definitions. The observation supports this instruction, not complete encounter
+or combat parity.
+
+Original-resource replay now advances both seeded encounter branches beyond
+SURPRISE: seed 10 stops at program 20 offset 965, seed 19 at offset 1150, both
+with `Unknown ECL opcode 41` (0x29). The pinned Pool metadata names that next
+instruction ENCOUNTER_MENU with 14 operands; other titles assign different
+meanings. These precise stops replace the earlier offset-776 SURPRISE gate.
+Tests restore each pre-move save and repeat it, checking the exact stop and
+serialized resulting state including RNG. Encounter-menu behavior and its
+combat/movement dependencies remain unimplemented and require separate native
+verification; no successful encounter or full-game parity is claimed.
+
+The ordinary boundary path still completes at program/map 20, (15,4), west,
+EXIT 615. All seven previously matched rendered region fingerprints remain
+unchanged. The private probe/report and build logs remain outside the repository.
+
+Final serialized two-worker build/test run: 30 suites passed, zero failures,
+36.71 seconds of tests. The Windows-only original RNG integration suite skipped
+under WSL; the installed-resource campaign replay, both seeded save/replays and
+seven rendered-region comparisons ran and passed. Hygiene and attribution
+checks passed. Private full log: `surprise-full-tests.log`; native evidence:
+`probe_original_surprise.py` and `original-surprise-report.json` in the external
+validation cache. Installed assets, user saves and artwork were not modified.

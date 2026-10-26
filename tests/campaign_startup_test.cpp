@@ -151,13 +151,14 @@ int main(int argc, char** argv) {
         session.movement_addresses = dispatch.movement_addresses;
         session.transfer_clear_ranges = dispatch.transfer_clear_ranges;
         session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::weighted_strength,
-            EclPartyCheckDialect::class_presence2);
+            EclPartyCheckDialect::class_presence2,EclSurpriseDialect::signed_threshold2);
         session.campaign_start = std::array<std::uint8_t,2>{config.map_record,config.program_record};
         session.position_refresh_call = config.position_refresh_call;
         session.position_advance_call = config.position_advance_call;
         session.sound_call = profile.sound_call; session.party_memory = profile.party_memory;
         session.party_strength = profile.party_strength;
         session.party_class_check = profile.party_class_check;
+        session.surprise = profile.surprise;
         session.character_rules = profile.character_rules; session.initial_random = profile.random;
         session.random_dialect = profile.random_dialect;
         session.arithmetic_dialect = profile.arithmetic_dialect;
@@ -186,10 +187,20 @@ int main(int argc, char** argv) {
         for (const auto seed : {10u,19u}) {
             auto candidate = session;
             candidate.state.random = HighWordLcg32(seed,profile.random->multiplier(),profile.random->increment());
+            const auto before = serialize_exploration(candidate,"private-encounter-check");
             MovementHost probe(candidate,profile,game);
             const auto result = candidate.move(Direction::west,probe);
-            check(result.execution && !result.execution->exited && result.execution->bytecode_offset == 776 &&
-                result.execution->diagnostic == "Unknown ECL opcode 35","Encounter surprise checkpoint changed");
+            check(result.execution && !result.execution->exited &&
+                result.execution->bytecode_offset == (seed == 10 ? 965u : 1150u) &&
+                result.execution->diagnostic == "Unknown ECL opcode 41","Encounter menu checkpoint changed");
+            auto replay = session;
+            restore_exploration(replay,before,"private-encounter-check");
+            MovementHost repeated_host(replay,profile,game);
+            const auto repeated_move = replay.move(Direction::west,repeated_host);
+            check(repeated_move.execution && repeated_move.execution->diagnostic == result.execution->diagnostic &&
+                repeated_move.execution->bytecode_offset == result.execution->bytecode_offset &&
+                serialize_exploration(replay,"private-encounter-check") ==
+                    serialize_exploration(candidate,"private-encounter-check"),"Seeded encounter replay differs");
         }
         auto walked = session; MovementHost movement_host(walked,profile,game);
         const auto move = walked.move(Direction::west,movement_host);

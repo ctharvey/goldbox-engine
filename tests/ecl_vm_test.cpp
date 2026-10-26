@@ -41,6 +41,62 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 
 int main() {
     {
+        // Golden observations from the unmodified native handler/dice helper/RNG.
+        struct Case { std::array<unsigned,4> args; std::uint32_t seed, result, final_seed; };
+        const Case cases[]{
+            {{0,0,0,0},0,1,134775814}, {{0,0,0,255},19,0,3414851041u},
+            {{0,6,0,6},0x12345678,2,2046801342}, // Both checks succeed; second wins.
+            {{0,128,0,128},0xffffffff,0,866343917}, // Signed thresholds wrap below zero.
+            {{6,0,0,0},0xffffffff,2,866343917}, {{6,6,6,6},1,0,3698175007u},
+            {{128,0,0,0},10,0,1409029376}, {{255,255,255,255},19,1,3414851041u},
+            {{4,12,20,28},10,1,1409029376}, {{127,125,123,121},0x12345678,2,2046801342},
+            {{144,176,208,240},0xffffffff,1,866343917}, {{244,220,196,172},10,2,1409029376}};
+        EclState state; Host host;
+        const auto ops = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,
+            EclPartyDialect::disabled,EclPartyCheckDialect::disabled,EclSurpriseDialect::signed_threshold2);
+        const EclSurpriseBinding binding{EclSurpriseDialect::signed_threshold2,0x4a20};
+        const auto invoke = [&](const auto& bytes, const auto& selected, std::optional<EclSurpriseBinding> adapter) {
+            return execute_ecl(bytes,EclEventKind::move,{"ssi-five-entry-v1",0x9900,0xc04f},selected,state,host,{},
+                EclRandomDialect::disabled,EclArithmeticDialect::disabled,adapter);
+        };
+        for (const auto& test : cases) for (const auto type : {0,1,2,3,4,5}) {
+            auto bytes = program({3,0,1,0,2,0x23});
+            for (std::size_t i = 0; i < test.args.size(); ++i) {
+                const auto address = 0x4b00+2*i;
+                state.memory[address] = test.args[i]; state.memory[address+1] = 0xa5;
+                bytes.push_back(type);
+                bytes.push_back(type == 1 || type == 3 || type == 5 ? address&255 : test.args[i]);
+                if (type != 0) bytes.push_back(type == 1 || type == 3 || type == 5 ? address>>8 : 0xa5);
+                if (type == 4) bytes.insert(bytes.end(),{0x12,0x34});
+            }
+            bytes.push_back(0);
+            state.random = HighWordLcg32(test.seed,0x08088405,1);
+            state.memory[0x4a20] = 0xff; state.memory[0x4a21] = 0x5a;
+            assert(invoke(bytes,ops,binding).exited);
+            assert(state.memory[0x4a20] == test.result && state.memory[0x4a21] == 0x5a);
+            assert(state.random->state() == test.final_seed && state.comparison == -1);
+        }
+        const auto valid = program({0x23,0,0,0,6,0,0,0,6,0});
+        const auto seed = state.random->state();
+        assert(!invoke(valid,ops,std::nullopt).exited && state.random->state() == seed);
+        assert(!invoke(valid,minimal_vm_opcodes(),binding).exited && state.random->state() == seed);
+        assert(!invoke(program({0x23,0x80,0,0,6,0,0,0,6,0}),ops,binding).exited);
+        assert(state.random->state() == seed);
+        assert(!invoke(valid,ops,EclSurpriseBinding{EclSurpriseDialect::signed_threshold2,0x9914}).exited);
+        assert(state.random->state() == seed); // Protected result address does not consume the stream.
+        auto conflict = ops; conflict.push_back({0x23,"OTHER",4});
+        assert(!invoke(valid,conflict,binding).exited);
+        conflict = ops;
+        for (auto& spec : conflict) if (spec.opcode == 0x23) spec.operand_count = 3;
+        assert(!invoke(valid,conflict,binding).exited);
+        conflict = ops;
+        for (auto& spec : conflict) if (spec.opcode == 0x23) spec.mnemonic = "STOP_MOVE_23";
+        assert(!invoke(valid,conflict,binding).exited);
+        assert(!invoke(valid,ops,EclSurpriseBinding{}).exited);
+        state.random.reset();
+        assert(!invoke(valid,ops,binding).exited);
+    }
+    {
         struct ClassHost : Host {
             bool present{}; unsigned queries{};
             bool party_class_present() override { ++queries; return present; }

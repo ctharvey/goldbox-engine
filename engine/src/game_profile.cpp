@@ -19,7 +19,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
         "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
-        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck"}, "game profile");
+        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck", "surprise"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -33,6 +33,15 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
         {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled", 0, {}
     };
+    if (const auto* value = root.if_contains("surprise")) {
+        const auto& object = j::object(*value,"surprise");
+        j::fields_only(object,{"dialect","resultAddress"},"surprise");
+        if (j::string(j::field(object,"dialect","surprise"),"surprise dialect") != "ssi-signed-threshold2-v1")
+            throw std::runtime_error("Unsupported surprise dialect");
+        const auto address = j::integer(j::field(object,"resultAddress","surprise"),"surprise result address");
+        if (address < 0 || address > 65535) throw std::runtime_error("Surprise result address out of range");
+        profile.surprise = EclSurpriseBinding{EclSurpriseDialect::signed_threshold2,static_cast<std::uint16_t>(address)};
+    }
     if (const auto* arithmetic = root.if_contains("arithmeticDialect")) {
         const auto value = j::string(*arithmetic,"arithmeticDialect");
         if (value != "ssi-unsigned16-v1") throw std::runtime_error("Unsupported arithmetic dialect");

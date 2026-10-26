@@ -75,7 +75,9 @@ std::optional<std::string> EclHost::string_at(std::uint16_t) { return std::nullo
 bool EclHost::write_string(std::uint16_t, std::string_view) { return false; }
 
 std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDialect area, EclPartyDialect party,
-    EclPartyCheckDialect check) {
+    EclPartyCheckDialect check, EclSurpriseDialect surprise) {
+    require(surprise == EclSurpriseDialect::disabled || surprise == EclSurpriseDialect::signed_threshold2,
+        "Unknown surprise dialect");
     require(check == EclPartyCheckDialect::disabled || check == EclPartyCheckDialect::class_presence2,
         "Unknown party check dialect");
     require(images == EclImageDialect::disabled || images == EclImageDialect::sprite3,"Unknown image dialect");
@@ -101,14 +103,24 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
     else result.push_back({0x39,"WHO",1});
     if (party == EclPartyDialect::weighted_strength) result.push_back({0x1d,"PARTY_STRENGTH",1});
     if (check == EclPartyCheckDialect::class_presence2) result.push_back({0x22,"PARTY_CLASS_CHECK2",2});
+    if (surprise == EclSurpriseDialect::signed_threshold2) result.push_back({0x23,"SURPRISE_THRESHOLD2",4});
     return result;
 }
 
 EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind,
     const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes,
-    EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random, EclArithmeticDialect arithmetic) {
+    EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random, EclArithmeticDialect arithmetic,
+    std::optional<EclSurpriseBinding> surprise) {
     EclExecution result;
     try {
+        const auto surprise_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x23; });
+        if (surprise) require(surprise->dialect == EclSurpriseDialect::signed_threshold2,
+            "Unknown surprise dialect");
+        if (surprise || surprise_spec != opcodes.end()) require(surprise && surprise_spec != opcodes.end() &&
+            surprise_spec->operand_count == 4 && surprise_spec->variable_count_operand == -1 &&
+            surprise_spec->mnemonic == "SURPRISE_THRESHOLD2" &&
+            std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x23; }) == 1,
+            "Conflicting surprise opcode definition or missing adapter");
         require(arithmetic == EclArithmeticDialect::disabled || arithmetic == EclArithmeticDialect::unsigned16,
             "Unknown arithmetic dialect");
         if (arithmetic == EclArithmeticDialect::unsigned16)
@@ -209,6 +221,27 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                 destination(args[0],state); destination(args[1],state);
                 const auto present = host.party_class_present();
                 store(args[0],present ? 1 : 0); store(args[1],0);
+                break;
+            }
+            case 0x23: {
+                require(surprise.has_value(),"Surprise adapter unavailable");
+                require(state.random.has_value(),"RNG state unavailable; legacy saves require an explicit new seed");
+                std::array<int,4> values{};
+                for (std::size_t i = 0; i < values.size(); ++i) values[i] = numeric(args[i]) & 255u;
+                const auto signed_byte = [](int value) {
+                    const auto byte = static_cast<std::uint8_t>(value);
+                    return byte < 128 ? int(byte) : int(byte)-256;
+                };
+                const auto first_threshold = signed_byte(values[3]+2-values[0]);
+                const auto second_threshold = signed_byte(values[1]+2-values[2]);
+                auto candidate = *state.random;
+                const auto first = candidate.draw(6)+1;
+                const auto second = candidate.draw(6)+1;
+                // The native second test overwrites its earlier both-success result.
+                const auto value = int(second) <= second_threshold ? 2 : int(first) <= first_threshold ? 1 : 0;
+                EclOperand output{}; output.type = 1; output.value = surprise->result_address;
+                store(output,value);
+                state.random = candidate;
                 break;
             }
             case 0x20: {

@@ -22,6 +22,11 @@ enum class EclImageDialect { disabled, sprite3 };
 enum class EclAreaDialect { disabled, map3 };
 enum class EclPartyDialect { disabled, load_character, weighted_strength };
 enum class EclPartyCheckDialect { disabled, class_presence2 };
+enum class EclSurpriseDialect { disabled, signed_threshold2 };
+struct EclSurpriseBinding {
+    EclSurpriseDialect dialect{EclSurpriseDialect::disabled};
+    std::uint16_t result_address{};
+};
 struct EclSpriteRequest {
     std::uint8_t sprite{}, distance{}, replacement_picture{};
 };
@@ -92,10 +97,12 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEvent
     const formats::EclDispatchDialect& dialect, std::span<const formats::EclOpcodeSpec> opcodes,
     EclState& state, EclHost& host, EclLimits limits = {},
     EclRandomDialect random = EclRandomDialect::disabled,
-    EclArithmeticDialect arithmetic = EclArithmeticDialect::disabled);
+    EclArithmeticDialect arithmetic = EclArithmeticDialect::disabled,
+    std::optional<EclSurpriseBinding> surprise = std::nullopt);
 
 std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
     EclAreaDialect area = EclAreaDialect::disabled, EclPartyDialect party = EclPartyDialect::disabled,
-    EclPartyCheckDialect check = EclPartyCheckDialect::disabled);
+    EclPartyCheckDialect check = EclPartyCheckDialect::disabled,
+    EclSurpriseDialect surprise = EclSurpriseDialect::disabled);
 
 } // namespace goldbox

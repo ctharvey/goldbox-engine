@@ -456,3 +456,10 @@ configuration and `data/character/ClassSelections.java` for class-code labels.
 Its behavior comes from 263 independent native-handler checks; the reference
 skill-check handler is empty. Profile-selected symbolic class IDs replace native
 record offsets in the shared engine. No Java class table or handler was copied.
+
+SURPRISE likewise consults the pinned SSI Engine opcode metadata and VM as
+research references. The reference handler is empty, so it supplies no reusable
+calculation. The independent C++ dialect follows 512 bounded original-handler
+checks, including the original dice helper and RNG, signed-byte wrapping and
+second-check precedence. No Java implementation or native instructions were
+copied or ported; Pool's result register is explicit profile data.
