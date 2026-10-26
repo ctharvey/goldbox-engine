@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "goldbox/exploration.hpp"
 #include "goldbox/game_profile.hpp"
+#include "goldbox/formats/monster.hpp"
 #include "goldbox/mods.hpp"
 #ifdef GOLDBOX_RENDERER
 #include "view.hpp"
@@ -66,6 +67,32 @@ std::shared_ptr<const ResourceFamily> load_family(const fs::path& directory,
     return result;
 }
 
+goldbox::MonsterResources monster_resources(const goldbox::GameProfile& profile, const fs::path& directory) {
+    using Bundles = std::map<std::uint8_t,std::array<std::shared_ptr<const ResourceFamily>,3>>;
+    auto bundles = std::make_shared<Bundles>();
+    std::string identity;
+    for (const auto& [program,files] : profile.monster_archives) {
+        auto& bundle = (*bundles)[program];
+        identity += std::to_string(program)+":";
+        for (std::size_t i = 0; i < 3; ++i) {
+            bundle[i] = load_family(directory,files[i].empty() ? std::vector<std::string>{} :
+                std::vector<std::string>{files[i]});
+            identity += bundle[i]->identity+"|";
+        }
+    }
+    return {[bundles](std::uint8_t program, std::uint8_t id) {
+        const auto found = bundles->find(program);
+        if (found == bundles->end()) throw std::runtime_error("Monster archives unavailable for current program");
+        const auto& bundle = found->second;
+        const auto character = bundle[0]->records.find(id);
+        if (character == bundle[0]->records.end()) throw std::runtime_error("Monster character record missing");
+        const auto optional = [&](std::size_t index) -> std::span<const std::uint8_t> {
+            const auto entry = bundle[index]->records.find(id);
+            return entry == bundle[index]->records.end() ? std::span<const std::uint8_t>{} : entry->second;
+        };
+        goldbox::formats::validate_ssi_monster_resources(character->second,optional(1),optional(2));
+    },identity};
+}
 class TerminalHost final : public goldbox::EclHost {
 public:
     void text(std::string_view text, bool clear) override {
@@ -504,6 +531,9 @@ int main(int argc, char** argv) {
         session.party_class_check = profile.party_class_check;
         session.surprise = profile.surprise;
         session.encounter = profile.encounter;
+        session.monster_dialect = profile.monster_dialect;
+        if (profile.monster_dialect != goldbox::EclMonsterDialect::disabled && window && campaign_mode)
+            session.monster_resources = monster_resources(profile,fs::path(argv[2]).parent_path());
 #ifdef GOLDBOX_RENDERER
         if (images) images->sprite_replacement_ms = profile.sprite_replacement_ms;
         session.wall_banks = initial_banks;
@@ -522,7 +552,7 @@ int main(int argc, char** argv) {
             profile.party_memory ? goldbox::EclPartyDialect::load_character : goldbox::EclPartyDialect::disabled,
             profile.party_class_check ? goldbox::EclPartyCheckDialect::class_presence2 : goldbox::EclPartyCheckDialect::disabled,
             profile.surprise ? profile.surprise->dialect : goldbox::EclSurpriseDialect::disabled,
-            profile.encounter ? profile.encounter->dialect : goldbox::EclEncounterDialect::disabled);
+            profile.encounter ? profile.encounter->dialect : goldbox::EclEncounterDialect::disabled,profile.monster_dialect);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
         if (profile.campaign_startup && window && campaign_mode) {
             const auto& start = *profile.campaign_startup;

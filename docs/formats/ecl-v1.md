@@ -132,6 +132,41 @@ unchanged. Stores/host effects retain the existing partial-progress policy on
 failure. The runtime has no current party movement/effects provider yet: actions
 that need it fail with `Current party movement and effects unavailable`.
 
+Optional `monsterSetup` selects `ssi-monster-setup-v1` for CLEAR_MON (0x1C)
+and LOAD_MON (0x0B). Its `programResources` entries bind a `program` byte to
+three `archives`: character, items and effects. Only optional item/effect
+archives may use an empty filename. The shared VM receives typed requests;
+archive selection remains in the campaign adapter. Standalone map previews do
+not eagerly require campaign monster archives.
+
+CLEAR_MON resets prepared groups and numbering to 8, preserving sprites, party,
+comparison and RNG. LOAD_MON truncates its three numeric inputs to bytes:
+resource ID, requested count and an uninterpreted selector. Count zero means
+one; the active setup is capped at 63 creatures. A full setup skips resource
+access and RNG. Otherwise the read-only resolver validates a 285-byte character
+record, item records in 63-byte units and effect records in 9-byte units. Missing
+optional records are empty. This validates resource boundaries, not all field
+meanings or combat rules.
+
+Each accepted LOAD_MON consumes exactly five `draw(6)` calls, once per template
+and independent of clone count. Prepared groups retain the program/resource ID,
+effective count, group number, selector and pre-initialization RNG seed. The
+original initializer writes five derived bytes at record offsets C1/C2/C3/C5/C6
+and a fixed byte at C4; storing the seed permits a later combat adapter to
+reproduce that initialization without consuming the shared stream again.
+
+These are deterministic setup recipes, **not combat-ready normalized actors**.
+Native actor links, inventory/effect instances, monster character windows and
+combat mutation rules are not yet reproduced. COMBAT still fails through the
+existing unavailable host; no victory, damage or combat-result flags are faked.
+
+The optional saved `monsterSetup` contains its dialect, immutable resource
+source identity, next group and recipes. Restore validates the entire setup and
+source before publication; malformed or mismatched saves leave the session
+unchanged. Legacy saves without the field retain unknown setup, requiring an
+explicit CLEAR_MON before loading. Starting a new campaign clears that knowledge.
+Failed resource validation does not append a group or consume RNG.
+
 State changes made before an error remain visible; execution is not
 transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations

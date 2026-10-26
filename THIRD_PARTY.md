@@ -481,3 +481,12 @@ inputs; coverage status comes from current C++ source. No Java tables, handler
 implementation, native instructions or proprietary resources are adopted. Names
 and reference arities do not assert native semantic compatibility, particularly
 for values absent from this installed release's dispatcher.
+
+Monster setup research consulted the same pinned SSI Engine VM/opcode metadata.
+Its LOAD_MON handler is empty and its CLEAR_MON sprite-clearing placeholder does
+not reproduce the observed native reset; neither was adopted. Independent native
+probes establish counts/grouping, resource boundaries and template RNG order.
+The C++ implementation records deterministic preparation recipes and validates
+resource shapes; it does not copy native records into public content or claim
+a complete monster/combat decoder. No Java implementation or native instructions
+were copied or ported. Combat remains an explicit unavailable host boundary.

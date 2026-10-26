@@ -28,6 +28,8 @@ struct EclSurpriseBinding {
     std::uint16_t result_address{};
 };
 enum class EclEncounterDialect { disabled, menu14 };
+enum class EclMonsterDialect { disabled, setup_v1 };
+struct EclMonsterRequest { std::uint8_t resource{}, count{}, selector{}; };
 struct EclEncounterBinding {
     EclEncounterDialect dialect{EclEncounterDialect::disabled};
     std::uint16_t view_mode_address{};
@@ -68,6 +70,8 @@ public:
     virtual bool party_class_present();
     virtual std::uint8_t encounter_distance();
     virtual std::array<std::uint8_t,2> party_movement(); // Current minimum, maximum, including effects.
+    virtual void clear_monsters();
+    virtual void load_monsters(EclMonsterRequest request);
     // Prepare host resources before a validated program is published and initialized.
     virtual void program_changed(std::uint8_t record);
     // Optional virtual memory overlays. Unhandled accesses retain ordinary RAM/string semantics.
@@ -107,12 +111,14 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEvent
     EclRandomDialect random = EclRandomDialect::disabled,
     EclArithmeticDialect arithmetic = EclArithmeticDialect::disabled,
     std::optional<EclSurpriseBinding> surprise = std::nullopt,
-    std::optional<EclEncounterBinding> encounter = std::nullopt);
+    std::optional<EclEncounterBinding> encounter = std::nullopt,
+    EclMonsterDialect monsters = EclMonsterDialect::disabled);
 
 std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
     EclAreaDialect area = EclAreaDialect::disabled, EclPartyDialect party = EclPartyDialect::disabled,
     EclPartyCheckDialect check = EclPartyCheckDialect::disabled,
     EclSurpriseDialect surprise = EclSurpriseDialect::disabled,
-    EclEncounterDialect encounter = EclEncounterDialect::disabled);
+    EclEncounterDialect encounter = EclEncounterDialect::disabled,
+    EclMonsterDialect monsters = EclMonsterDialect::disabled);
 
 } // namespace goldbox

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "goldbox/exploration.hpp"
+#include "goldbox/formats/monster.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -48,6 +49,91 @@ ExplorationSession native_session(std::vector<std::uint8_t> code) {
     session.movement_addresses = std::array<std::uint16_t,4>{0x7200,0x7201,0x7202,0x7203};
     session.opcodes = minimal_vm_opcodes(); session.ecl_record = std::move(code);
     return session;
+}
+void monster_setup() {
+    const auto load = [](std::uint8_t count) { return std::vector<std::uint8_t>{0x0b,0,7,0,count,0,3}; };
+    const auto fixture = [&](std::vector<std::uint8_t> body) {
+        auto session = native_session(lifecycle(std::move(body),{0}));
+        session.monster_dialect = EclMonsterDialect::setup_v1;
+        session.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,
+            EclPartyDialect::disabled,EclPartyCheckDialect::disabled,EclSurpriseDialect::disabled,
+            EclEncounterDialect::disabled,EclMonsterDialect::setup_v1);
+        session.current_program_record = 0;
+        session.programs = ProgramResources{[code=session.ecl_record](std::uint8_t id) {
+            return ProgramResource{id,code}; },"synthetic-monster-program"};
+        session.monster_resources = MonsterResources{[](std::uint8_t program,std::uint8_t id) {
+            if (program != 0 || id != 7) throw std::runtime_error("Missing synthetic monster");
+            const std::vector<std::uint8_t> character(285),items(126),effects(18);
+            validate_ssi_monster_resources(character,items,effects);
+        },"synthetic-monster-resources"};
+        session.initial_random = HighWordLcg32(0,0x08088405,1);
+        session.state.random = session.initial_random;
+        return session;
+    };
+    Host host;
+    for (const auto requested : {0,1,2,63,255}) {
+        auto body = std::vector<std::uint8_t>{3,0,1,0,2,0x1c};
+        const auto request = load(requested); body.insert(body.end(),request.begin(),request.end()); body.push_back(0);
+        auto session = fixture(body);
+        const auto run = session.trigger(EclEventKind::move,host);
+        assert(run.exited && session.monster_setup && session.monster_setup->groups.size() == 1);
+        const auto& group = session.monster_setup->groups.front();
+        assert(group.count == std::min(std::max(requested,1),63) && group.group == 8 && group.selector == 3);
+        assert(group.program == 0 && group.resource == 7 && group.template_seed == 0);
+        assert(session.monster_setup->next_group == 9 && session.state.random->state() == 1172187917);
+        assert(session.state.comparison == -1 && host.clears == 0); // Native CLEAR_MON does not clear the sprite.
+        const auto saved = serialize_exploration(session,"monster-fixture");
+        auto restored = fixture(body);
+        restore_exploration(restored,saved,"monster-fixture");
+        assert(serialize_exploration(restored,"monster-fixture") == saved);
+        for (const auto& [before,after] : std::vector<std::pair<std::string,std::string>>{
+            {"\"nextGroup\":9","\"nextGroup\":255"},
+            {"\"sourceIdentity\":\"synthetic-monster-resources\"","\"sourceIdentity\":\"wrong\""},
+            {"\"count\":"+std::to_string(group.count),"\"count\":0"},
+            {"\"templateSeed\":0","\"templateSeed\":4294967296"}}) {
+            auto invalid = saved;
+            const auto at = invalid.find(before); assert(at != std::string::npos);
+            invalid.replace(at,before.size(),after);
+            rejects([&] { restore_exploration(restored,invalid,"monster-fixture"); });
+            assert(serialize_exploration(restored,"monster-fixture") == saved);
+        }
+        auto legacy = session; legacy.monster_setup.reset();
+        restore_exploration(restored,serialize_exploration(legacy,"monster-fixture"),"monster-fixture");
+        assert(!restored.monster_setup);
+    }
+    auto body = load(1); body.push_back(0);
+    auto multiple_body = std::vector<std::uint8_t>{0x1c};
+    for (const auto count : {62,2,1}) {
+        const auto request = load(count); multiple_body.insert(multiple_body.end(),request.begin(),request.end());
+    }
+    multiple_body.push_back(0);
+    auto multiple = fixture(multiple_body);
+    assert(multiple.trigger(EclEventKind::move,host).exited);
+    assert(multiple.monster_setup->groups.size() == 2 && multiple.monster_setup->next_group == 10);
+    assert(multiple.monster_setup->groups[0].count == 62 && multiple.monster_setup->groups[1].count == 1 &&
+        multiple.monster_setup->groups[1].group == 9 && multiple.monster_setup->groups[1].template_seed == 1172187917);
+    assert(multiple.state.random->state() == 1828254910); // Ten draws; the third request hits the cap.
+    auto invalid_resource = fixture(body); invalid_resource.monster_setup.emplace();
+    invalid_resource.monster_resources->validate = [](std::uint8_t,std::uint8_t) {
+        throw std::runtime_error("Malformed synthetic template");
+    };
+    assert(!invalid_resource.trigger(EclEventKind::move,host).exited &&
+        invalid_resource.monster_setup->groups.empty() && invalid_resource.state.random->state() == 0);
+    auto unknown = fixture(body);
+    assert(unknown.trigger(EclEventKind::move,host).diagnostic == "Monster setup state unavailable; CLEAR_MON required");
+    auto capped = fixture(body);
+    capped.monster_setup = MonsterSetup{{PreparedMonsterGroup{0,7,63,8,3,0}},9};
+    capped.monster_resources.reset(); capped.state.random.reset();
+    assert(capped.trigger(EclEventKind::move,host).exited && capped.monster_setup->groups.size() == 1);
+    auto missing = fixture(body); missing.monster_setup.emplace(); missing.monster_resources.reset();
+    assert(missing.trigger(EclEventKind::move,host).diagnostic == "Monster resource binding unavailable");
+    assert(missing.state.random->state() == 0 && missing.monster_setup->groups.empty());
+    auto clear = fixture({0x1c,0}); clear.monster_setup = capped.monster_setup;
+    assert(clear.trigger(EclEventKind::move,host).exited && clear.monster_setup->groups.empty() &&
+        clear.monster_setup->next_group == 8 && clear.state.random->state() == 0);
+    for (const auto sizes : {std::array<std::size_t,3>{284,0,0},{285,1,0},{285,0,1}})
+        rejects([&] { validate_ssi_monster_resources(std::vector<std::uint8_t>(sizes[0]),
+            std::vector<std::uint8_t>(sizes[1]),std::vector<std::uint8_t>(sizes[2])); });
 }
 void encounter_visibility() {
     struct EncounterHost : Host {
@@ -252,6 +338,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    monster_setup();
     encounter_visibility();
     movement_lifecycle();
     // Every GEO16 direction permits an ordinary door, in both directions,

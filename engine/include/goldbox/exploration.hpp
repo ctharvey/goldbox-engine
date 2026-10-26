@@ -22,6 +22,20 @@ struct ProgramResources {
     std::function<ProgramResource(std::uint8_t)> resolve;
     std::string source_identity;
 };
+struct MonsterResources {
+    // Resolve/validate an immutable template bundle by program and resource ID.
+    std::function<void(std::uint8_t,std::uint8_t)> validate;
+    std::string source_identity;
+};
+struct PreparedMonsterGroup {
+    std::uint8_t program{}, resource{}, count{}, group{}, selector{};
+    std::uint32_t template_seed{};
+};
+struct MonsterSetup {
+    // Deterministic preparation recipes, not combat-ready normalized actors.
+    std::vector<PreparedMonsterGroup> groups;
+    std::uint8_t next_group{8};
+};
 
 struct ExplorationMove {
     bool moved{};
@@ -66,6 +80,9 @@ struct ExplorationSession {
     std::optional<PartyClassCheckBinding> party_class_check{};
     std::optional<EclSurpriseBinding> surprise{};
     std::optional<EclEncounterBinding> encounter{};
+    EclMonsterDialect monster_dialect{EclMonsterDialect::disabled};
+    std::optional<MonsterResources> monster_resources{};
+    std::optional<MonsterSetup> monster_setup{}; // Unknown until CLEAR_MON, including legacy saves.
 
     // Both GEO16 edges must permit traversal; boundaries remain solid.
     // Door state 1 is passable. Opening/bashing states 2/3 is not modeled.

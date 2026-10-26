@@ -8,6 +8,19 @@
 
 namespace goldbox {
 namespace {
+void validate_monsters(const MonsterSetup& setup, const ExplorationSession& session) {
+    if (session.monster_dialect != EclMonsterDialect::setup_v1 || !session.monster_resources ||
+        !session.monster_resources->validate || session.monster_resources->source_identity.empty() ||
+        session.monster_resources->source_identity.size() > 4096 || setup.groups.size() > 63 ||
+        setup.next_group != 8+setup.groups.size()) throw std::runtime_error("Invalid monster setup binding/state");
+    unsigned total = 0;
+    for (std::size_t i = 0; i < setup.groups.size(); ++i) {
+        const auto& group = setup.groups[i];
+        if (!group.count || group.group != 8+i || (total += group.count) > 63)
+            throw std::runtime_error("Invalid prepared monster group");
+        session.monster_resources->validate(group.program,group.resource);
+    }
+}
 std::optional<std::uint8_t> area_record(std::array<std::uint8_t,3> values) {
     if (values == std::array<std::uint8_t,3>{0,0,0}) return 0;
     if (values == std::array<std::uint8_t,3>{255,255,127}) return std::nullopt; // No active dungeon.
@@ -197,6 +210,31 @@ public:
         return delegate.menu(choices,prompt,vertical);
     }
     void combat(EclState& state) override { delegate.combat(state); }
+    void clear_monsters() override {
+        if (session.monster_dialect != EclMonsterDialect::setup_v1)
+            throw std::runtime_error("Monster setup adapter unavailable");
+        session.monster_setup = MonsterSetup{};
+    }
+    void load_monsters(EclMonsterRequest request) override {
+        if (session.monster_dialect != EclMonsterDialect::setup_v1 || !session.monster_setup)
+            throw std::runtime_error("Monster setup state unavailable; CLEAR_MON required");
+        auto& setup = *session.monster_setup;
+        unsigned total = 0;
+        for (const auto& group : setup.groups) total += group.count;
+        if (total >= 63) return; // Native cap skips resource loading and RNG consumption.
+        if (!session.current_program_record || !session.monster_resources || !session.monster_resources->validate)
+            throw std::runtime_error("Monster resource binding unavailable");
+        if (!session.state.random) throw std::runtime_error("Monster initialization requires saved RNG state");
+        session.monster_resources->validate(*session.current_program_record,request.resource);
+        auto random = *session.state.random;
+        const auto seed = random.state();
+        for (unsigned i = 0; i < 5; ++i) (void)random.draw(6);
+        const auto count = std::min(std::max(unsigned(request.count),1u),63-total);
+        setup.groups.push_back({*session.current_program_record,request.resource,static_cast<std::uint8_t>(count),
+            setup.next_group,request.selector,seed});
+        ++setup.next_group;
+        session.state.random = random;
+    }
     std::uint8_t party_strength() override {
         if (!session.party_strength) throw std::runtime_error("Party strength adapter unavailable");
         return calculate_party_strength(session.party,*session.party_strength);
@@ -399,6 +437,7 @@ EclExecution ExplorationSession::begin_campaign(EclHost& host, EclLimits limits)
     candidate.state = {}; candidate.state.random = state.random;
     candidate.row = candidate.column = candidate.loaded_character = 0;
     candidate.facing = Direction::north; candidate.area.reset(); candidate.wall_banks.reset();
+    candidate.monster_setup.reset();
     (void)SessionHost(candidate,host);
     host.program_changed(*candidate.current_program_record);
     *this = std::move(candidate);
@@ -423,7 +462,7 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
             SessionHost session_host(*this,host);
             auto remaining = limits; remaining.steps -= result.steps;
             auto run = execute_ecl(ecl_record,events.front(),dialect,opcodes,state,session_host,remaining,
-                random_dialect,arithmetic_dialect,surprise,encounter);
+                random_dialect,arithmetic_dialect,surprise,encounter,monster_dialect);
             result.steps += run.steps; result.bytecode_offset = run.bytecode_offset;
             result.dispatches.insert(result.dispatches.end(),run.dispatches.begin(),run.dispatches.end());
             if (!run.exited) { result.diagnostic = std::move(run.diagnostic); return result; }
@@ -472,6 +511,16 @@ std::string serialize_exploration(const ExplorationSession& session, std::string
     auto object = bj::object{{"schemaVersion", 1}, {"sourceIdentity", source_identity},
         {"dialect", session.dialect.id}, {"row", session.row}, {"column", session.column},
         {"facing", static_cast<unsigned>(session.facing)}, {"memory", std::move(memory)}, {"strings", std::move(strings)}};
+    if (session.monster_setup) {
+        validate_monsters(*session.monster_setup,session);
+        bj::array groups;
+        for (const auto& group : session.monster_setup->groups) groups.push_back(bj::object{
+            {"program",group.program},{"resource",group.resource},{"count",group.count},{"group",group.group},
+            {"selector",group.selector},{"templateSeed",group.template_seed}});
+        object["monsterSetup"] = bj::object{{"dialect","ssi-monster-setup-v1"},
+            {"sourceIdentity",session.monster_resources->source_identity},{"nextGroup",session.monster_setup->next_group},
+            {"groups",std::move(groups)}};
+    }
     if (session.state.random) {
         const auto& rng = *session.state.random;
         if (session.random_dialect != EclRandomDialect::disabled &&
@@ -523,7 +572,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     const auto parsed = boost::json::parse(json);
     const auto& root = j::object(parsed, "exploration save");
     j::fields_only(root, {"schemaVersion", "sourceIdentity", "dialect", "row", "column", "facing", "memory", "strings", "wallBanks",
-        "area", "mapRecord", "mapSource", "party", "loadedCharacter", "random", "programRecord", "programSource"}, "save");
+        "area", "mapRecord", "mapSource", "party", "loadedCharacter", "random", "programRecord", "programSource", "monsterSetup"}, "save");
     if (j::integer(j::field(root, "schemaVersion", "save"), "schemaVersion") != 1 ||
         j::string(j::field(root, "sourceIdentity", "save"), "sourceIdentity") != source_identity ||
         j::string(j::field(root, "dialect", "save"), "dialect") != session.dialect.id) {
@@ -535,6 +584,28 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
         return number;
     };
     const auto row = bounded(j::field(root, "row", "save"), 15);
+    std::optional<MonsterSetup> monsters;
+    if (const auto* value = root.if_contains("monsterSetup")) {
+        const auto& object = j::object(*value,"monsterSetup");
+        j::fields_only(object,{"dialect","sourceIdentity","nextGroup","groups"},"monsterSetup");
+        if (!session.monster_resources || j::string(j::field(object,"dialect","monsterSetup"),"monster dialect") !=
+            "ssi-monster-setup-v1" || j::string(j::field(object,"sourceIdentity","monsterSetup"),"monster source") !=
+            session.monster_resources->source_identity) throw std::runtime_error("Saved monster resource/dialect mismatch");
+        monsters.emplace();
+        monsters->next_group = static_cast<std::uint8_t>(bounded(j::field(object,"nextGroup","monsterSetup"),255));
+        const auto& groups = j::array(j::field(object,"groups","monsterSetup"),"monster groups");
+        if (groups.size() > 63) throw std::runtime_error("Too many prepared monster groups");
+        for (const auto& value : groups) {
+            const auto& group = j::object(value,"monster group");
+            j::fields_only(group,{"program","resource","count","group","selector","templateSeed"},"monster group");
+            const auto byte = [&](const char* key) {
+                return static_cast<std::uint8_t>(bounded(j::field(group,key,"monster group"),255));
+            };
+            monsters->groups.push_back({byte("program"),byte("resource"),byte("count"),byte("group"),byte("selector"),
+                static_cast<std::uint32_t>(bounded(j::field(group,"templateSeed","monster group"),UINT32_MAX))});
+        }
+        validate_monsters(*monsters,session);
+    }
     const auto column = bounded(j::field(root, "column", "save"), 15);
     const auto facing = bounded(j::field(root, "facing", "save"), 3);
     const auto& memory = j::array(j::field(root, "memory", "save"), "save memory");
@@ -628,6 +699,7 @@ void restore_exploration(ExplorationSession& session, std::string_view json, std
     session.state = std::move(state);
     session.party = std::move(party);
     session.loaded_character = loaded_character;
+    session.monster_setup = std::move(monsters);
     session.row = static_cast<std::uint8_t>(row);
     session.column = static_cast<std::uint8_t>(column);
     session.facing = static_cast<Direction>(facing);

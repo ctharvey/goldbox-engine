@@ -16,6 +16,9 @@ int main(int argc, char** argv) {
     assert(pool.party_class_check && !curse.party_class_check);
     assert(pool.surprise && !curse.surprise);
     assert(pool.encounter && !curse.encounter);
+    assert(pool.monster_dialect == goldbox::EclMonsterDialect::setup_v1 &&
+        curse.monster_dialect == goldbox::EclMonsterDialect::disabled);
+    assert(pool.monster_archives.at(20) == (std::array<std::string,3>{"MON2CHA.DAX","MON2ITM.DAX","MON2SPC.DAX"}));
     assert(pool.encounter->dialect == goldbox::EclEncounterDialect::menu14 &&
         pool.encounter->view_mode_address == 0x49e6 &&
         pool.encounter->distance_addresses == (std::array<std::uint16_t,2>{0x6dc0,0x6dc1}));
@@ -93,6 +96,18 @@ int main(int argc, char** argv) {
     if (!rejected) return 1;
     const std::string prefix = R"({"schemaVersion":1,"id":"test","title":"Test","formatFamily":"goldbox-dos","archiveFormat":"dax-v1","eventDialect":"unverified","rulesProfile":"test","validationStatus":"unverified","resourcePatterns":[],"colorBackdrop":)";
     auto class_prefix = prefix;
+    auto monster_prefix = prefix;
+    monster_prefix.replace(monster_prefix.find("colorBackdrop"),13,"monsterSetup");
+    for (const auto value : {R"({"dialect":"unknown","programResources":[]})",
+        R"({"dialect":"ssi-monster-setup-v1","programResources":[]})",
+        R"({"dialect":"ssi-monster-setup-v1","programResources":[{"program":256,"archives":["A.DAX","",""]}]})",
+        R"({"dialect":"ssi-monster-setup-v1","programResources":[{"program":1,"archives":["../A.DAX","",""]}]})",
+        R"({"dialect":"ssi-monster-setup-v1","programResources":[{"program":1,"archives":["A.DAX"]}]})"}) {
+        { std::ofstream output(path); output << monster_prefix << value << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
     auto encounter_prefix = prefix;
     encounter_prefix.replace(encounter_prefix.find("colorBackdrop"),13,"encounter");
     for (const auto value : {

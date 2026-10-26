@@ -41,6 +41,32 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 
 int main() {
     {
+        struct MonsterHost : Host {
+            unsigned resets{};
+            std::vector<EclMonsterRequest> requests;
+            void clear_monsters() override { ++resets; }
+            void load_monsters(EclMonsterRequest request) override { requests.push_back(request); }
+        } host;
+        EclState state;
+        const auto ops = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,
+            EclPartyDialect::disabled,EclPartyCheckDialect::disabled,EclSurpriseDialect::disabled,
+            EclEncounterDialect::disabled,EclMonsterDialect::setup_v1);
+        const auto invoke = [&](const auto& bytes,const auto& selected,EclMonsterDialect dialect) {
+            return execute_ecl(bytes,EclEventKind::move,{"ssi-five-entry-v1",0x9900,0xc04f},selected,state,host,{},
+                EclRandomDialect::disabled,EclArithmeticDialect::disabled,std::nullopt,std::nullopt,dialect);
+        };
+        const auto script = program({3,0,1,0,2,0x1c,0x0b,2,7,1,2,0,1,2,3,1,0});
+        assert(invoke(script,ops,EclMonsterDialect::setup_v1).exited);
+        assert(host.resets == 1 && host.requests.size() == 1 && state.comparison == -1);
+        assert(host.requests[0].resource == 7 && host.requests[0].count == 0 && host.requests[0].selector == 3);
+        assert(!invoke(script,ops,EclMonsterDialect::disabled).exited);
+        assert(!invoke(program({0x0b,0x80,0,0,1,0,0,0}),ops,EclMonsterDialect::setup_v1).exited);
+        auto conflict = ops;
+        for (auto& spec : conflict) if (spec.opcode == 0x0b) spec.operand_count = 2;
+        assert(!invoke(script,conflict,EclMonsterDialect::setup_v1).exited);
+        assert(host.requests.size() == 1);
+    }
+    {
         struct EncounterHost : Host {
             std::vector<std::size_t> actions;
             std::vector<EclSpriteRequest> sprites;

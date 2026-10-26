@@ -1,6 +1,6 @@
 # Pool native opcode and address map
 
-Snapshot: 2026-10-25, engine milestone `a6629d7`.
+Native map: 2026-10-25. Engine coverage includes the subsequent monster setup preparation increment.
 
 All 256 opcode-byte values were exercised through the installed Pool native
 dispatcher. 61 select 49 distinct handlers; 195 have no handler entry in this dispatcher.
@@ -53,7 +53,7 @@ No upstream Java implementation or native code was adopted for this catalog.
 | ECL logical memory address | `0x6DCB` | A script register, resolved through the game's memory adapter. |
 | Native DS-relative field | `DS:49ED` | Interpreter bookkeeping in native memory; distinct from an ECL global with the same number. |
 
-The current seeded replay stop at bytecode offset 6319 therefore selects opcode
+The earlier seeded replay stop at bytecode offset 6319 therefore selects opcode
 `0x1C`, whose native handler is `1F:125D` / file `0x01FA3`. Those three numbers
 describe different locations. Never use the raw native offset as an ECL target.
 
@@ -83,7 +83,7 @@ intentional: a common routine examines the opcode to select its operation.
 | `0x08` | RANDOM | 2 | `1F:0234` | `0x00F7A` | VM / profile |  |
 | `0x09` | WRITE_MEM | 2 | `1F:0292` | `0x00FD8` | VM |  |
 | `0x0A` | LOAD_CHAR | 1 | `1F:02E0` | `0x01026` | VM / profile | Read-only normalized party adapter |
-| `0x0B` | LOAD_MON | 3 | `1F:0450` | `0x01196` | Decode only | Monster roster dependency |
+| `0x0B` | LOAD_MON | 3 | `1F:0450` | `0x01196` | VM / profile | Saved preparation recipes; combat actors not decoded |
 | `0x0C` | SPRITE_START3 | 3 | `1F:03B4` | `0x010FA` | VM / profile |  |
 | `0x0D` | SPRITE_ADVANCE | 0 | `1F:0817` | `0x0155D` | VM / profile |  |
 | `0x0E` | PICTURE | 1 | `1F:0856` | `0x0159C` | VM / profile |  |
@@ -100,7 +100,7 @@ intentional: a common routine examines the opcode to select its operation.
 | `0x19` | IF_GREATER | 0 | `1F:0B52` | `0x01898` | VM |  |
 | `0x1A` | IF_LESS_EQUALS | 0 | `1F:0B52` | `0x01898` | VM |  |
 | `0x1B` | IF_GREATER_EQUALS | 0 | `1F:0B52` | `0x01898` | VM |  |
-| `0x1C` | CLEAR_MON | 0 | `1F:125D` | `0x01FA3` | Missing | Current seeded stop: bytecode 6319 |
+| `0x1C` | CLEAR_MON | 0 | `1F:125D` | `0x01FA3` | VM / profile | Native setup reset; preserves sprite/party |
 | `0x1D` | PARTY_STRENGTH | 1 | `1F:12C6` | `0x0200C` | VM / profile | Native weighted rating verified |
 | `0x1E` | PARTY_CHECK | 6 | `1F:1435` | `0x0217B` | Missing |  |
 | `0x20` | NEW_ECL | 1 | `1F:0BD1` | `0x01917` | VM |  |
@@ -149,8 +149,8 @@ configuration names HAS_EFFECT (`0x3F`), DESTROY_ITEM (`0x40`) and UNUSED_42
 dispatcher routes none of those values. Other releases or preprocessing paths
 require independent evidence.
 
-Current coverage: 25 ordinary VM paths, 16 profile-selected paths, three
-decode-only instructions, 16 missing instructions and one combat host boundary.
+Current coverage: 25 ordinary VM paths, 18 profile-selected paths, two
+decode-only instructions, 15 missing instructions and one combat host boundary.
 These counts describe source coverage, not a percentage of game compatibility.
 
 ## Native bookkeeping and script registers already located
@@ -189,7 +189,7 @@ new address.
 
 | Related operations | Dependency to implement/verify together |
 | --- | --- |
-| CLEAR_MON `1C`, LOAD_MON `0B`, COMBAT `24` | Monster roster creation/reset, resource decoding, persistent encounter state and a real combat host. The seeded path currently stops at CLEAR_MON. |
+| CLEAR_MON `1C`, LOAD_MON `0B`, COMBAT `24` | Setup recipes, resource boundaries and persistence now exist. Combat-ready actors, inventory/effect instances and a real combat host remain missing. Both seeded paths reach COMBAT at bytecode offset 6330. |
 | ENCOUNTER_MENU `29`, PARTY_CHECK `1E` | Current character state, movement/effects and verified map-edge visibility; menu support alone does not supply those values. |
 | TREASURE `27`, ROB `28`, FIND_ITEM `32` | Inventory/currency ownership, item resources and explicit state writes/persistence. |
 | PARLAY `2C`, INPUT_NUMBER `0F`, INPUT_STRING `10` | Typed host input and verified result/state semantics. |

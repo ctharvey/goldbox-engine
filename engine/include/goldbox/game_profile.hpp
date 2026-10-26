@@ -95,6 +95,8 @@ struct GameProfile {
     std::optional<PartyClassCheckBinding> party_class_check{};
     std::optional<EclSurpriseBinding> surprise{};
     std::optional<EclEncounterBinding> encounter{};
+    EclMonsterDialect monster_dialect{EclMonsterDialect::disabled};
+    std::map<std::uint8_t,std::array<std::string,3>> monster_archives{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

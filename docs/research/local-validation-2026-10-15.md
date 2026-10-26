@@ -2153,3 +2153,90 @@ the observed targets and raw-file offset arithmetic, confirms the complete
 current C++ opcode execution case with the catalog (41 VM paths plus one combat
 callback boundary). It passed, as did hygiene and attribution. This increment
 changes documentation only; no compile or game launch was needed.
+
+### Monster setup group and combat boundary, 2026-10-25
+
+The pinned SSI Engine VM has an empty LOAD_MON handler and a CLEAR_MON placeholder
+that clears the sprite. Neither supplies the native behavior needed here, so no
+Java implementation was adopted. The native handler group was investigated
+together using the complete dispatcher map, rather than implementing guessed
+meanings one opcode at a time.
+
+60 bounded cases ran the original LOAD_MON handler (1F:0450), operand decoder
+and native record-copy logic with synthetic template, allocator and presentation
+boundaries. They cover initial counts 0/1/62/63, requests 0/1/2/63/255 and group
+bytes 8/254/255. A request of zero becomes one; additions stop at 63. The group
+byte increments once per accepted template request, with byte wrapping, and all
+its clones receive the same group. A setup already at capacity skips the resource
+loader and keeps the group/RNG unchanged. The template source was synthetic;
+this probe does not measure the real template initializer's RNG consumption.
+
+Three separate CLEAR_MON cases (1F:125D) reset count/group bookkeeping to 0/8,
+clear the native 28-byte auxiliary area and release synthetic auxiliary lists
+of lengths 0/1/3. No sprite host call or RNG consumption occurs. This resets
+active setup bookkeeping; it is not evidence for a complete native actor-list
+cleanup implementation.
+
+54 checks then ran the original resource initializer block (7C:0FA5..106D) and
+its original dice/RNG helpers with six seeds and nine synthetic race codes.
+Exactly five one-based d6 draws initialize offsets C1/C2/C3/C5/C6 as wrapped
+`128 + 17*roll`; C4 receives C4. Initialization happens once per template, before
+the handler copies clones. Native final states for initial seeds 0, 1, 10, 19,
+FFFFFFFF and 12345678 were respectively 1172187917, 2884733762, 1117777183,
+3645787900, 3754609368 and 3859354085. These are initializer-block observations,
+not a full native campaign/combat RNG parity claim.
+
+16 further native COMBAT preamble cases (1F:179B) observed its entry routing.
+With neither native preparation flag set, logical globals 6E6C and 6DE2 select
+entry 28:0025, 22:0025 or 25:0025. When either flag is set, native visibility
+clamps current distance before preparation at 35:0025 and battle entry 25:0025.
+These probes supplied synthetic visibility/preparation boundaries and stopped
+before a battle engine executed. They neither inject nor verify combat outcomes.
+The remaining preamble, actor initialization and post-combat state need a real
+combat adapter; the existing C++ host remains explicitly unavailable.
+
+The implementation adds opt-in `ssi-monster-setup-v1` callbacks and source-bound
+prepared-group recipes, not native-pointer replicas or complete combat actors.
+Profile data binds programs 0/20 to native-observed resource groups 3/2. Runtime
+bundles retain immutable DAX snapshots and include filename/content fingerprints
+in saved source identities. Selected character resources must be 285 bytes;
+items/effects must be multiples of the observed 63/9-byte record sizes. Optional
+missing item/effect records are empty. This checks record structure only; it
+does not validate every combat/inventory/effect field. Native pointer fields
+are never deserialized into host pointers.
+
+Each accepted setup recipe saves program/resource ID, effective count, group,
+the uninterpreted third operand and its pre-initialization seed. Five draws
+advance the shared stream now; the future combat adapter can reproduce template
+initialization from the recipe seed without advancing it again. Clone counts
+do not add draws. Limits, resource shape failures, zero counts, reset behavior,
+numeric-byte truncation, conflicting dialects and atomic save rejection have
+synthetic regressions. Legacy saves retain unknown setup until CLEAR_MON.
+Campaign restart forgets prior setup; standalone previews do not eagerly load
+unrelated campaign monster archives.
+
+Both installed-resource seeded paths now pass CLEAR_MON/LOAD_MON and stop at
+COMBAT offset 6330 with `Combat host unavailable`. Each has one prepared group
+numbered 8, next group 9 and exactly the expected five-draw RNG state. Replaying
+from each pre-move save yields identical stops and serialized resulting state.
+The ordinary opening/boundary and seven matched rendered regions remain valid.
+Native loader status text, normalized monster character windows, inventory and
+effect instances, complete actor decoding, combat execution and aftermath are
+still absent. Prepared recipes do not establish monster/combat compatibility.
+
+Private evidence: `probe_original_monster_setup.py`,
+`original-monster-setup-report.json`, `probe_original_monster_initial_rng.py`,
+`original-monster-initial-rng-report.json`, `probe_original_combat_boundary.py`
+and `original-combat-boundary-report.json` in the external validation cache.
+133 bounded native cases passed across these probes. No game assets, generated
+proprietary records or status text were committed; installed files and user saves
+were not changed. The repaired focused build passed five suites. The full
+serialized two-worker run passed 30 suites with zero failures in 45.32 seconds;
+the Windows-only original RNG integration suite skipped under WSL. Full private
+log: `monster-setup-full-tests.log`.
+
+The final targeted rerun passed VM/exploration suites after adding multi-load
+cap and malformed-resource regressions (0.76 seconds): counts 62 then 2 prepare
+62+1 creatures in groups 8/9, and a third load consumes no RNG. Exact ten-draw
+state is 1828254910 from seed zero. Log: `monster-setup-final-focused.log`.
+Hygiene, attribution and the updated dispatch-catalog/source cross-check passed.

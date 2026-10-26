@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Optional, read-only original-resource check. No game bytes or text are output.
 #include "goldbox/game_profile.hpp"
+#include "goldbox/formats/monster.hpp"
 #include "goldbox/image_presentation.hpp"
 #ifdef GOLDBOX_CAMPAIGN_VIEW_TESTS
 #include "view.hpp"
@@ -151,7 +152,8 @@ int main(int argc, char** argv) {
         session.movement_addresses = dispatch.movement_addresses;
         session.transfer_clear_ranges = dispatch.transfer_clear_ranges;
         session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::weighted_strength,
-            EclPartyCheckDialect::class_presence2,EclSurpriseDialect::signed_threshold2,EclEncounterDialect::menu14);
+            EclPartyCheckDialect::class_presence2,EclSurpriseDialect::signed_threshold2,EclEncounterDialect::menu14,
+            EclMonsterDialect::setup_v1);
         session.campaign_start = std::array<std::uint8_t,2>{config.map_record,config.program_record};
         session.position_refresh_call = config.position_refresh_call;
         session.position_advance_call = config.position_advance_call;
@@ -160,6 +162,19 @@ int main(int argc, char** argv) {
         session.party_class_check = profile.party_class_check;
         session.surprise = profile.surprise;
         session.encounter = profile.encounter;
+        session.monster_dialect = profile.monster_dialect;
+        using MonsterBundle = std::array<std::map<std::uint8_t,std::vector<std::uint8_t>>,3>;
+        std::map<std::uint8_t,MonsterBundle> monsters;
+        for (const auto& [program,files] : profile.monster_archives) for (std::size_t i = 0; i < 3; ++i)
+            if (!files[i].empty()) monsters[program][i] = family(std::vector<std::string>{files[i]});
+        session.monster_resources = MonsterResources{[&](std::uint8_t program,std::uint8_t id) {
+            const auto& bundle = monsters.at(program);
+            const auto optional = [&](std::size_t index) -> std::span<const std::uint8_t> {
+                const auto found = bundle[index].find(id);
+                return found == bundle[index].end() ? std::span<const std::uint8_t>{} : found->second;
+            };
+            validate_ssi_monster_resources(bundle[0].at(id),optional(1),optional(2));
+        },"local-monster-test"};
         session.character_rules = profile.character_rules; session.initial_random = profile.random;
         session.random_dialect = profile.random_dialect;
         session.arithmetic_dialect = profile.arithmetic_dialect;
@@ -191,8 +206,15 @@ int main(int argc, char** argv) {
             const auto before = serialize_exploration(candidate,"private-encounter-check");
             MovementHost probe(candidate,profile,game);
             const auto result = candidate.move(Direction::west,probe);
-            check(result.execution && !result.execution->exited && result.execution->bytecode_offset == 6319 &&
-                result.execution->diagnostic == "Unknown ECL opcode 28","Monster setup checkpoint changed");
+            check(result.execution && !result.execution->exited && result.execution->bytecode_offset == 6330 &&
+                result.execution->diagnostic == "Combat host unavailable","Combat boundary checkpoint changed");
+            check(candidate.monster_setup && candidate.monster_setup->groups.size() == 1 &&
+                candidate.monster_setup->next_group == 9,"Prepared monster group missing");
+            const auto& group = candidate.monster_setup->groups.front();
+            check(group.count > 0 && group.count <= 63 && group.group == 8,"Invalid prepared monster group");
+            auto initialized = HighWordLcg32(group.template_seed,profile.random->multiplier(),profile.random->increment());
+            for (unsigned i = 0; i < 5; ++i) (void)initialized.draw(6);
+            check(candidate.state.random && candidate.state.random->state() == initialized.state(),"Monster RNG checkpoint differs");
             auto replay = session;
             restore_exploration(replay,before,"private-encounter-check");
             MovementHost repeated_host(replay,profile,game);

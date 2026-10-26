@@ -69,6 +69,8 @@ void EclHost::select_character(std::string_view) { throw EclDecodeError("Party s
 std::uint8_t EclHost::party_strength() { throw EclDecodeError("Party strength host unavailable"); }
 bool EclHost::party_class_present() { throw EclDecodeError("Party class check host unavailable"); }
 std::uint8_t EclHost::encounter_distance() { throw EclDecodeError("Encounter visibility adapter unavailable"); }
+void EclHost::clear_monsters() { throw EclDecodeError("Monster setup host unavailable"); }
+void EclHost::load_monsters(EclMonsterRequest) { throw EclDecodeError("Monster resource host unavailable"); }
 std::array<std::uint8_t,2> EclHost::party_movement() {
     throw EclDecodeError("Current party movement and effects unavailable");
 }
@@ -79,7 +81,8 @@ std::optional<std::string> EclHost::string_at(std::uint16_t) { return std::nullo
 bool EclHost::write_string(std::uint16_t, std::string_view) { return false; }
 
 std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDialect area, EclPartyDialect party,
-    EclPartyCheckDialect check, EclSurpriseDialect surprise, EclEncounterDialect encounter) {
+    EclPartyCheckDialect check, EclSurpriseDialect surprise, EclEncounterDialect encounter, EclMonsterDialect monsters) {
+    require(monsters == EclMonsterDialect::disabled || monsters == EclMonsterDialect::setup_v1,"Unknown monster dialect");
     require(encounter == EclEncounterDialect::disabled || encounter == EclEncounterDialect::menu14,
         "Unknown encounter dialect");
     require(surprise == EclSurpriseDialect::disabled || surprise == EclSurpriseDialect::signed_threshold2,
@@ -111,15 +114,24 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
     if (check == EclPartyCheckDialect::class_presence2) result.push_back({0x22,"PARTY_CLASS_CHECK2",2});
     if (surprise == EclSurpriseDialect::signed_threshold2) result.push_back({0x23,"SURPRISE_THRESHOLD2",4});
     if (encounter == EclEncounterDialect::menu14) result.push_back({0x29,"ENCOUNTER_MENU14",14});
+    if (monsters == EclMonsterDialect::setup_v1) result.push_back({0x1c,"CLEAR_MON",0});
     return result;
 }
 
 EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind,
     const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes,
     EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random, EclArithmeticDialect arithmetic,
-    std::optional<EclSurpriseBinding> surprise, std::optional<EclEncounterBinding> encounter) {
+    std::optional<EclSurpriseBinding> surprise, std::optional<EclEncounterBinding> encounter, EclMonsterDialect monsters) {
     EclExecution result;
     try {
+        require(monsters == EclMonsterDialect::disabled || monsters == EclMonsterDialect::setup_v1,"Unknown monster dialect");
+        if (monsters == EclMonsterDialect::setup_v1) for (const auto opcode : {0x0b,0x1c}) {
+            const auto spec = std::find_if(opcodes.begin(),opcodes.end(),[opcode](const auto& op) { return op.opcode == opcode; });
+            require(spec != opcodes.end() && spec->operand_count == (opcode == 0x0b ? 3 : 0) &&
+                spec->variable_count_operand == -1 && spec->mnemonic == (opcode == 0x0b ? "LOAD_MON" : "CLEAR_MON") &&
+                std::count_if(opcodes.begin(),opcodes.end(),[opcode](const auto& op) { return op.opcode == opcode; }) == 1,
+                "Conflicting monster opcode definition");
+        }
         const auto encounter_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x29; });
         if (encounter) require(encounter->dialect == EclEncounterDialect::menu14 &&
             encounter->distance_addresses[0] != encounter->distance_addresses[1] &&
@@ -378,6 +390,17 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                 host.select_character(string(args[0],state,host));
                 break;
             case 0x24: host.combat(state); break;
+            case 0x1c:
+                require(monsters == EclMonsterDialect::setup_v1,"Monster setup dialect disabled");
+                host.clear_monsters(); break;
+            case 0x0b: {
+                require(monsters == EclMonsterDialect::setup_v1,"Monster setup dialect disabled");
+                const auto resource = numeric(args[0]) & 255u, count = numeric(args[1]) & 255u;
+                const auto selector = numeric(args[2]) & 255u;
+                host.load_monsters({static_cast<std::uint8_t>(resource),static_cast<std::uint8_t>(count),
+                    static_cast<std::uint8_t>(selector)});
+                break;
+            }
             case 0x29: {
                 require(encounter.has_value(),"Encounter adapter unavailable");
                 destination(args[3],state);

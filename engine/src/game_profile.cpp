@@ -19,7 +19,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
         "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
-        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck", "surprise", "encounter"}, "game profile");
+        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck", "surprise", "encounter", "monsterSetup"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -33,6 +33,31 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
         {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled", 0, {}
     };
+    if (const auto* value = root.if_contains("monsterSetup")) {
+        const auto& object = j::object(*value,"monsterSetup");
+        j::fields_only(object,{"dialect","programResources"},"monsterSetup");
+        if (j::string(j::field(object,"dialect","monsterSetup"),"monster dialect") != "ssi-monster-setup-v1")
+            throw std::runtime_error("Unsupported monster setup dialect");
+        profile.monster_dialect = EclMonsterDialect::setup_v1;
+        const auto& resources = j::array(j::field(object,"programResources","monsterSetup"),"monster resources");
+        if (resources.empty() || resources.size() > 256) throw std::runtime_error("Invalid monster resource binding count");
+        for (const auto& value : resources) {
+            const auto& binding = j::object(value,"monster resource binding");
+            j::fields_only(binding,{"program","archives"},"monster resource binding");
+            const auto program = j::integer(j::field(binding,"program","monster resource binding"),"monster program");
+            const auto& archives = j::array(j::field(binding,"archives","monster resource binding"),"monster archives");
+            if (program < 0 || program > 255 || archives.size() != 3) throw std::runtime_error("Invalid monster resource binding");
+            std::array<std::string,3> files;
+            for (std::size_t i = 0; i < 3; ++i) {
+                files[i] = j::string(archives[i],"monster archive");
+                if ((files[i].empty() && i == 0) || (!files[i].empty() &&
+                    !std::regex_match(files[i],std::regex(R"([A-Za-z0-9_-]+\.DAX)"))))
+                    throw std::runtime_error("Invalid monster archive filename");
+            }
+            if (!profile.monster_archives.emplace(static_cast<std::uint8_t>(program),files).second)
+                throw std::runtime_error("Duplicate monster program binding");
+        }
+    }
     if (const auto* value = root.if_contains("encounter")) {
         const auto& object = j::object(*value,"encounter");
         j::fields_only(object,{"dialect","viewModeAddress","distanceAddresses"},"encounter");

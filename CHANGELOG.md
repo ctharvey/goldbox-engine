@@ -2,6 +2,11 @@
 
 ## 2026-10-25
 
+- Add opt-in monster setup preparation: native count/group limits, five RNG draws
+  per template, validated character/item/effect archive bindings and saved setup
+  recipes. Advance both seeded paths through CLEAR_MON/LOAD_MON to the explicit
+  combat-host boundary; combat actors and outcomes remain unimplemented.
+
 - Map all 256 native opcode dispatcher inputs for the installed Pool release:
   61 routed opcodes, 49 distinct handlers and 195 unrouted values. Publish a
   version-bound address/coverage catalog with operand-reference confidence,
