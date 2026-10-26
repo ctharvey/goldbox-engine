@@ -444,3 +444,9 @@ The read-only position/clock binding consults the same pinned movement, memory
 and position interfaces as research references. Its addresses, zero padding and
 two-character formatting follow independent bounded native-code observations.
 No upstream clock implementation or native instructions were copied or ported.
+
+The optional unsigned-16 arithmetic dialect checks SSI Engine's opcode metadata
+and VM as research references. Its native operand order, result wrapping and
+unchanged remainder/comparison state were independently verified. The upstream
+division remainder assignment does not match the observed Pool handler and was
+not adopted. No Java arithmetic code or native instructions were copied/ported.

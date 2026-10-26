@@ -17,6 +17,7 @@ struct EclState {
     std::optional<HighWordLcg32> random{};
 };
 enum class EclRandomDialect { disabled, byte_upper };
+enum class EclArithmeticDialect { disabled, unsigned16 };
 enum class EclImageDialect { disabled, sprite3 };
 enum class EclAreaDialect { disabled, map3 };
 enum class EclPartyDialect { disabled, load_character, weighted_strength };
@@ -88,7 +89,8 @@ struct EclExecution {
 EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEventKind kind,
     const formats::EclDispatchDialect& dialect, std::span<const formats::EclOpcodeSpec> opcodes,
     EclState& state, EclHost& host, EclLimits limits = {},
-    EclRandomDialect random = EclRandomDialect::disabled);
+    EclRandomDialect random = EclRandomDialect::disabled,
+    EclArithmeticDialect arithmetic = EclArithmeticDialect::disabled);
 
 std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
     EclAreaDialect area = EclAreaDialect::disabled, EclPartyDialect party = EclPartyDialect::disabled);

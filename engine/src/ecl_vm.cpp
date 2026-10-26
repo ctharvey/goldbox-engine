@@ -101,9 +101,19 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
 
 EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind,
     const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes,
-    EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random) {
+    EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random, EclArithmeticDialect arithmetic) {
     EclExecution result;
     try {
+        require(arithmetic == EclArithmeticDialect::disabled || arithmetic == EclArithmeticDialect::unsigned16,
+            "Unknown arithmetic dialect");
+        if (arithmetic == EclArithmeticDialect::unsigned16)
+            for (const auto opcode : {5,6,7}) {
+                const auto spec = std::find_if(opcodes.begin(),opcodes.end(),
+                    [opcode](const auto& op) { return op.opcode == opcode; });
+                require(spec != opcodes.end() && spec->operand_count == 3 && spec->variable_count_operand == -1 &&
+                    std::count_if(opcodes.begin(),opcodes.end(),[opcode](const auto& op) { return op.opcode == opcode; }) == 1,
+                    "Conflicting arithmetic opcode definition");
+            }
         require(random == EclRandomDialect::disabled || random == EclRandomDialect::byte_upper,
             "Unknown ECL random dialect");
         const auto image_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0c; });
@@ -218,6 +228,15 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             case 4:
                 store(args[2],numeric(args[0]) + numeric(args[1]));
                 break;
+            case 5: case 6: case 7: {
+                require(arithmetic == EclArithmeticDialect::unsigned16,"Arithmetic dialect disabled");
+                const auto left = numeric(args[0]) & 65535u, right = numeric(args[1]) & 65535u;
+                if (instruction.opcode == 6) require(right != 0,"ECL division by zero");
+                const auto value = instruction.opcode == 5 ? right-left :
+                    instruction.opcode == 6 ? left/right : left*right;
+                store(args[2],value & 65535u);
+                break;
+            }
             case 8: {
                 require(random == EclRandomDialect::byte_upper,"Unsupported VM opcode 8 (random dialect disabled)");
                 require(state.random.has_value(),"RNG state unavailable; legacy saves require an explicit new seed");

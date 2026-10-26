@@ -394,7 +394,8 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
             if (result.steps >= limits.steps) throw std::runtime_error("Campaign ECL step limit exceeded");
             SessionHost session_host(*this,host);
             auto remaining = limits; remaining.steps -= result.steps;
-            auto run = execute_ecl(ecl_record,events.front(),dialect,opcodes,state,session_host,remaining,random_dialect);
+            auto run = execute_ecl(ecl_record,events.front(),dialect,opcodes,state,session_host,remaining,
+                random_dialect,arithmetic_dialect);
             result.steps += run.steps; result.bytecode_offset = run.bytecode_offset;
             result.dispatches.insert(result.dispatches.end(),run.dispatches.begin(),run.dispatches.end());
             if (!run.exited) { result.diagnostic = std::move(run.diagnostic); return result; }

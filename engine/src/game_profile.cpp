@@ -19,7 +19,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
         "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
-        "originalDisplay", "partyStrength"}, "game profile");
+        "originalDisplay", "partyStrength", "arithmeticDialect"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -33,6 +33,11 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
         {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled", 0, {}
     };
+    if (const auto* arithmetic = root.if_contains("arithmeticDialect")) {
+        const auto value = j::string(*arithmetic,"arithmeticDialect");
+        if (value != "ssi-unsigned16-v1") throw std::runtime_error("Unsupported arithmetic dialect");
+        profile.arithmetic_dialect = EclArithmeticDialect::unsigned16;
+    }
     static const std::regex id_pattern(R"(^[a-z0-9][a-z0-9._-]{0,127}$)");
     if (!std::regex_match(profile.id, id_pattern) || profile.id.find("..") != std::string::npos ||
         profile.title.empty() || profile.title.size() > 256 || profile.format_family.empty() ||

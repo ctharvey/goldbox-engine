@@ -51,6 +51,16 @@ AND stores the bitwise result and sets comparison to zero for a zero result,
 one otherwise; subsequent IF instructions use that flag rather than an earlier
 COMPARE. Comparison is updated only after a successful store.
 
+Profile `arithmeticDialect: ssi-unsigned16-v1` enables SUBTRACT (0x05), DIVIDE
+(0x06) and MULTIPLY (0x07). Other profiles retain disabled arithmetic semantics.
+Operands are unsigned 16-bit values: subtraction computes second minus first,
+division computes first divided by second, and multiplication computes their
+product. Results wrap to 16 bits before the ordinary typed destination store.
+Comparison and other memory, including a presumed remainder register, are not
+implicitly changed. Division by zero fails explicitly before writing a result.
+The dialect rejects conflicting operand definitions. These semantics follow
+the native Pool handler; another title's remainder policy needs another dialect.
+
 State changes made before an error remain visible; execution is not
 transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations

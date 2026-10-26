@@ -1904,3 +1904,50 @@ seeds 10 and 19, stopping at unsupported opcode 0x06 (DIVIDE), program 20 offset
 compatibility work is the native arithmetic handler, rather than a fabricated
 combat result or inactive original command labels. No game assets, native text,
 user saves or instructions were committed.
+
+## Native arithmetic and the next encounter blocker (2026-10-25)
+
+Thirty bounded checks executed the unmodified shared arithmetic handler plus
+original operand decoder and writer, using synthetic inputs and a sentinel
+remainder word. The native dispatcher opcode variable was initialized explicitly;
+this is a handler probe, not full-game execution. Correct overlay-relative entry
+selection and opcode initialization were necessary during probe setup. Only the
+final passing cases support the result. Subtraction is second minus first;
+division is unsigned first divided by second; multiplication retains the low
+16 bits. The presumed 0x6E3F remainder register is unchanged. The SSI Engine
+reference's remainder assignment was therefore not adopted. Inputs include
+0/1, unequal operands, values over 255, 32768 and 65535. Each call was bounded
+to 20,000 instructions/100 ms. Private report: `original-arithmetic-report.json`.
+
+Profile `arithmeticDialect: ssi-unsigned16-v1` selects the independent shared
+implementation; other profiles default to disabled. Arithmetic reuses typed,
+protected destination writes, preserves comparison state and diagnoses division
+by zero rather than invoking a host CPU fault. Synthetic cases check all 30
+native numeric results with byte and word stores, overflow/underflow, zero
+division, invalid/protected destinations, malformed dialects and opcode conflicts.
+The first test fixture incorrectly expected pre-invocation comparison state to
+survive the existing VM reset; it now establishes COMPARE inside the program
+before asserting that arithmetic preserves it. No VM reset policy changed.
+
+The original-resource seeded boundary probes now advance from offset 616 to
+offset 769 in program 20 for seeds 10 and 19. Both stop with
+`Unknown ECL opcode 34` (0x22), and the integration test asserts that exact gate.
+The pinned Pool profile calls this instruction `PARTY_SKILL_CHECK2`, while its
+VM implementation is empty. Other dialects assign 0x22 to yes/no input or other
+skill checks. Native operand/result and party-skill semantics remain unverified;
+substituting a generic confirmation or always-success result would invent game
+state. This is the current executable encounter blocker. The ordinary opening,
+non-encounter boundary and all seven previously matched rendered regions remain
+unchanged. No full encounter, combat or synchronized-party parity is claimed.
+
+Five focused suites passed. The command bar still exposes the supported engine
+controls rather than unsupported native actions. Host time advancement, the
+native skill-check adapter, remaining commands and combat remain unfinished.
+All original assets, native text and captures stayed in the private cache; user
+artwork, installed resources and user saves were not modified.
+
+Final arithmetic validation passed all 30 runnable CTest suites; the Windows-only
+original RNG suite was skipped under WSL. The actual installed-resource opening,
+ordinary boundary, rendered-region fingerprints and two unsupported skill-check
+checkpoints ran. Hygiene and attribution checks passed. Private logs:
+`parity-arithmetic-final-focused.log` and `parity-arithmetic-full-tests.log`.

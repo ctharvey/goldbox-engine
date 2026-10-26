@@ -7,6 +7,7 @@
   "eventDialect": "unverified",
   "imageDialect": "ssi-images-3-v1",
   "areaDialect": "ssi-area-map3-v1",
+  "arithmeticDialect": "ssi-unsigned16-v1",
   "picturePeriodMs": 400,
   "scriptDelayMs": 400,
   "spriteReplacementMs": 1000,

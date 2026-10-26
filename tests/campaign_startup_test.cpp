@@ -158,6 +158,7 @@ int main(int argc, char** argv) {
         session.party_strength = profile.party_strength;
         session.character_rules = profile.character_rules; session.initial_random = profile.random;
         session.random_dialect = profile.random_dialect;
+        session.arithmetic_dialect = profile.arithmetic_dialect;
         auto random = *profile.random;
         Character draft; draft.name = "TEST"; draft.race = "dwarf"; draft.gender = "male";
         draft.character_class = "fighter"; draft.alignment = "lawful-good";
@@ -180,6 +181,14 @@ int main(int argc, char** argv) {
         auto repeated = initial; Host second(repeated,profile,assets,game);
         check(repeated.begin_campaign(second).exited,"Repeated startup failed");
         check(serialize_exploration(repeated,"private-opening-check") == saved,"Deterministic startup differs");
+        for (const auto seed : {10u,19u}) {
+            auto candidate = session;
+            candidate.state.random = HighWordLcg32(seed,profile.random->multiplier(),profile.random->increment());
+            MovementHost probe(candidate,profile,game);
+            const auto result = candidate.move(Direction::west,probe);
+            check(result.execution && !result.execution->exited && result.execution->bytecode_offset == 769 &&
+                result.execution->diagnostic == "Unknown ECL opcode 34","Encounter unsupported checkpoint changed");
+        }
         auto walked = session; MovementHost movement_host(walked,profile,game);
         const auto move = walked.move(Direction::west,movement_host);
         check(move.execution.has_value(),"Boundary event did not run");

@@ -41,6 +41,45 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 
 int main() {
     {
+        // Expected results independently checked against the original unsigned handler.
+        const unsigned cases[][5]{{0,1,1,0,0},{1,2,1,0,2},{17,5,65524,3,85},
+            {255,2,65283,127,510},{256,3,65283,85,768},{32767,7,32776,4681,32761},
+            {32768,255,33023,128,32768},{65535,1,2,65535,65535},
+            {65535,255,256,257,65281},{65535,65535,0,1,1}};
+        EclState arithmetic_state; Host arithmetic_host;
+        const auto invoke = [&](const auto& bytes, const auto& ops, EclArithmeticDialect dialect) {
+            return execute_ecl(bytes,EclEventKind::move,{"ssi-five-entry-v1",0x9900,0xc04f},
+                ops,arithmetic_state,arithmetic_host,{},EclRandomDialect::disabled,dialect);
+        };
+        const auto ops = minimal_vm_opcodes();
+        for (const auto& values : cases) for (unsigned opcode = 5; opcode <= 7; ++opcode)
+            for (const auto type : {1,3}) {
+                auto bytes = program({3,0,1,0,2}); // Establish comparison within this invocation.
+                bytes.insert(bytes.end(),{static_cast<std::uint8_t>(opcode),2,
+                    static_cast<std::uint8_t>(values[0]),static_cast<std::uint8_t>(values[0]>>8),2,
+                    static_cast<std::uint8_t>(values[1]),static_cast<std::uint8_t>(values[1]>>8),
+                    static_cast<std::uint8_t>(type),0x20,0x4a,0});
+                arithmetic_state.comparison = -1; arithmetic_state.memory[0x6e3f] = 0xa5;
+                arithmetic_state.memory[0x4a21] = 0xcc;
+                assert(invoke(bytes,ops,EclArithmeticDialect::unsigned16).exited);
+                const auto expected = values[opcode-3];
+                assert(arithmetic_state.memory[0x4a20] == (expected&255));
+                assert(arithmetic_state.memory[0x4a21] == (type == 3 ? expected>>8 : 0xcc));
+                assert(arithmetic_state.memory[0x6e3f] == 0xa5 && arithmetic_state.comparison == -1);
+            }
+        const auto valid = program({6,0,17,0,5,1,0x20,0x4a,0});
+        assert(!invoke(valid,ops,EclArithmeticDialect::disabled).exited);
+        arithmetic_state.memory[0x4a20] = 99;
+        assert(!invoke(program({6,0,17,0,0,1,0x20,0x4a,0}),ops,EclArithmeticDialect::unsigned16).exited);
+        assert(arithmetic_state.memory[0x4a20] == 99);
+        assert(!invoke(program({6,0,17,0,5,0,20,0}),ops,EclArithmeticDialect::unsigned16).exited);
+        assert(!invoke(program({6,0,17,0,5,1,0x14,0x99,0}),ops,EclArithmeticDialect::unsigned16).exited);
+        assert(!invoke(program({6,0,17,0,5,3,0xff,0xff,0}),ops,EclArithmeticDialect::unsigned16).exited);
+        auto conflict = ops;
+        for (auto& spec : conflict) if (spec.opcode == 6) spec.operand_count = 2;
+        assert(!invoke(valid,conflict,EclArithmeticDialect::unsigned16).exited);
+    }
+    {
         struct StrengthHost : Host {
             unsigned queries{};
             std::uint8_t party_strength() override { ++queries; return 42; }

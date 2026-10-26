@@ -91,6 +91,7 @@ struct GameProfile {
         std::vector<std::array<std::uint16_t,5>> frame_runs;
     };
     std::optional<OriginalDisplay> original_display{};
+    EclArithmeticDialect arithmetic_dialect{EclArithmeticDialect::disabled};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

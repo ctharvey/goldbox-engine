@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Add an explicitly selected unsigned-16 arithmetic dialect for native SUBTRACT,
+  DIVIDE and MULTIPLY behavior. Advance deterministic encounter branches past
+  DIVIDE to the unsupported Pool 0x22 skill-check boundary, with regression gates.
+
 - Display the native clock from profile-selected script globals beside position.
   Verify 54 native formatting cases and the rendered boundary position region;
   preserve saved script state without inventing elapsed-time advancement.

@@ -497,6 +497,7 @@ int main(int argc, char** argv) {
         }
         session.state.random = session.initial_random;
         session.random_dialect = profile.random_dialect;
+        session.arithmetic_dialect = profile.arithmetic_dialect;
 
         session.party_memory = profile.party_memory;
         session.party_strength = profile.party_strength;

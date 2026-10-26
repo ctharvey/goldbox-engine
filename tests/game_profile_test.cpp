@@ -13,6 +13,8 @@ int main(int argc, char** argv) {
     assert(argc == 3);
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
+    assert(pool.arithmetic_dialect == goldbox::EclArithmeticDialect::unsigned16);
+    assert(curse.arithmetic_dialect == goldbox::EclArithmeticDialect::disabled);
     assert(pool.original_display && !curse.original_display);
     assert((pool.original_display->scene == std::array<std::uint16_t,4>{24,24,88,88}));
     assert(pool.original_display->symbols_record == 202 && pool.original_display->frame_runs.size() == 26);
@@ -81,6 +83,14 @@ int main(int argc, char** argv) {
     fs::remove(path);
     if (!rejected) return 1;
     const std::string prefix = R"({"schemaVersion":1,"id":"test","title":"Test","formatFamily":"goldbox-dos","archiveFormat":"dax-v1","eventDialect":"unverified","rulesProfile":"test","validationStatus":"unverified","resourcePatterns":[],"colorBackdrop":)";
+    auto arithmetic_prefix = prefix;
+    arithmetic_prefix.replace(arithmetic_prefix.find("colorBackdrop"),13,"arithmeticDialect");
+    for (const auto value : {"\"unknown\"","false","3"}) {
+        { std::ofstream output(path); output << arithmetic_prefix << value << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
     auto reset_prefix = prefix;
     reset_prefix.replace(reset_prefix.find("colorBackdrop"),13,"eventDispatch");
     reset_prefix += R"({"dialect":"ssi-five-entry-v1","codeBase":39168,"squareInfoAddress":49231,"transferClearRanges":)";
