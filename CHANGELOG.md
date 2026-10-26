@@ -2,6 +2,11 @@
 
 ## 2026-10-25
 
+- Decode verified monster item type/equipped/weight/quantity and effect ID/timer/
+  parameter/removal-handler fields. Preserve native stack-weight byte/word
+  behavior and encounter movement effect precedence. Add native-backed boundary
+  regressions; combat damage, effect handlers and runtime integration remain open.
+
 - Decode the observed SSI 285/63/9-byte monster template layout into local
   snapshots with current HP/AC/THAC0/movement, detached item/effect records and
   deterministic independent clones. Add native-derived synthetic fingerprints

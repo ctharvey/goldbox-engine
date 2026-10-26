@@ -431,3 +431,22 @@ Runtime normalized combatants, native inventory/effect rule semantics and combat
 execution remain unavailable. In particular, preserving an item's encoded record
 does not establish its damage/equipment behavior, nor does preserving an effect
 establish its duration or combat action.
+
+The item view now exposes the independently checked type byte `2E`, nonzero
+equipped flag `34`, little-endian unit weight word `37` and quantity byte `39`.
+`stack_weight()` uses quantity zero as one and wraps multiplication to 16 bits,
+matching native inventory accounting. It does not calculate total encumbrance,
+equipment slots, money weight or Bag of Holding adjustments. Display names,
+bonuses, values and consumable properties remain in the encoded snapshot.
+
+The effect view exposes ID byte `0`, timer word `1`, uninterpreted parameter byte
+`3` and nonzero removal-handler flag `4`. The timer traversal skips zero words;
+nonzero timers decrement and expire. This decoder does not advance time, invoke
+handlers or assume every effect parameter/timer has the same interpretation.
+
+`ssi_encounter_movement()` supplies the verified per-creature encounter movement
+input: effect `27` doubles with byte wrapping; otherwise `2A` halves with integer
+rounding down. Presence is sufficient, including zero timers and duplicates;
+`27` takes precedence regardless of list order. This is not a general combat
+movement implementation or a party movement aggregator. Those runtime adapters
+must still account for their own state and title-selected rules.

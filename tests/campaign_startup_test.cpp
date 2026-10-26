@@ -226,6 +226,20 @@ int main(int argc, char** argv) {
             };
             const auto actors = materialize(group);
             check(actors.size() == group.count && actors.front() == actors.back(),"Monster clones differ");
+            for (const auto& item : actors.front().items) {
+                const auto typed = decode_ssi_monster_item(item);
+                check(typed.type == item[0x2e] && typed.equipped == (item[0x34] != 0) &&
+                    typed.stack_weight() == ((unsigned(item[0x37])+(unsigned(item[0x38]) << 8))*
+                        std::max(unsigned(item[0x39]),1u)%65536),"Decoded monster inventory differs");
+            }
+            for (const auto& effect : actors.front().effects) {
+                const auto typed = decode_ssi_monster_effect(effect);
+                check(typed.type == effect[0] && typed.timer == (effect[1] | (unsigned(effect[2]) << 8)) &&
+                    typed.parameter == effect[3] && typed.calls_handler_on_removal == (effect[4] != 0),
+                    "Decoded monster effect differs");
+            }
+            check(ssi_encounter_movement(actors.front()) == ssi_encounter_movement(actors.back()),
+                "Monster clone encounter movement differs");
             const auto& raw = monsters.at(group.program)[0].at(group.resource);
             check(actors.front().stats() == SsiMonsterStats{raw[0x11b],raw[0x11c],60-int(raw[0x111]),60-int(raw[0x110])},
                 "Decoded monster combat fields differ");

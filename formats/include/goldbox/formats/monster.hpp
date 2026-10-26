@@ -25,6 +25,33 @@ struct SsiMonsterStats {
     int armor_class{}, thac0{};
     bool operator==(const SsiMonsterStats&) const = default;
 };
+struct SsiMonsterItem {
+    std::uint8_t type{}, quantity{};
+    bool equipped{};
+    std::uint16_t unit_weight{};
+    std::uint16_t stack_weight() const {
+        return static_cast<std::uint16_t>(std::uint32_t(unit_weight)*std::max(unsigned(quantity),1u));
+    }
+    bool operator==(const SsiMonsterItem&) const = default;
+};
+inline SsiMonsterItem decode_ssi_monster_item(std::span<const std::uint8_t> record) {
+    if (record.size() != 63) throw std::runtime_error("Invalid SSI monster item record size");
+    return {record[0x2e],record[0x39],record[0x34] != 0,
+        static_cast<std::uint16_t>(record[0x37] | (unsigned(record[0x38]) << 8))};
+}
+struct SsiMonsterEffect {
+    std::uint8_t type{};
+    // Native timer word; interpretation of special effect payloads belongs to
+    // their handler. Zero is skipped by the native timer-expiry traversal.
+    std::uint16_t timer{};
+    std::uint8_t parameter{};
+    bool calls_handler_on_removal{};
+    bool operator==(const SsiMonsterEffect&) const = default;
+};
+inline SsiMonsterEffect decode_ssi_monster_effect(std::span<const std::uint8_t> record) {
+    if (record.size() != 9) throw std::runtime_error("Invalid SSI monster effect record size");
+    return {record[0],static_cast<std::uint16_t>(record[1] | (unsigned(record[2]) << 8)),record[3],record[4] != 0};
+}
 struct SsiMonsterTemplate {
     std::array<std::uint8_t,285> character{};
     std::vector<std::array<std::uint8_t,63>> items;
@@ -34,6 +61,19 @@ struct SsiMonsterTemplate {
     }
     bool operator==(const SsiMonsterTemplate&) const = default;
 };
+// Per-creature input to the native encounter movement aggregator, not the full
+// combat movement/effect handler. Presence of 27 takes precedence over 2A,
+// including when its timer is zero; doubling wraps to one byte.
+inline std::uint8_t ssi_encounter_movement(const SsiMonsterTemplate& source) {
+    bool doubled = false, halved = false;
+    for (const auto& record : source.effects) {
+        const auto effect = decode_ssi_monster_effect(record);
+        doubled |= effect.type == 0x27;
+        halved |= effect.type == 0x2a;
+    }
+    const auto movement = source.stats().movement;
+    return doubled ? static_cast<std::uint8_t>(movement*2) : (halved ? movement/2 : movement);
+}
 inline SsiMonsterTemplate decode_ssi_monster_resources(std::span<const std::uint8_t> character,
     std::span<const std::uint8_t> items, std::span<const std::uint8_t> effects) {
     validate_ssi_monster_resources(character,items,effects);

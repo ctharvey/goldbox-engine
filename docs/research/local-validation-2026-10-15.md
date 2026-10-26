@@ -2280,3 +2280,55 @@ zero failures in 35.76 seconds, including the installed-resource campaign test
 with both seeded snapshot/replay checks. The Windows-only original RNG suite
 skipped under WSL. Private log: `monster-snapshots-full-tests.log`. Repository
 hygiene and attribution checks passed (13 records, five adopted local files).
+
+## Typed monster inventory and effect views (2026-10-25)
+
+Research compared cached SSI Engine's unimplemented inventory methods, cached
+Gold Box Explorer's incompatible FRUA item parser, Stephen S. Lee's PC v1.3
+research (FAQ 2.00, sections 12.2.3/4 and 12.6), and marainein's older forum
+item-format notes. The older notes place the type byte at `2D`, overlapping the
+next-item far pointer; the installed code reads it at `2E`. No parser or guide
+text/tables were adopted. See THIRD_PARTY.md for URLs, authorship and licenses.
+
+Private `probe_original_monster_fields.py` ran native resident `BA:0BB8..0D84`,
+stopping after inventory accounting and before money/remaining stat processing.
+All 240 cases passed: weights 0/1/255/256/65535, quantities 0/1/2/255, equipped
+bytes 0/1/2/255, and types 0/7/255. The item type selects the corresponding
+16-byte base-item table entry. Equipped bytes are tested as nonzero, not exactly
+one. Quantity zero contributes one unit; multiplication and accumulation use
+16-bit wrapping. Unit weight is word `37`, quantity byte `39`, equipped byte
+`34`, type byte `2E`. The probe uses a synthetic base-item table and stops before
+any complete equipment/combat-stat recalculation claim.
+
+Another 192 cases executed native `8C:0000` effect timing and `B0:0026` removal:
+timer words 0/1/2/10/11/255/256/65535, minute deltas 0/1/2/10/11/255, removal flags
+0/1/2/255. Zero timers remain; nonzero timers decrement or expire at the boundary.
+Expired effects unlink and free a nine-byte node; nonzero byte `4` invokes the
+removal callback with the effect ID. Only free and effect-handler boundaries
+were substituted; traversal, timer arithmetic and unlinking stayed original.
+Every case returned and preserved RNG. Calls were capped at 100 ms and 30,000
+instructions (10,000 for inventory), with a 30-second batch deadline. Report:
+`.cache/goldbox-validation/original-monster-fields-report.json`.
+
+Typed views expose only independently checked fields. Effect byte `3` remains
+an uninterpreted parameter; timer-word interpretation can be handler-specific.
+No timer scheduler or effect callback implementation is claimed. The individual
+encounter movement helper uses the previously native-checked `27`/`2A` presence
+rules (67 native aggregator cases), preserving precedence, byte wrapping and
+integer halving. It does not implement the native first-member min/max quirk or
+provide a runtime party movement source.
+
+Regression tests cover the native inventory grid, timer-word/flag boundaries,
+malformed record lengths, immutable views, and all 256 movement speeds with
+seven effect-list combinations. Both installed-resource seeded encounter checks
+decode available item/effect records and compare clone movement. Complete base
+item properties, equipment/damage calculation, special effect handlers and
+runtime normalized combatants remain the next dependencies. COMBAT still fails
+explicitly at the existing unavailable-host boundary.
+
+Validation: full serialized two-worker build passed 30 CTest suites with zero
+failures in 35.70 seconds, including installed-resource campaign startup and
+both seeded encounters. The Windows-only original RNG suite skipped under WSL.
+Private log: `monster-fields-full-tests.log`. Hygiene and attribution checks
+passed (13 records, five adopted local files). No original assets, saves,
+screenshots or derived item/effect records were committed.

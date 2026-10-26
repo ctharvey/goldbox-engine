@@ -135,6 +135,45 @@ void monster_setup() {
         rejects([&] { validate_ssi_monster_resources(std::vector<std::uint8_t>(sizes[0]),
             std::vector<std::uint8_t>(sizes[1]),std::vector<std::uint8_t>(sizes[2])); });
 }
+void monster_attachments() {
+    // Matches the synthetic parameter grid exercised in native BA:0BB8..0D84.
+    for (const auto weight : {0,1,255,256,65535}) for (const auto quantity : {0,1,2,255})
+        for (const auto equipped : {0,1,2,255}) for (const auto type : {0,7,255}) {
+            std::array<std::uint8_t,63> record{};
+            record[0x2e] = type; record[0x34] = equipped; record[0x39] = quantity;
+            record[0x37] = weight & 255; record[0x38] = weight >> 8;
+            std::fill_n(record.begin()+0x2a,4,0xff); // Never follow serialized pointers.
+            const auto before = record;
+            const auto item = decode_ssi_monster_item(record);
+            assert((item == SsiMonsterItem{static_cast<std::uint8_t>(type),static_cast<std::uint8_t>(quantity),
+                equipped != 0,static_cast<std::uint16_t>(weight)}));
+            assert(item.stack_weight() == (unsigned(weight)*unsigned(std::max(quantity,1)) & 65535));
+            assert(record == before);
+        }
+    for (const auto timer : {0,1,2,10,11,255,256,65535}) for (const auto flag : {0,1,2,255}) {
+        const std::array<std::uint8_t,9> record{39,static_cast<std::uint8_t>(timer & 255),
+            static_cast<std::uint8_t>(timer >> 8),255,static_cast<std::uint8_t>(flag),255,255,255,255};
+        const auto effect = decode_ssi_monster_effect(record);
+        assert((effect == SsiMonsterEffect{39,static_cast<std::uint16_t>(timer),255,flag != 0}));
+    }
+    // Presence alone controls encounter movement. Unknown IDs are retained and
+    // ignored here; zero timers, list order and duplicates do not alter priority.
+    const std::vector<std::vector<std::uint8_t>> effect_lists{
+        {},{1},{0x27},{0x2a},{0x27,0x2a},{0x2a,0x27},{0x27,0x27}};
+    for (unsigned speed = 0; speed <= 255; ++speed) for (const auto& ids : effect_lists) {
+        SsiMonsterTemplate source; source.character[0x11c] = speed;
+        for (const auto id : ids) source.effects.push_back({id,0,0,0,0,0,0,0,0});
+        const bool twice = std::find(ids.begin(),ids.end(),0x27) != ids.end();
+        const bool half = std::find(ids.begin(),ids.end(),0x2a) != ids.end();
+        const auto before = source;
+        assert(ssi_encounter_movement(source) == (twice ? (speed*2)%256 : (half ? speed/2 : speed)));
+        assert(source == before);
+    }
+    for (const auto size : {0,62,64})
+        rejects([&] { decode_ssi_monster_item(std::vector<std::uint8_t>(size)); });
+    for (const auto size : {0,8,10})
+        rejects([&] { decode_ssi_monster_effect(std::vector<std::uint8_t>(size)); });
+}
 void monster_templates() {
     std::vector<std::uint8_t> character(285),items(126),effects(18);
     for (std::size_t i = 0; i < character.size(); ++i) character[i] = (i*17+3)%256;
@@ -401,6 +440,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    monster_attachments();
     monster_templates();
     monster_setup();
     encounter_visibility();

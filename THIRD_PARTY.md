@@ -499,3 +499,22 @@ character/item offsets were not adopted for Pool. The existing reference labels
 for current HP/AC/THAC0 corroborate native observations. Independent bounded
 native initializer/list-copy probes establish the snapshot transformations;
 no upstream parser, item names, effect definitions or native code was adopted.
+
+Additional research-only references for monster inventory/effects:
+
+- Stephen S. Lee, *Pool of Radiance Exhaustive Game Information*, version 2.00,
+  April 2, 2026, sections 12.2.3, 12.2.4.1 and 12.6.2/3:
+  https://gamefaqs.gamespot.com/c64/578753-pool-of-radiance/faqs/73869
+  The author's stated license is CC BY-NC 4.0. No guide text, tables, code,
+  game descriptions or effect catalog was adopted. Its format/routine labels
+  directed independent native observations. This is not a GPL code dependency.
+- marainein, *Pool of Radiance Hub*, post #53, November 30, 2013:
+  https://forums.goldbox.games/index.php?topic=1912.45
+  No reuse license established; research only. The post's older item offsets
+  conflict with the installed native layout and were not adopted.
+
+Independent bounded probes of the installed native inventory accounting,
+effect-expiry traversal and effect removal establish the implemented fields.
+Synthetic resource records and substituted allocation/effect callback boundaries
+were used; no native code was copied into the engine. Unknown item/effect
+properties and complete effect handlers remain unimplemented.
