@@ -2,6 +2,12 @@
 
 ## 2026-10-25
 
+- Decode the observed SSI 285/63/9-byte monster template layout into local
+  snapshots with current HP/AC/THAC0/movement, detached item/effect records and
+  deterministic independent clones. Add native-derived synthetic fingerprints
+  and installed-resource replay checks for both seeded groups. Inventory/effect
+  rule semantics and runtime combatant integration remain unfinished.
+
 - Add opt-in monster setup preparation: native count/group limits, five RNG draws
   per template, validated character/item/effect archive bindings and saved setup
   recipes. Advance both seeded paths through CLEAR_MON/LOAD_MON to the explicit

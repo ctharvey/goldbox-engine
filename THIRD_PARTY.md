@@ -490,3 +490,12 @@ The C++ implementation records deterministic preparation recipes and validates
 resource shapes; it does not copy native records into public content or claim
 a complete monster/combat decoder. No Java implementation or native instructions
 were copied or ported. Combat remains an explicit unavailable host boundary.
+
+The subsequent monster snapshot decoder also consulted pinned SSI Engine
+`CharacterValues.java` and `CharacterForgottenRealms.java`, and pinned Gold Box
+Explorer `src/Common/Frua/Frua/FruaCharacter.cs`, `FruaCharacterFile.cs`,
+`FruaItem.cs` and `FruaItemFile.cs` as research references. FRUA's different
+character/item offsets were not adopted for Pool. The existing reference labels
+for current HP/AC/THAC0 corroborate native observations. Independent bounded
+native initializer/list-copy probes establish the snapshot transformations;
+no upstream parser, item names, effect definitions or native code was adopted.

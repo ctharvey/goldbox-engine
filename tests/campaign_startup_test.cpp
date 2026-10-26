@@ -212,6 +212,23 @@ int main(int argc, char** argv) {
                 candidate.monster_setup->next_group == 9,"Prepared monster group missing");
             const auto& group = candidate.monster_setup->groups.front();
             check(group.count > 0 && group.count <= 63 && group.group == 8,"Invalid prepared monster group");
+            const auto materialize = [&](const PreparedMonsterGroup& recipe) {
+                const auto& bundle = monsters.at(recipe.program);
+                const auto optional = [&](std::size_t index) -> std::span<const std::uint8_t> {
+                    const auto found = bundle[index].find(recipe.resource);
+                    return found == bundle[index].end() ? std::span<const std::uint8_t>{} : found->second;
+                };
+                const auto decoded = decode_ssi_monster_resources(bundle[0].at(recipe.resource),optional(1),optional(2));
+                auto random = HighWordLcg32(recipe.template_seed,profile.random->multiplier(),profile.random->increment());
+                std::array<std::uint8_t,5> rolls;
+                for (auto& roll : rolls) roll = random.draw(6)+1;
+                return materialize_ssi_monster_group(decoded,recipe.count,recipe.group,rolls);
+            };
+            const auto actors = materialize(group);
+            check(actors.size() == group.count && actors.front() == actors.back(),"Monster clones differ");
+            const auto& raw = monsters.at(group.program)[0].at(group.resource);
+            check(actors.front().stats() == SsiMonsterStats{raw[0x11b],raw[0x11c],60-int(raw[0x111]),60-int(raw[0x110])},
+                "Decoded monster combat fields differ");
             auto initialized = HighWordLcg32(group.template_seed,profile.random->multiplier(),profile.random->increment());
             for (unsigned i = 0; i < 5; ++i) (void)initialized.draw(6);
             check(candidate.state.random && candidate.state.random->state() == initialized.state(),"Monster RNG checkpoint differs");
@@ -223,6 +240,7 @@ int main(int argc, char** argv) {
                 repeated_move.execution->bytecode_offset == result.execution->bytecode_offset &&
                 serialize_exploration(replay,"private-encounter-check") ==
                     serialize_exploration(candidate,"private-encounter-check"),"Seeded encounter replay differs");
+            check(materialize(replay.monster_setup->groups.front()) == actors,"Seeded monster snapshots differ");
         }
         auto walked = session; MovementHost movement_host(walked,profile,game);
         const auto move = walked.move(Direction::west,movement_host);

@@ -2240,3 +2240,43 @@ cap and malformed-resource regressions (0.76 seconds): counts 62 then 2 prepare
 62+1 creatures in groups 8/9, and a third load consumes no RNG. Exact ten-draw
 state is 1828254910 from seed zero. Log: `monster-setup-final-focused.log`.
 Hygiene, attribution and the updated dispatch-catalog/source cross-check passed.
+
+## Detached monster template decoding (2026-10-25)
+
+The next format-layer increment decodes the observed 285-byte character and
+ordered 63-byte item / 9-byte effect resources into detached local snapshots.
+Known serialized native list pointers are discarded; no file pointer is followed.
+Current HP, AC, THAC0 and movement are typed fields derived from the offsets
+already checked in native strength/movement research. Race/class codes are not
+mapped through player creation enums. Item/effect payloads remain encoded.
+
+Private `probe_original_monster_snapshots.py` ran 54 synthetic character cases
+(six seeds by nine race codes) through native `7C:0F61..106D`. This includes
+pointer resets and the full initializer, using original dice/RNG instructions.
+All 285 result bytes matched the independent expected transformation. Six
+whole-record native fingerprints for race zero are public synthetic regression
+vectors. Another six cases ran the native item/effect list-copy blocks with
+1/2/3 records, replacing only heap allocation/free boundaries. All non-link
+payload bytes and list ordering matched, with correct termination. Per-call
+bounds were 100 ms / 20,000 instructions and the batch deadline was 25 seconds.
+Private report: `original-monster-snapshots-report.json`. Original resources and
+derived records remain outside the repository.
+
+Public tests cover pointer removal, unknown-byte preservation, typed fields,
+all byte-valued race codes, native-derived initializer fingerprints, invalid
+rolls/counts, empty lists and clone independence. The opt-in installation test
+materializes both seeded encounter groups from their immutable source bundles,
+checks typed fields and verifies identical snapshots after save/replay.
+
+Precise remaining dependency: a faithful normalized inventory/effect adapter
+needs verified meanings for the 63-byte item's payload fields and the 9-byte
+effect's parameters, duration and combat application. The examined FRUA parser
+uses a different item layout and cannot supply those offsets. Snapshots are not
+yet integrated as runtime normalized combatants. Combat still stops explicitly
+at offset 6330; no combat outcome or complete game parity is claimed.
+
+Validation: the serialized two-worker full build/test run passed 30 suites with
+zero failures in 35.76 seconds, including the installed-resource campaign test
+with both seeded snapshot/replay checks. The Windows-only original RNG suite
+skipped under WSL. Private log: `monster-snapshots-full-tests.log`. Repository
+hygiene and attribution checks passed (13 records, five adopted local files).

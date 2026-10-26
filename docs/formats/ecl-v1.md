@@ -404,3 +404,30 @@ Observations also record the installed build's movement-block (0x6DC9) and
 exit-attempt (0x6DD5) words from its separate 0x6B00 memory buffer. These are
 diagnostic reference values; the opening comparison does not yet validate
 engine movement against them.
+
+### Monster template snapshots
+
+`formats/monster.hpp` provides an explicitly selected SSI 285/63/9-byte layout
+adapter. It decodes current HP (`+11B`), movement (`+11C`), AC (`60 - byte[111]`)
+and THAC0 (`60 - byte[110]`) without interpreting monster race/class codes as
+player creation choices. Other fields remain encoded and are not rules data.
+
+The decoder clears character list pointers at `7F`, `C8`, `104` and `108`, item
+next pointers at `2A` and effect next pointers at `5`. Ordered vectors replace
+native links. It never follows resource pointers. Empty optional lists are valid.
+Snapshots retain local original data and must not be published or put in public
+fixtures. Existing engine saves continue to contain source-bound setup recipes.
+
+Group materialization takes a decoded template, effective count 1..63, group byte
+and five caller-provided d6 rolls. It applies the observed race-code `C0` update,
+stores `128 + 17*roll` at `C1/C2/C3/C5/C6`, stores `C4` at `C4`, assigns group
+`BF` and copies the initialized template into independent instances. These byte
+names intentionally do not assert unknown meanings. RNG parameters/state remain
+outside formats; clones consume no additional draws. The third LOAD_MON operand
+is not interpreted by this snapshot adapter.
+
+This is a format-layer building block, tested on both seeded encounter recipes.
+Runtime normalized combatants, native inventory/effect rule semantics and combat
+execution remain unavailable. In particular, preserving an item's encoded record
+does not establish its damage/equipment behavior, nor does preserving an effect
+establish its duration or combat action.

@@ -135,6 +135,69 @@ void monster_setup() {
         rejects([&] { validate_ssi_monster_resources(std::vector<std::uint8_t>(sizes[0]),
             std::vector<std::uint8_t>(sizes[1]),std::vector<std::uint8_t>(sizes[2])); });
 }
+void monster_templates() {
+    std::vector<std::uint8_t> character(285),items(126),effects(18);
+    for (std::size_t i = 0; i < character.size(); ++i) character[i] = (i*17+3)%256;
+    for (std::size_t i = 0; i < items.size(); ++i) items[i] = (i*13+7)%256;
+    for (std::size_t i = 0; i < effects.size(); ++i) effects[i] = (i*19+11)%256;
+    character[0x11b] = 42; character[0x11c] = 12; character[0x111] = 67; character[0x110] = 55;
+    const auto source = character;
+    const auto decoded = decode_ssi_monster_resources(character,items,effects);
+    assert((decoded.stats() == SsiMonsterStats{42,12,-7,5}));
+    for (std::size_t i = 0; i < character.size(); ++i) {
+        const bool pointer = (i >= 0x7f && i < 0x83) || (i >= 0xc8 && i < 0xcc) ||
+            (i >= 0x104 && i < 0x10c);
+        assert(decoded.character[i] == (pointer ? 0 : character[i]));
+    }
+    assert(decoded.items.size() == 2 && decoded.effects.size() == 2);
+    for (std::size_t i = 0; i < items.size(); ++i)
+        assert(decoded.items[i/63][i%63] == (i%63 >= 42 && i%63 < 46 ? 0 : items[i]));
+    for (std::size_t i = 0; i < effects.size(); ++i)
+        assert(decoded.effects[i/9][i%9] == (i%9 >= 5 ? 0 : effects[i]));
+    const auto actors = materialize_ssi_monster_group(decoded,63,8,{1,2,3,4,6});
+    assert(actors.size() == 63 && actors[0] == actors[62] && character == source);
+    assert(actors[0].character[0xbf] == 8 && actors[0].character[0xc1] == 145 &&
+        actors[0].character[0xc2] == 162 && actors[0].character[0xc3] == 179 &&
+        actors[0].character[0xc4] == 196 && actors[0].character[0xc5] == 196 &&
+        actors[0].character[0xc6] == 230 && actors[0].stats() == decoded.stats());
+    auto independent = actors;
+    independent[0].items[0][0] ^= 1; independent[0].effects[0][0] ^= 1; independent[0].character[0x11b] = 0;
+    assert(independent[1] == actors[1] && independent[0] != actors[0]);
+    for (const auto count : {0,64,255})
+        rejects([&] { materialize_ssi_monster_group(decoded,count,8,{1,2,3,4,6}); });
+    for (const auto roll : {0,7,255})
+        rejects([&] { materialize_ssi_monster_group(decoded,1,8,{1,2,3,4,static_cast<std::uint8_t>(roll)}); });
+    const auto empty = decode_ssi_monster_resources(character,{},{});
+    assert(empty.items.empty() && empty.effects.empty());
+    // Whole-character fingerprints from the unmodified native initializer with
+    // this synthetic record, after pointer reset and before group assignment.
+    const std::array<std::uint32_t,6> seeds{0,1,10,19,0xffffffff,0x12345678};
+    const std::array<std::uint64_t,6> hashes{16231138795531230182ull,7236336294179404197ull,
+        10598656561769504289ull,11904246922652444164ull,6601990890219560637ull,3773905603647061516ull};
+    auto native_record = character; native_record[0x2e] = 0;
+    const auto native_template = decode_ssi_monster_resources(native_record,{},{});
+    for (std::size_t i = 0; i < seeds.size(); ++i) {
+        HighWordLcg32 random(seeds[i],0x08088405,1);
+        std::array<std::uint8_t,5> rolls;
+        for (auto& roll : rolls) roll = random.draw(6)+1;
+        const auto result = materialize_ssi_monster_group(native_template,1,native_record[0xbf],rolls);
+        std::uint64_t hash = 14695981039346656037ull;
+        for (const auto byte : result[0].character) { hash ^= byte; hash *= 1099511628211ull; }
+        assert(hash == hashes[i]);
+    }
+    for (unsigned race = 0; race <= 255; ++race) {
+        auto record = character; record[0x2e] = race;
+        const auto result = materialize_ssi_monster_group(decode_ssi_monster_resources(record,{},{}),1,8,{1,2,3,4,5});
+        const auto expected = race == 1 || race == 3 || race == 5 ? 1 :
+            (race == 2 || race == 4 || race == 6 || race == 7 ? 2 : record[0xc0]);
+        assert(result[0].character[0xc0] == expected);
+    }
+    for (const auto byte : {0,39,60,255}) {
+        auto record = character; record[0x111] = byte; record[0x110] = byte;
+        const auto stats = decode_ssi_monster_resources(record,{},{}).stats();
+        assert(stats.armor_class == 60-byte && stats.thac0 == 60-byte);
+    }
+}
 void encounter_visibility() {
     struct EncounterHost : Host {
         unsigned sprites{};
@@ -338,6 +401,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    monster_templates();
     monster_setup();
     encounter_visibility();
     movement_lifecycle();
