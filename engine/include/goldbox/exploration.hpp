@@ -65,6 +65,7 @@ struct ExplorationSession {
     EclArithmeticDialect arithmetic_dialect{EclArithmeticDialect::disabled};
     std::optional<PartyClassCheckBinding> party_class_check{};
     std::optional<EclSurpriseBinding> surprise{};
+    std::optional<EclEncounterBinding> encounter{};
 
     // Both GEO16 edges must permit traversal; boundaries remain solid.
     // Door state 1 is passable. Opening/bashing states 2/3 is not modeled.

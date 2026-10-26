@@ -68,6 +68,10 @@ void EclHost::load_character(std::uint8_t) { throw EclDecodeError("Party host un
 void EclHost::select_character(std::string_view) { throw EclDecodeError("Party selection host unavailable"); }
 std::uint8_t EclHost::party_strength() { throw EclDecodeError("Party strength host unavailable"); }
 bool EclHost::party_class_present() { throw EclDecodeError("Party class check host unavailable"); }
+std::uint8_t EclHost::encounter_distance() { throw EclDecodeError("Encounter visibility adapter unavailable"); }
+std::array<std::uint8_t,2> EclHost::party_movement() {
+    throw EclDecodeError("Current party movement and effects unavailable");
+}
 void EclHost::program_changed(std::uint8_t) {}
 std::optional<std::uint8_t> EclHost::memory_byte(std::uint16_t) { return std::nullopt; }
 bool EclHost::write_memory(std::uint16_t, std::uint32_t, std::size_t) { return false; }
@@ -75,7 +79,9 @@ std::optional<std::string> EclHost::string_at(std::uint16_t) { return std::nullo
 bool EclHost::write_string(std::uint16_t, std::string_view) { return false; }
 
 std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDialect area, EclPartyDialect party,
-    EclPartyCheckDialect check, EclSurpriseDialect surprise) {
+    EclPartyCheckDialect check, EclSurpriseDialect surprise, EclEncounterDialect encounter) {
+    require(encounter == EclEncounterDialect::disabled || encounter == EclEncounterDialect::menu14,
+        "Unknown encounter dialect");
     require(surprise == EclSurpriseDialect::disabled || surprise == EclSurpriseDialect::signed_threshold2,
         "Unknown surprise dialect");
     require(check == EclPartyCheckDialect::disabled || check == EclPartyCheckDialect::class_presence2,
@@ -104,15 +110,26 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
     if (party == EclPartyDialect::weighted_strength) result.push_back({0x1d,"PARTY_STRENGTH",1});
     if (check == EclPartyCheckDialect::class_presence2) result.push_back({0x22,"PARTY_CLASS_CHECK2",2});
     if (surprise == EclSurpriseDialect::signed_threshold2) result.push_back({0x23,"SURPRISE_THRESHOLD2",4});
+    if (encounter == EclEncounterDialect::menu14) result.push_back({0x29,"ENCOUNTER_MENU14",14});
     return result;
 }
 
 EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind,
     const EclDispatchDialect& dialect, std::span<const EclOpcodeSpec> opcodes,
     EclState& state, EclHost& host, EclLimits limits, EclRandomDialect random, EclArithmeticDialect arithmetic,
-    std::optional<EclSurpriseBinding> surprise) {
+    std::optional<EclSurpriseBinding> surprise, std::optional<EclEncounterBinding> encounter) {
     EclExecution result;
     try {
+        const auto encounter_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x29; });
+        if (encounter) require(encounter->dialect == EclEncounterDialect::menu14 &&
+            encounter->distance_addresses[0] != encounter->distance_addresses[1] &&
+            encounter->view_mode_address != encounter->distance_addresses[0] &&
+            encounter->view_mode_address != encounter->distance_addresses[1],"Invalid encounter binding");
+        if (encounter || encounter_spec != opcodes.end()) require(encounter && encounter_spec != opcodes.end() &&
+            encounter_spec->operand_count == 14 && encounter_spec->variable_count_operand == -1 &&
+            encounter_spec->mnemonic == "ENCOUNTER_MENU14" &&
+            std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x29; }) == 1,
+            "Conflicting encounter opcode definition or missing adapter");
         const auto surprise_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x23; });
         if (surprise) require(surprise->dialect == EclSurpriseDialect::signed_threshold2,
             "Unknown surprise dialect");
@@ -361,6 +378,100 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
                 host.select_character(string(args[0],state,host));
                 break;
             case 0x24: host.combat(state); break;
+            case 0x29: {
+                require(encounter.has_value(),"Encounter adapter unavailable");
+                destination(args[3],state);
+                const auto sprite = numeric(args[0]) & 255u, requested = numeric(args[1]);
+                const auto picture = numeric(args[2]) & 255u;
+                require(requested <= 2,"Unsupported encounter distance");
+                std::array<std::uint8_t,5> behaviors{};
+                for (std::size_t i = 0; i < behaviors.size(); ++i) {
+                    behaviors[i] = numeric(args[4+i]) & 255u;
+                    require(behaviors[i] <= 4,"Unsupported encounter behavior");
+                }
+                std::array<std::string,3> descriptions{};
+                for (std::size_t i = 0; i < descriptions.size(); ++i) descriptions[i] = string(args[9+i],state,host);
+                const auto minimum = numeric(args[12]) & 255u, maximum = numeric(args[13]) & 255u;
+                EclOperand mode{}; mode.type = 1; mode.value = encounter->view_mode_address;
+                const bool dungeon = numeric(mode) != 0;
+                const auto visible = host.encounter_distance();
+                require(visible <= 2,"Invalid encounter visibility");
+                auto distance = static_cast<std::uint8_t>(std::min(requested,std::uint32_t(visible)));
+                const auto publish_distance = [&](std::size_t index, std::uint8_t value) {
+                    EclOperand output{}; output.type = 1; output.value = encounter->distance_addresses[index];
+                    store(output,value);
+                };
+                publish_distance(0,static_cast<std::uint8_t>(requested)); publish_distance(1,distance);
+                const auto show_sprite = [&] { host.sprite_start({static_cast<std::uint8_t>(sprite),distance,
+                    static_cast<std::uint8_t>(picture)}); };
+                const auto message = [&](std::string_view value) {
+                    host.text(value,true);
+                    if (!value.empty()) {
+                        const std::array<std::string,1> choices{"CONTINUE"};
+                        require(host.menu(choices,"",false) == 0,"Invalid encounter continuation choice");
+                    }
+                };
+                const auto movement = [&] {
+                    const auto rates = host.party_movement();
+                    require(rates[0] <= rates[1],"Invalid party movement range");
+                    return rates;
+                };
+                show_sprite();
+                while (true) {
+                    require(result.steps < limits.steps,"ECL step limit exceeded"); ++result.steps;
+                    std::string_view description;
+                    for (unsigned i = 0; i < 3; ++i) if (!descriptions[(distance+i)%3].empty()) {
+                        description = descriptions[(distance+i)%3]; break;
+                    }
+                    message(description);
+                    const bool parlay = distance == 0 || !dungeon;
+                    const std::array<std::string,4> choices{"COMBAT","WAIT","FLEE",parlay ? "PARLAY" : "ADVANCE"};
+                    auto choice = host.menu(choices,"",false);
+                    require(choice < choices.size(),"Invalid encounter menu choice");
+                    if (choice == 3 && parlay) choice = 4;
+                    const auto behavior = behaviors[choice];
+                    bool repeat = false;
+                    std::uint8_t outcome{};
+                    const auto advance = [&] {
+                        if (distance) { --distance; publish_distance(1,distance); show_sprite(); }
+                        else message("BOTH SIDES WAIT.");
+                        repeat = true;
+                    };
+                    switch (behavior) {
+                    case 0: outcome = choice == 2 && movement()[0] >= minimum ? 2 : 1; break;
+                    case 1:
+                        if (choice == 0) outcome = 1;
+                        else if (choice == 1) { message("BOTH SIDES WAIT."); repeat = true; }
+                        else if (choice == 2) outcome = 2;
+                        else if (choice == 3) advance();
+                        else if (distance == 0) outcome = 3;
+                        else advance();
+                        break;
+                    case 2:
+                        outcome = choice == 0 && maximum <= movement()[1] ? 1 : 0;
+                        store(args[3],outcome);
+                        if (!outcome) message("THE MONSTERS FLEE.");
+                        break;
+                    case 3:
+                        if (choice == 0) outcome = 1;
+                        else if (choice == 2) outcome = 2;
+                        else if (choice == 1 || choice == 3) advance();
+                        else if (distance == 0) outcome = 3;
+                        else advance();
+                        break;
+                    case 4:
+                        if (choice == 0) outcome = 1;
+                        else if (choice == 2) outcome = 2;
+                        else if (distance == 0) outcome = 3;
+                        else advance();
+                        break;
+                    }
+                    if (repeat) continue;
+                    if (behavior != 2) store(args[3],outcome);
+                    break;
+                }
+                break;
+            }
             case 0x0e: {
                 if (!images_enabled) throw EclDecodeError("Unsupported VM opcode 14");
                 const auto id = numeric(args[0]);

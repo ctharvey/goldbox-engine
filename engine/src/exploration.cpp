@@ -205,6 +205,29 @@ public:
         if (!session.party_class_check) throw std::runtime_error("Party class check adapter unavailable");
         return goldbox::party_class_present(session.party,*session.party_class_check);
     }
+    std::array<std::uint8_t,2> party_movement() override { return delegate.party_movement(); }
+    std::uint8_t encounter_distance() override {
+        if (!session.encounter) throw std::runtime_error("Encounter adapter unavailable");
+        const auto address = session.encounter->view_mode_address;
+        if (memory_byte(address).value_or(session.state.memory[address]) == 0) return 2;
+        if (!session.has_dungeon_map() || !session.dialect.position_addresses)
+            throw std::runtime_error("Encounter visibility requires an active dungeon and position binding");
+        const auto& positions = *session.dialect.position_addresses;
+        int x = session.state.memory[positions[0]], y = session.state.memory[positions[1]];
+        const auto direction = session.state.memory[positions[2]];
+        if (direction > 3) throw std::runtime_error("Invalid encounter direction");
+        const int dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
+        for (std::uint8_t distance = 0; distance < 2; ++distance) {
+            if (x < 0 || x >= 16 || y < 0 || y >= 16)
+                throw std::runtime_error("Encounter visibility across map boundaries is unverified");
+            const auto& cell = session.map.cell(y,x);
+            const std::uint8_t walls[]{cell.north,cell.east,cell.south,cell.west};
+            // Native visibility tests the current edge's wall graphic, including open doors.
+            if (walls[direction] != 0) return distance;
+            x += dx[direction]; y += dy[direction];
+        }
+        return 2;
+    }
     void native_call(std::uint16_t function) override {
         if (session.position_advance_call && function == session.position_advance_call->function) {
             const auto& addresses = *session.dialect.position_addresses;
@@ -400,7 +423,7 @@ EclExecution ExplorationSession::trigger(formats::EclEventKind kind, EclHost& ho
             SessionHost session_host(*this,host);
             auto remaining = limits; remaining.steps -= result.steps;
             auto run = execute_ecl(ecl_record,events.front(),dialect,opcodes,state,session_host,remaining,
-                random_dialect,arithmetic_dialect,surprise);
+                random_dialect,arithmetic_dialect,surprise,encounter);
             result.steps += run.steps; result.bytecode_offset = run.bytecode_offset;
             result.dispatches.insert(result.dispatches.end(),run.dispatches.begin(),run.dispatches.end());
             if (!run.exited) { result.diagnostic = std::move(run.diagnostic); return result; }

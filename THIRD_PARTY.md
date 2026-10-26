@@ -463,3 +463,13 @@ calculation. The independent C++ dialect follows 512 bounded original-handler
 checks, including the original dice helper and RNG, signed-byte wrapping and
 second-check precedence. No Java implementation or native instructions were
 copied or ported; Pool's result register is explicit profile data.
+
+The encounter-menu implementation also consults the pinned SSI Engine VM and
+opcode metadata as research references. Its assumed party movement rates were
+not adopted. Independent native observations establish different cautious-WAIT
+and equal-speed pursuit behavior. The independent C++ state machine uses the
+existing text/menu/sprite host interface, explicit profile register bindings and
+a current-movement provider that fails when unavailable. No Java menu handler,
+native instructions or proprietary descriptions were copied or ported. Native
+probes used synthetic presentation/input boundaries; they do not establish full
+original display, input timing or combat parity.

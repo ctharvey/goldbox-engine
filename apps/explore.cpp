@@ -503,6 +503,7 @@ int main(int argc, char** argv) {
         session.party_strength = profile.party_strength;
         session.party_class_check = profile.party_class_check;
         session.surprise = profile.surprise;
+        session.encounter = profile.encounter;
 #ifdef GOLDBOX_RENDERER
         if (images) images->sprite_replacement_ms = profile.sprite_replacement_ms;
         session.wall_banks = initial_banks;
@@ -520,7 +521,8 @@ int main(int argc, char** argv) {
             profile.party_strength ? goldbox::EclPartyDialect::weighted_strength :
             profile.party_memory ? goldbox::EclPartyDialect::load_character : goldbox::EclPartyDialect::disabled,
             profile.party_class_check ? goldbox::EclPartyCheckDialect::class_presence2 : goldbox::EclPartyCheckDialect::disabled,
-            profile.surprise ? profile.surprise->dialect : goldbox::EclSurpriseDialect::disabled);
+            profile.surprise ? profile.surprise->dialect : goldbox::EclSurpriseDialect::disabled,
+            profile.encounter ? profile.encounter->dialect : goldbox::EclEncounterDialect::disabled);
         (void)goldbox::formats::decode_ecl_program_entries(session.ecl_record, session.dialect, session.opcodes);
         if (profile.campaign_startup && window && campaign_mode) {
             const auto& start = *profile.campaign_startup;

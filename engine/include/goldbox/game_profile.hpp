@@ -94,6 +94,7 @@ struct GameProfile {
     EclArithmeticDialect arithmetic_dialect{EclArithmeticDialect::disabled};
     std::optional<PartyClassCheckBinding> party_class_check{};
     std::optional<EclSurpriseBinding> surprise{};
+    std::optional<EclEncounterBinding> encounter{};
 };
 
 [[nodiscard]] GameProfile read_game_profile(const std::filesystem::path& path);

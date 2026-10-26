@@ -2,6 +2,11 @@
 
 ## 2026-10-25
 
+- Add the profile-selected 14-operand encounter menu with verified behavior
+  selection, description fallback, distance updates and bounded wait/advance
+  loops. Advance both seeded encounter replays to monster setup. Keep missing
+  current movement/effects and unverified map-edge visibility explicit failures.
+
 - Implement profile-selected SURPRISE with signed-byte thresholds, two deterministic
   dice rolls and the native second-check precedence. Keep the result address in
   profile data and add native-observed golden regressions.

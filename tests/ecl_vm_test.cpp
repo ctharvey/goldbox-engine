@@ -41,6 +41,111 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 
 int main() {
     {
+        struct EncounterHost : Host {
+            std::vector<std::size_t> actions;
+            std::vector<EclSpriteRequest> sprites;
+            std::vector<std::string> fourth_choices;
+            std::uint8_t visible{2};
+            std::array<std::uint8_t,2> rates{6,12};
+            bool movement_available{true}, endless_wait{};
+            std::uint8_t encounter_distance() override { return visible; }
+            std::array<std::uint8_t,2> party_movement() override {
+                if (!movement_available) return EclHost::party_movement();
+                return rates;
+            }
+            void sprite_start(EclSpriteRequest request) override { sprites.push_back(request); }
+            std::size_t menu(std::span<const std::string> choices, std::string_view, bool vertical) override {
+                assert(!vertical);
+                if (choices.size() == 1) return 0;
+                assert(choices.size() == 4); fourth_choices.push_back(choices[3]);
+                if (endless_wait) return 1;
+                if (actions.empty()) return 0;
+                const auto choice = actions.front(); actions.erase(actions.begin()); return choice;
+            }
+        } host;
+        const auto ops = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,
+            EclPartyDialect::disabled,EclPartyCheckDialect::disabled,EclSurpriseDialect::disabled,EclEncounterDialect::menu14);
+        const EclEncounterBinding binding{EclEncounterDialect::menu14,0x4a32,{0x4a30,0x4a31}};
+        const auto bytes = [](std::uint8_t behavior, std::uint8_t distance, unsigned description_mask = 0) {
+            auto code = program({3,0,1,0,2,0x29,0,7,0,distance,0,8,1,0x20,0x4a});
+            for (unsigned i = 0; i < 5; ++i) code.insert(code.end(),{0,behavior});
+            for (unsigned i = 0; i < 3; ++i) {
+                code.push_back(0x80);
+                if (description_mask & (1u<<i)) code.insert(code.end(),{1,static_cast<std::uint8_t>(4*(i+1))});
+                else code.push_back(0);
+            }
+            code.insert(code.end(),{0,6,0,12,0});
+            return code;
+        };
+        EclState state;
+        const auto invoke = [&](const auto& code, const auto& selected, std::optional<EclEncounterBinding> adapter,
+            EclLimits limits = {}) {
+            return execute_ecl(code,EclEventKind::move,{"ssi-five-entry-v1",0x9900,0xc04f},selected,state,host,limits,
+                EclRandomDialect::disabled,EclArithmeticDialect::disabled,std::nullopt,adapter);
+        };
+        // Native-handler golden tuples: behavior, first choice, distance, result, final distance, sprite calls.
+        const unsigned cases[][6]{
+            {0,0,0,1,0,1},{0,0,1,1,1,1},{0,0,2,1,2,1},{0,1,0,1,0,1},{0,1,1,1,1,1},{0,1,2,1,2,1},
+            {0,2,0,2,0,1},{0,2,1,2,1,1},{0,2,2,2,2,1},{0,3,0,1,0,1},{0,3,1,1,1,1},{0,3,2,1,2,1},
+            {1,0,0,1,0,1},{1,0,1,1,1,1},{1,0,2,1,2,1},{1,1,0,1,0,1},{1,1,1,1,1,1},{1,1,2,1,2,1},
+            {1,2,0,2,0,1},{1,2,1,2,1,1},{1,2,2,2,2,1},{1,3,0,3,0,1},{1,3,1,1,0,2},{1,3,2,1,1,2},
+            {2,0,0,1,0,1},{2,0,1,1,1,1},{2,0,2,1,2,1},{2,1,0,0,0,1},{2,1,1,0,1,1},{2,1,2,0,2,1},
+            {2,2,0,0,0,1},{2,2,1,0,1,1},{2,2,2,0,2,1},{2,3,0,0,0,1},{2,3,1,0,1,1},{2,3,2,0,2,1},
+            {3,0,0,1,0,1},{3,0,1,1,1,1},{3,0,2,1,2,1},{3,1,0,1,0,1},{3,1,1,1,0,2},{3,1,2,1,1,2},
+            {3,2,0,2,0,1},{3,2,1,2,1,1},{3,2,2,2,2,1},{3,3,0,3,0,1},{3,3,1,1,0,2},{3,3,2,1,1,2},
+            {4,0,0,1,0,1},{4,0,1,1,1,1},{4,0,2,1,2,1},{4,1,0,3,0,1},{4,1,1,1,0,2},{4,1,2,1,1,2},
+            {4,2,0,2,0,1},{4,2,1,2,1,1},{4,2,2,2,2,1},{4,3,0,3,0,1},{4,3,1,1,0,2},{4,3,2,1,1,2}};
+        for (const auto& test : cases) {
+            state = {}; state.random = HighWordLcg32(19,0x08088405,1); state.memory[0x4a32] = 1;
+            state.memory[0x4a21] = 0x5a;
+            host = {}; host.actions = {test[1],0};
+            assert(invoke(bytes(test[0],test[2]),ops,binding).exited);
+            assert(state.memory[0x4a20] == test[3] && state.memory[0x4a31] == test[4]);
+            assert(state.memory[0x4a30] == test[2] && state.memory[0x4a21] == 0x5a);
+            assert(host.sprites.size() == test[5] && host.sprites.back().distance == test[4]);
+            assert(host.sprites.front().sprite == 7 && host.sprites.front().replacement_picture == 8);
+            assert(state.random->state() == 19 && state.comparison == -1);
+            assert(host.fourth_choices.front() == (test[2] ? "ADVANCE" : "PARLAY"));
+        }
+        // Native descriptions start at current distance and wrap through the other two.
+        const char expected[][4]{{'A','B','C','A'},{'A','B','C','B'},{'A','B','C','C'}};
+        for (unsigned distance = 0; distance < 3; ++distance) {
+            unsigned index = 0;
+            for (const auto mask : {1u,2u,4u,7u}) {
+                host = {};
+                assert(invoke(bytes(0,distance,mask),ops,binding).exited);
+                assert(host.output.front() == std::string(1,expected[distance][index++]));
+            }
+        }
+        host = {}; host.visible = 1;
+        assert(invoke(bytes(0,2),ops,binding).exited && state.memory[0x4a31] == 1);
+        state.memory[0x4a32] = 0; host = {};
+        assert(invoke(bytes(0,2),ops,binding).exited && host.fourth_choices.front() == "PARLAY");
+        state.memory[0x4a32] = 1; host = {}; host.rates = {5,11}; host.actions = {2};
+        assert(invoke(bytes(0,2),ops,binding).exited && state.memory[0x4a20] == 1);
+        host = {}; host.rates = {5,11};
+        assert(invoke(bytes(2,2),ops,binding).exited && state.memory[0x4a20] == 0);
+        host = {}; host.movement_available = false; host.actions = {2};
+        assert(invoke(bytes(0,2),ops,binding).diagnostic == "Current party movement and effects unavailable");
+        host = {}; host.endless_wait = true;
+        assert(invoke(bytes(1,2),ops,binding,{8,64}).diagnostic == "ECL step limit exceeded");
+        host = {}; host.actions = {4};
+        assert(!invoke(bytes(0,2),ops,binding).exited);
+        host = {}; host.visible = 3;
+        assert(!invoke(bytes(0,2),ops,binding).exited);
+        host = {};
+        assert(!invoke(bytes(5,2),ops,binding).exited);
+        assert(!invoke(bytes(0,3),ops,binding).exited);
+        assert(!invoke(bytes(0,2),ops,std::nullopt).exited);
+        assert(!invoke(bytes(0,2),minimal_vm_opcodes(),binding).exited);
+        assert(!invoke(bytes(0,2),ops,EclEncounterBinding{}).exited);
+        auto conflict = ops; conflict.push_back({0x29,"INPUT_RETURN_29",0});
+        assert(!invoke(bytes(0,2),conflict,binding).exited);
+        conflict = ops;
+        for (auto& op : conflict) if (op.opcode == 0x29) op.operand_count = 13;
+        assert(!invoke(bytes(0,2),conflict,binding).exited);
+    }
+    {
         // Golden observations from the unmodified native handler/dice helper/RNG.
         struct Case { std::array<unsigned,4> args; std::uint32_t seed, result, final_seed; };
         const Case cases[]{

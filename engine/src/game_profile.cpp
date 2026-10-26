@@ -19,7 +19,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
         "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
-        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck", "surprise"}, "game profile");
+        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck", "surprise", "encounter"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -33,6 +33,25 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         j::string(j::field(root, "validationStatus", "game profile"), "profile.validationStatus"),
         {}, std::nullopt, "disabled", std::nullopt, std::nullopt, "disabled", 0, {}
     };
+    if (const auto* value = root.if_contains("encounter")) {
+        const auto& object = j::object(*value,"encounter");
+        j::fields_only(object,{"dialect","viewModeAddress","distanceAddresses"},"encounter");
+        if (j::string(j::field(object,"dialect","encounter"),"encounter dialect") != "ssi-encounter14-v1")
+            throw std::runtime_error("Unsupported encounter dialect");
+        const auto address = [&](const auto& value) {
+            const auto number = j::integer(value,"encounter address");
+            if (number < 0 || number > 65535) throw std::runtime_error("Encounter address out of range");
+            return static_cast<std::uint16_t>(number);
+        };
+        EclEncounterBinding binding{EclEncounterDialect::menu14,address(j::field(object,"viewModeAddress","encounter")),{}};
+        const auto& distances = j::array(j::field(object,"distanceAddresses","encounter"),"encounter distances");
+        if (distances.size() != 2) throw std::runtime_error("Encounter requires two distance addresses");
+        for (std::size_t i = 0; i < 2; ++i) binding.distance_addresses[i] = address(distances[i]);
+        if (binding.distance_addresses[0] == binding.distance_addresses[1] ||
+            binding.view_mode_address == binding.distance_addresses[0] || binding.view_mode_address == binding.distance_addresses[1])
+            throw std::runtime_error("Overlapping encounter addresses");
+        profile.encounter = binding;
+    }
     if (const auto* value = root.if_contains("surprise")) {
         const auto& object = j::object(*value,"surprise");
         j::fields_only(object,{"dialect","resultAddress"},"surprise");

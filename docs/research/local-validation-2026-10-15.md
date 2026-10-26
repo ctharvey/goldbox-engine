@@ -2052,3 +2052,78 @@ seven rendered-region comparisons ran and passed. Hygiene and attribution
 checks passed. Private full log: `surprise-full-tests.log`; native evidence:
 `probe_original_surprise.py` and `original-surprise-report.json` in the external
 validation cache. Installed assets, user saves and artwork were not modified.
+
+### Pool encounter menu (0x29), 2026-10-25
+
+The pinned SSI Engine VM provides a 14-operand ENCOUNTER_MENU reference, with
+assumed party speeds 6/12 and a movement-rate TODO. Independent observations of
+the installed Pool handler (overlay 1F offset 0x1EF8) found material differences:
+cautious WAIT advances enemies at positive distance, and equal maximum party/
+enemy speed permits combat against cowardly enemies. Those upstream policies
+were not adopted. No Java or native instructions were copied or ported.
+
+72 bounded native-handler cases passed: all five behavior selectors, four menu
+choices and three distances (60 cases), plus 12 synthetic-description fallback
+cases. The original operand decoder, string handling, branch logic and result
+writer ran unchanged. These probes supplied synthetic party speed, visibility
+and menu-choice boundaries and suppressed presentation. They verify instruction
+decisions, not the native renderer or timing. Results, distance changes, sprite
+requests, description selection/acknowledgement and unchanged RNG were recorded.
+All runs returned within 100 ms / 40,000 instructions per call and the 40-second
+batch limit. Empty descriptions do not request acknowledgement; nonempty
+descriptions and wait/flee messages do. Description lookup cycles from current
+distance through the other two slots.
+
+72 separate checks ran the original visibility helper (overlay 2B offset 0x482)
+and wall query unchanged, using synthetic interior map planes. Four directions,
+three obstruction distances, three wall values and zero/nonzero view mode were
+checked. Visibility tests only the current-facing wall graphic, not door flags
+or the neighboring cell's reciprocal edge. It checks at most two cells. The
+independent GEO16 adapter follows these interior semantics. Native map-edge
+queries have area-mode-dependent handling; the current adapter rejects a query
+that crosses the map edge rather than guessing that policy.
+
+67 further checks ran the original party movement aggregator (overlay 2B offset
+0x1FB1) and resident effect-list search unchanged against synthetic linked
+actors/effects. The source is the current movement byte at record offset 0x11C.
+Effect 0x27 doubles with byte wrapping and takes precedence over 0x2A, which
+halves with integer truncation. Both extrema are initially seeded with the
+first member's unadjusted movement, so a one-member hasted/slow party does not
+simply produce two equal adjusted rates. None of these cases consumed RNG.
+
+This establishes the missing runtime dependency precisely: the normalized party
+does not yet store current movement or active effects, nor update those values
+from equipment/encumbrance and effects. The encounter VM queries an explicit
+host provider only for decisions requiring those extrema. The runtime reports
+`Current party movement and effects unavailable` for such choices; it never
+supplies the upstream guessed 6/12. Implementing this provider requires current
+state, persistence and verified update rules as a separate increment.
+
+The profile selects `ssi-encounter14-v1`, mode address 0x49E6 and requested/current
+distance globals 0x6DC0/0x6DC1. The shared VM has no title selection or native
+record offsets. Each action round consumes the existing execution-step budget.
+Headless synthetic regressions retain the 60 observed decision tuples, 12
+description cases, exact distance/sprite transitions and unchanged RNG/comparison,
+plus invalid input/host/dialect failures and a nonterminating WAIT limit. Session
+tests exercise all 72 interior visibility cases with both closed and open door
+flags, preserving party coordinates; profile tests reject malformed bindings.
+
+Both installed-resource encounter replays now pass the menu with deterministic
+COMBAT choices and stop at offset 6319 with `Unknown ECL opcode 28` (0x1C,
+metadata name CLEAR_MON). Both pre-move save/replays agree exactly through that
+new checkpoint, including RNG and script globals. No monster/combat success was
+invented. The ordinary boundary and all seven previously matched rendered
+regions remain unchanged. This is partial encounter execution, not verified
+complete encounters, original encounter UI parity or complete game compatibility.
+
+Private evidence remains in the external validation cache:
+`probe_original_encounter.py`, `original-encounter-report.json`,
+`probe_original_encounter_distance.py`, `original-encounter-distance-report.json`,
+`probe_original_encounter_movement.py`, `original-encounter-movement-report.json`.
+The first focused run passed five suites; log: `encounter-focused.log`.
+
+The final serialized two-worker run passed 30 suites with zero failures in
+37.86 seconds of tests. The Windows-only original RNG integration suite skipped
+under WSL; installed-resource seeded replays and rendered-region checks ran.
+Hygiene and attribution passed. Full private log: `encounter-full-tests.log`.
+Installed game files, user saves and artwork were not changed.

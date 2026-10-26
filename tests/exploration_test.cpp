@@ -49,6 +49,47 @@ ExplorationSession native_session(std::vector<std::uint8_t> code) {
     session.opcodes = minimal_vm_opcodes(); session.ecl_record = std::move(code);
     return session;
 }
+void encounter_visibility() {
+    struct EncounterHost : Host {
+        unsigned sprites{};
+        std::uint8_t distance{};
+        void sprite_start(EclSpriteRequest request) override { ++sprites; distance = request.distance; }
+        std::size_t menu(std::span<const std::string>, std::string_view, bool) override { return 0; }
+    };
+    auto code = std::vector<std::uint8_t>{0x29,0,7,0,2,0,8,1,0x20,0x4a};
+    for (unsigned i = 0; i < 5; ++i) code.insert(code.end(),{0,0});
+    code.insert(code.end(),{0x80,0,0x80,0,0x80,0,0,6,0,12,0});
+    const auto fixture = [&] {
+        auto session = native_session(lifecycle(code,{0}));
+        session.encounter = EclEncounterBinding{EclEncounterDialect::menu14,0x4a32,{0x4a30,0x4a31}};
+        session.opcodes = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,
+            EclPartyDialect::disabled,EclPartyCheckDialect::disabled,EclSurpriseDialect::disabled,EclEncounterDialect::menu14);
+        session.row = session.column = 8;
+        return session;
+    };
+    // Native helper observations: first-edge wall graphics, independent of door flags.
+    const int dx[]{0,1,0,-1}, dy[]{-1,0,1,0};
+    for (unsigned direction = 0; direction < 4; ++direction) for (unsigned blocked = 0; blocked < 3; ++blocked)
+        for (const auto wall : {1,10,15}) for (const auto mode : {0,1}) for (const auto door : {0,1}) {
+            auto session = fixture(); session.facing = static_cast<Direction>(direction);
+            session.state.memory[0x4a32] = mode;
+            if (blocked < 2) {
+                auto& cell = session.map.cells[(8+blocked*dy[direction])*16+8+blocked*dx[direction]];
+                std::uint8_t* walls[]{&cell.north,&cell.east,&cell.south,&cell.west};
+                *walls[direction] = wall; cell.door_flags = door << (direction*2);
+            }
+            EncounterHost host;
+            const auto run = session.trigger(EclEventKind::move,host);
+            assert(run.exited && host.sprites == 1 && host.distance == (mode ? blocked : 2));
+            assert(session.row == 8 && session.column == 8 && session.state.memory[0x4a31] == host.distance);
+        }
+    auto boundary = fixture(); boundary.column = 0; boundary.facing = Direction::west;
+    boundary.state.memory[0x4a32] = 1;
+    EncounterHost host;
+    assert(boundary.trigger(EclEventKind::move,host).diagnostic ==
+        "Encounter visibility across map boundaries is unverified");
+    assert(host.sprites == 0);
+}
 void movement_lifecycle() {
     Host host;
     const auto source = std::vector<std::uint8_t>{9,1,0,0x71,1,0,0x4a,
@@ -211,6 +252,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    encounter_visibility();
     movement_lifecycle();
     // Every GEO16 direction permits an ordinary door, in both directions,
     // while closed states, inconsistent opposing walls and boundaries stay solid.

@@ -58,6 +58,7 @@
   "partyStrength": {"dialect": "ssi-weighted-party-strength-v1", "clericClass": "cleric", "mageClass": "magic-user"},
   "partyClassCheck": {"dialect": "ssi-class-presence2-v1", "classes": ["ranger", "cleric-ranger"]},
   "surprise": {"dialect": "ssi-signed-threshold2-v1", "resultAddress": 28107},
+  "encounter": {"dialect": "ssi-encounter14-v1", "viewModeAddress": 18918, "distanceAddresses": [28096, 28097]},
   "partyMemory": {
     "dialect": "ssi-selected-character-v1",
     "recordBase": 27392,

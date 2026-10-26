@@ -15,6 +15,10 @@ int main(int argc, char** argv) {
     const auto curse = goldbox::read_game_profile(argv[2]);
     assert(pool.party_class_check && !curse.party_class_check);
     assert(pool.surprise && !curse.surprise);
+    assert(pool.encounter && !curse.encounter);
+    assert(pool.encounter->dialect == goldbox::EclEncounterDialect::menu14 &&
+        pool.encounter->view_mode_address == 0x49e6 &&
+        pool.encounter->distance_addresses == (std::array<std::uint16_t,2>{0x6dc0,0x6dc1}));
     assert(pool.surprise->dialect == goldbox::EclSurpriseDialect::signed_threshold2 &&
         pool.surprise->result_address == 0x6dcb);
     assert(pool.party_class_check->classes == (std::vector<std::string>{"ranger","cleric-ranger"}));
@@ -89,6 +93,22 @@ int main(int argc, char** argv) {
     if (!rejected) return 1;
     const std::string prefix = R"({"schemaVersion":1,"id":"test","title":"Test","formatFamily":"goldbox-dos","archiveFormat":"dax-v1","eventDialect":"unverified","rulesProfile":"test","validationStatus":"unverified","resourcePatterns":[],"colorBackdrop":)";
     auto class_prefix = prefix;
+    auto encounter_prefix = prefix;
+    encounter_prefix.replace(encounter_prefix.find("colorBackdrop"),13,"encounter");
+    for (const auto value : {
+        R"({"dialect":"unknown","viewModeAddress":1,"distanceAddresses":[2,3]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":-1,"distanceAddresses":[2,3]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":65536,"distanceAddresses":[2,3]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":1,"distanceAddresses":[2]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":1,"distanceAddresses":[2,2]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":1,"distanceAddresses":[1,3]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":1,"distanceAddresses":[2,65536]})",
+        R"({"dialect":"ssi-encounter14-v1","viewModeAddress":1,"distanceAddresses":[2,3],"extra":0})"}) {
+        { std::ofstream output(path); output << encounter_prefix << value << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
     auto surprise_prefix = prefix;
     surprise_prefix.replace(surprise_prefix.find("colorBackdrop"),13,"surprise");
     for (const auto value : {R"({"dialect":"unknown","resultAddress":1})",

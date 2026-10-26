@@ -27,6 +27,12 @@ struct EclSurpriseBinding {
     EclSurpriseDialect dialect{EclSurpriseDialect::disabled};
     std::uint16_t result_address{};
 };
+enum class EclEncounterDialect { disabled, menu14 };
+struct EclEncounterBinding {
+    EclEncounterDialect dialect{EclEncounterDialect::disabled};
+    std::uint16_t view_mode_address{};
+    std::array<std::uint16_t,2> distance_addresses{}; // Requested, current distance.
+};
 struct EclSpriteRequest {
     std::uint8_t sprite{}, distance{}, replacement_picture{};
 };
@@ -60,6 +66,8 @@ public:
     virtual void select_character(std::string_view prompt);
     virtual std::uint8_t party_strength();
     virtual bool party_class_present();
+    virtual std::uint8_t encounter_distance();
+    virtual std::array<std::uint8_t,2> party_movement(); // Current minimum, maximum, including effects.
     // Prepare host resources before a validated program is published and initialized.
     virtual void program_changed(std::uint8_t record);
     // Optional virtual memory overlays. Unhandled accesses retain ordinary RAM/string semantics.
@@ -98,11 +106,13 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, formats::EclEvent
     EclState& state, EclHost& host, EclLimits limits = {},
     EclRandomDialect random = EclRandomDialect::disabled,
     EclArithmeticDialect arithmetic = EclArithmeticDialect::disabled,
-    std::optional<EclSurpriseBinding> surprise = std::nullopt);
+    std::optional<EclSurpriseBinding> surprise = std::nullopt,
+    std::optional<EclEncounterBinding> encounter = std::nullopt);
 
 std::vector<formats::EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images = EclImageDialect::disabled,
     EclAreaDialect area = EclAreaDialect::disabled, EclPartyDialect party = EclPartyDialect::disabled,
     EclPartyCheckDialect check = EclPartyCheckDialect::disabled,
-    EclSurpriseDialect surprise = EclSurpriseDialect::disabled);
+    EclSurpriseDialect surprise = EclSurpriseDialect::disabled,
+    EclEncounterDialect encounter = EclEncounterDialect::disabled);
 
 } // namespace goldbox

@@ -93,6 +93,40 @@ Conflicting definitions, absent adapters/RNG, invalid input types and writes
 into program memory fail explicitly. Failed result stores do not consume RNG.
 This implements surprise resolution only; it does not implement combat.
 
+Optional `encounter` selects `ssi-encounter14-v1` for opcode 0x29. It requires
+`viewModeAddress` and two distinct `distanceAddresses` (requested and current),
+all distinct logical byte addresses. Pool uses 0x49E6 and [0x6DC0,0x6DC1].
+Other title meanings remain disabled. Inputs are sprite, requested distance,
+replacement picture, typed result destination, five behavior selectors (one per
+COMBAT/WAIT/FLEE/ADVANCE/PARLAY action), three descriptions and enemy minimum/
+maximum movement. Supported requested distances are 0..2; unknown behavior
+selectors fail explicitly. Byte-valued selectors truncate numeric inputs.
+
+The host supplies visibility 0..2 and, only when a flee/pursuit decision needs
+it, current party minimum/maximum movement including effects. No default speed
+is inferred. The dungeon adapter tests at most two current-facing wall graphics,
+independent of door flags, with no party movement. Interior-cell behavior is
+native-verified; queries that cross map boundaries fail until their area-mode
+policy is verified. Zero view mode provides visibility 2 and a PARLAY menu.
+Actual encounter distance is the minimum of requested distance and visibility.
+
+Descriptions start at actual distance and cycle through the other two until a
+nonempty one is found. Nonempty descriptions and wait/flee messages use explicit
+CONTINUE menus. Actions use the existing horizontal menu host. ADVANCE becomes
+PARLAY at distance zero or in zero view mode. Behavior selectors 0..4 choose
+aggressive, passive, cowardly, cautious or confident responses. In particular,
+cautious WAIT decreases positive encounter distance, and cowardly enemies can
+be caught when maximum speeds are equal. Advancing updates current distance and
+reissues the sprite request, without moving the party on the map. Outcomes are
+0 (enemies flee), 1 (combat), 2 (party flees), 3 (parlay). The opcode itself
+does not resolve combat, move a fleeing party or execute parlay scripts.
+
+Every menu round consumes the existing VM step budget, so repeated WAIT or
+ADVANCE responses remain bounded in headless tests. Comparison and RNG remain
+unchanged. Stores/host effects retain the existing partial-progress policy on
+failure. The runtime has no current party movement/effects provider yet: actions
+that need it fail with `Current party movement and effects unavailable`.
+
 State changes made before an error remain visible; execution is not
 transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations
