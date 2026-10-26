@@ -2,6 +2,11 @@
 
 ## 2026-10-25
 
+- Map all 256 native opcode dispatcher inputs for the installed Pool release:
+  61 routed opcodes, 49 distinct handlers and 195 unrouted values. Publish a
+  version-bound address/coverage catalog with operand-reference confidence,
+  native/script memory distinctions and grouped implementation dependencies.
+
 - Add the profile-selected 14-operand encounter menu with verified behavior
   selection, description fallback, distance updates and bounded wait/advance
   loops. Advance both seeded encounter replays to monster setup. Keep missing

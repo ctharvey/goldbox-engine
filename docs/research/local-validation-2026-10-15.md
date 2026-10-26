@@ -2127,3 +2127,29 @@ The final serialized two-worker run passed 30 suites with zero failures in
 under WSL; installed-resource seeded replays and rendered-region checks ran.
 Hygiene and attribution passed. Full private log: `encounter-full-tests.log`.
 Installed game files, user saves and artwork were not changed.
+
+### Complete native opcode dispatch catalog, 2026-10-25
+
+All 256 byte values were exercised through the unchanged installed interpreter
+dispatcher at overlay 1F offset 0x2F2D, with a stop immediately before a selected
+handler executes. Values without a selected handler were allowed to return.
+The bounded 5,000-instruction / 100 ms per-value, 20-second batch probe passed:
+61 values selected 49 distinct native handlers. Exactly 0x1F and 0x3E..0xFF
+(195 values) had no handler entry. This does not classify them as valid no-ops
+in the full fetch/lifecycle path. Earlier observed 0x22/0x23/0x29 entries agree.
+
+The public [offset catalog](pool-native-offset-map.md) includes every routed
+opcode, raw overlay-file offsets, reference operand counts, engine coverage,
+known memory bindings and grouped dependencies. Operand layouts are identified
+as reference metadata, not an unperformed bulk native behavior validation.
+SSI Engine's later Pool opcode labels are not assumed valid for this release.
+Private probe/report: `map_original_dispatch.py` and
+`original-opcode-dispatch-map.json`. No proprietary code or assets were copied
+into the repository, and no installed files or user sessions were changed.
+
+The private `check_dispatch_catalog.py` validates all 61 published rows against
+the observed targets and raw-file offset arithmetic, confirms the complete
+195-value unrouted set, checks release fingerprints/links and reconciles every
+current C++ opcode execution case with the catalog (41 VM paths plus one combat
+callback boundary). It passed, as did hygiene and attribution. This increment
+changes documentation only; no compile or game launch was needed.

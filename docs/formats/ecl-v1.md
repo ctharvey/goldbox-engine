@@ -5,6 +5,11 @@ and synthetically tested. Lifecycle headers and a narrow original event path
 have also been checked against local Pool of Radiance resources.
 No complete campaign execution or playable compatibility claim.
 
+The [Pool native offset map](../research/pool-native-offset-map.md) catalogs all
+256 dispatcher inputs, native handler/file offsets, reference operand layouts,
+current engine coverage and known register bindings for the fingerprinted DOS
+release. It distinguishes native addresses from ECL instruction offsets.
+
 This is a deliberately narrow adoption from [Gold Box Explorer](https://github.com/bsimser/Gold-Box-Explorer) (MIT). Its ECL text decoder and typed-operand behavior have been adapted to standalone C++20 with strict bounds checks, exception-based error reporting, and a caller-selected instruction dialect. Opcode identifiers/operand counts were cross-checked against [SSI Engine](https://github.com/TiCoKH/ssi-engine) (GPLv3), but no Java VM code was copied.
 
 ## Interfaces

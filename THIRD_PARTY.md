@@ -473,3 +473,11 @@ a current-movement provider that fails when unavailable. No Java menu handler,
 native instructions or proprietary descriptions were copied or ported. Native
 probes used synthetic presentation/input boundaries; they do not establish full
 original display, input timing or combat parity.
+
+The Pool native offset catalog cross-references the same pinned opcode metadata
+and Pool configuration as research labels/layout facts. Native handler and file
+offsets were observed independently by exercising all 256 native dispatcher
+inputs; coverage status comes from current C++ source. No Java tables, handler
+implementation, native instructions or proprietary resources are adopted. Names
+and reference arities do not assert native semantic compatibility, particularly
+for values absent from this installed release's dispatcher.
