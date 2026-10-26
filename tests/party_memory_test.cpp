@@ -32,6 +32,26 @@ std::vector<std::uint8_t> program(std::initializer_list<std::uint8_t> body) {
 }
 }
 int main(int argc, char** argv) {
+    {
+        const PartyClassCheckBinding binding{"ssi-class-presence2-v1",{"ranger","cleric-ranger"}};
+        assert(!party_class_present({},binding));
+        Party party(1); party[0].character_class = "fighter";
+        assert(!party_class_present(party,binding));
+        for (const auto name : {"ranger","cleric-ranger"}) {
+            party[0].character_class = name; party[0].status = "dead"; party[0].hit_points = HitPoints{0,10};
+            assert(party_class_present(party,binding));
+        }
+        party[0].character_class = "ranger-thief";
+        assert(!party_class_present(party,binding));
+        assert(party_class_present(party,{"ssi-class-presence2-v1",{"ranger-thief"}}));
+        party.emplace_back();
+        rejects([&] { (void)party_class_present(party,binding); });
+        for (const auto invalid : {PartyClassCheckBinding{"unknown",{"ranger"}},
+            PartyClassCheckBinding{"ssi-class-presence2-v1",{}},
+            PartyClassCheckBinding{"ssi-class-presence2-v1",{"ranger","ranger"}},
+            PartyClassCheckBinding{"ssi-class-presence2-v1",{"../ranger"}}})
+            rejects([&] { validate_party_class_check(invalid); });
+    }
     assert(argc == 2);
     const auto profile = read_game_profile(argv[1]);
     assert(profile.character_rules && profile.party_memory);

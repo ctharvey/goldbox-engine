@@ -40,6 +40,7 @@ class SessionHost final : public EclHost {
     EclHost& delegate;
 public:
     SessionHost(ExplorationSession& value, EclHost& host) : session(value), delegate(host) {
+        if (session.party_class_check) validate_party_class_check(*session.party_class_check);
         if (session.party_strength) {
             if (!session.character_rules) throw std::runtime_error("Party strength requires creation rules");
             validate_party_strength(*session.party_strength,*session.character_rules);
@@ -199,6 +200,10 @@ public:
     std::uint8_t party_strength() override {
         if (!session.party_strength) throw std::runtime_error("Party strength adapter unavailable");
         return calculate_party_strength(session.party,*session.party_strength);
+    }
+    bool party_class_present() override {
+        if (!session.party_class_check) throw std::runtime_error("Party class check adapter unavailable");
+        return goldbox::party_class_present(session.party,*session.party_class_check);
     }
     void native_call(std::uint16_t function) override {
         if (session.position_advance_call && function == session.position_advance_call->function) {

@@ -21,6 +21,9 @@ struct PartyLevelBinding {
 struct PartyStrengthBinding {
     std::string dialect, cleric_class, mage_class;
 };
+struct PartyClassCheckBinding { std::string dialect; std::vector<std::string> classes; };
+void validate_party_class_check(const PartyClassCheckBinding& binding);
+bool party_class_present(const Party& party, const PartyClassCheckBinding& binding);
 void validate_party_strength(const PartyStrengthBinding& binding, const CreationRules& rules);
 std::uint8_t calculate_party_strength(const Party& party, const PartyStrengthBinding& binding);
 // Shared SSI dialect adapter. Native addresses/offsets belong to game profiles.

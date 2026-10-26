@@ -104,6 +104,24 @@ std::optional<std::string> party_memory_string(const PartyMemoryLayout& layout, 
     if (address == layout.count_address) throw std::runtime_error("Party count is not a string");
     return std::nullopt;
 }
+void validate_party_class_check(const PartyClassCheckBinding& binding) {
+    if (binding.dialect != "ssi-class-presence2-v1" || binding.classes.empty() || binding.classes.size() > 32)
+        throw std::runtime_error("Unsupported party class check binding");
+    std::set<std::string> names;
+    static const std::regex class_id("[a-z][a-z0-9-]{0,63}");
+    for (const auto& name : binding.classes)
+        if (!std::regex_match(name,class_id) || !names.insert(name).second)
+            throw std::runtime_error("Invalid or duplicate party class check ID");
+}
+bool party_class_present(const Party& party, const PartyClassCheckBinding& binding) {
+    validate_party_class_check(binding);
+    bool present = false;
+    for (const auto& character : party) {
+        if (character.character_class.empty()) throw std::runtime_error("Party class is unknown");
+        present |= std::find(binding.classes.begin(),binding.classes.end(),character.character_class) != binding.classes.end();
+    }
+    return present;
+}
 void validate_party_strength(const PartyStrengthBinding& binding, const CreationRules& rules) {
     if (binding.dialect != "ssi-weighted-party-strength-v1" || binding.cleric_class == binding.mage_class)
         throw std::runtime_error("Unsupported or conflicting party strength binding");

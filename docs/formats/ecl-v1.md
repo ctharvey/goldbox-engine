@@ -61,6 +61,23 @@ implicitly changed. Division by zero fails explicitly before writing a result.
 The dialect rejects conflicting operand definitions. These semantics follow
 the native Pool handler; another title's remainder policy needs another dialect.
 
+Optional `partyClassCheck` selects `ssi-class-presence2-v1` and an explicit
+`classes` list. It enables opcode 0x22 with two typed destinations. The host reads
+normalized party class IDs; the VM writes presence (0/1) to the first destination
+and zero to the second, in that order. Aliasing therefore leaves zero. Invalid
+operand forms fail before querying the host; protected store failures retain
+the existing partial-progress policy. Comparison, RNG and character state are
+unchanged. Missing adapters, unknown character class state, duplicate bindings
+and conflicting opcode meanings fail explicitly.
+
+Pool selects `ranger` and `cleric-ranger`, corresponding to native class codes
+4 and 10. These reserved symbolic identities do not enable character creation
+for those classes. Other class combinations are not inferred from components;
+eligibility is profile data. The native handler checks class presence even with
+zero HP and does not inspect status, level or ability scores. The reference name
+PARTY_SKILL_CHECK2 does not imply a random roll. Other dialects' yes/no and
+three-operand meanings remain unsupported by this adapter.
+
 State changes made before an error remain visible; execution is not
 transactional. The host owns input and combat behavior. Determinism assumes
 deterministic host responses, and callers must bound blocking host operations

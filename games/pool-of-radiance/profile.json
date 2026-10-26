@@ -56,6 +56,7 @@
   "validationStatus": "unverified",
   "resourcePatterns": ["GEO*.DAX", "ECL*.DAX", "ITEM*.DAX", "PIC*.DAX"],
   "partyStrength": {"dialect": "ssi-weighted-party-strength-v1", "clericClass": "cleric", "mageClass": "magic-user"},
+  "partyClassCheck": {"dialect": "ssi-class-presence2-v1", "classes": ["ranger", "cleric-ranger"]},
   "partyMemory": {
     "dialect": "ssi-selected-character-v1",
     "recordBase": 27392,

@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Implement profile-selected opcode 0x22 as the verified two-output class-presence
+  check, rather than a random skill roll. Keep class IDs in profile data and
+  preserve ordered typed stores, alias behavior and unchanged comparison state.
+
 - Add an explicitly selected unsigned-16 arithmetic dialect for native SUBTRACT,
   DIVIDE and MULTIPLY behavior. Advance deterministic encounter branches past
   DIVIDE to the unsupported Pool 0x22 skill-check boundary, with regression gates.

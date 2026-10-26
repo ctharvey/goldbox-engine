@@ -19,7 +19,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         "colorBackdrop", "portrait", "areaDialect", "picturePeriodMs", "startupTitleRecords",
         "characterCreationRules", "partyMemory", "random", "characterCreationDice", "speakerAudio", "soundCall",
         "startupTitlePeriodMs", "tandyMusic", "campaignStartup", "scriptDelayMs", "spriteReplacementMs",
-        "originalDisplay", "partyStrength", "arithmeticDialect"}, "game profile");
+        "originalDisplay", "partyStrength", "arithmeticDialect", "partyClassCheck"}, "game profile");
     if (j::integer(j::field(root, "schemaVersion", "game profile"), "schemaVersion") != 1) {
         throw std::runtime_error("unsupported game profile schemaVersion");
     }
@@ -423,6 +423,14 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         }
         validate_party_memory_layout(layout,*profile.character_rules);
         profile.party_memory = std::move(layout);
+    }
+    if (const auto* value = root.if_contains("partyClassCheck")) {
+        const auto& o = j::object(*value,"partyClassCheck");
+        j::fields_only(o,{"dialect","classes"},"partyClassCheck");
+        PartyClassCheckBinding binding{j::string(j::field(o,"dialect","partyClassCheck"),"party check dialect"),{}};
+        for (const auto& name : j::array(j::field(o,"classes","partyClassCheck"),"party check classes"))
+            binding.classes.push_back(j::string(name,"party check class"));
+        validate_party_class_check(binding); profile.party_class_check = std::move(binding);
     }
     if (const auto* value = root.if_contains("partyStrength")) {
         if (!profile.character_rules || !profile.party_memory)

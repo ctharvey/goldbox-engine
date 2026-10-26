@@ -450,3 +450,9 @@ and VM as research references. Its native operand order, result wrapping and
 unchanged remainder/comparison state were independently verified. The upstream
 division remainder assignment does not match the observed Pool handler and was
 not adopted. No Java arithmetic code or native instructions were copied/ported.
+
+Opcode 0x22's class-presence adapter also consults the pinned Pool opcode
+configuration and `data/character/ClassSelections.java` for class-code labels.
+Its behavior comes from 263 independent native-handler checks; the reference
+skill-check handler is empty. Profile-selected symbolic class IDs replace native
+record offsets in the shared engine. No Java class table or handler was copied.

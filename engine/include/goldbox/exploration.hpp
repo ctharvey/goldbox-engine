@@ -63,6 +63,7 @@ struct ExplorationSession {
     std::optional<std::array<std::uint16_t,4>> movement_addresses{};
     std::vector<std::array<std::uint16_t,2>> transfer_clear_ranges;
     EclArithmeticDialect arithmetic_dialect{EclArithmeticDialect::disabled};
+    std::optional<PartyClassCheckBinding> party_class_check{};
 
     // Both GEO16 edges must permit traversal; boundaries remain solid.
     // Door state 1 is passable. Opening/bashing states 2/3 is not modeled.

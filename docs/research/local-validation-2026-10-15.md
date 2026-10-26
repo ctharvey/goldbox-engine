@@ -1951,3 +1951,52 @@ original RNG suite was skipped under WSL. The actual installed-resource opening,
 ordinary boundary, rendered-region fingerprints and two unsupported skill-check
 checkpoints ran. Hygiene and attribution checks passed. Private logs:
 `parity-arithmetic-final-focused.log` and `parity-arithmetic-full-tests.log`.
+
+## Native opcode 0x22 class presence (2026-10-25)
+
+The native interpreter dispatches 0x22 to its two-operand handler at overlay
+1F:1629. The handler traverses the party list and tests only class byte 0x2F:
+codes 4 or 10 set the first result to one; otherwise it is zero. The second
+result is always zero. Both operands are destinations, stored in order. The
+handler does not inspect HP, status, levels or ability scores, and does not roll
+random numbers. This is narrower than the reference name PARTY_SKILL_CHECK2.
+
+263 bounded original-code cases passed: empty party, every class byte 0..255,
+linked mixed parties and a six-member party with the eligible class last.
+All actor HP fields were zero. The probe used the original handler, operand
+decoder and writer without instruction substitution; each call was bounded to
+20,000 instructions/100 ms, with a 40-second batch deadline. The RNG state was
+unchanged and the program counter advanced seven bytes. Private report:
+`.cache/goldbox-validation/original-party-class-check-report.json`. The pinned
+ClassSelections reference corroborates Ranger and Cleric/Ranger labels for
+4 and 10. Its class table was not copied; the reference opcode handler is empty.
+
+The shared adapter now selects `ssi-class-presence2-v1` using profile
+`partyClassCheck`, with explicit eligible symbolic class IDs. Pool lists
+`ranger` and `cleric-ranger`; these reserved identities do not expand its
+character creator. The host reads normalized classes, without native record
+offsets or title conditions in the core. The VM performs ordered typed stores,
+so aliased destinations end at zero. Comparison, RNG and party state remain
+unchanged. Malformed destination forms fail before querying the host; later
+protected-write errors follow the existing partial-progress policy.
+
+Synthetic tests cover both presence outcomes, empty and mixed-class state,
+alternate configured class IDs, ignored HP/status, unknown class state, output
+widths/aliasing, invalid operands and bindings, disabled dialects and conflicting
+opcode meanings. The original-resource seeds 10 and 19 now pass offset 769 and
+stop at program 20 offset 776 with `Unknown ECL opcode 35` (0x23). That exact
+new stop is asserted, replacing the previous 0x22 gate. The reference calls 0x23
+SURPRISE and assigns four operands; its native behavior and encounter effects
+are the next unresolved dependency. No random skill result, yes/no behavior or
+combat outcome was substituted.
+
+Six focused suites passed. Existing opening, ordinary boundary and seven native
+rendered-region fingerprints remain valid. Private focused log:
+`party-class-check-focused.log`. Original assets/captures stayed private, and
+installed files, user saves and artwork were not modified.
+
+The final serialized two-worker run passed 30 suites; the Windows-only original
+RNG integration suite was skipped under WSL. The installed-resource opening,
+ordinary boundary, seven rendered regions and two new 0x23 stops were exercised.
+Hygiene and attribution checks passed. Full private log:
+`party-class-check-full-tests.log`.

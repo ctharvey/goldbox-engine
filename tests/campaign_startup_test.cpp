@@ -150,12 +150,14 @@ int main(int argc, char** argv) {
         session.dialect = {dispatch.dialect,dispatch.code_base,dispatch.square_info_address,true,dispatch.position_addresses};
         session.movement_addresses = dispatch.movement_addresses;
         session.transfer_clear_ranges = dispatch.transfer_clear_ranges;
-        session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::weighted_strength);
+        session.opcodes = minimal_vm_opcodes(EclImageDialect::sprite3,EclAreaDialect::map3,EclPartyDialect::weighted_strength,
+            EclPartyCheckDialect::class_presence2);
         session.campaign_start = std::array<std::uint8_t,2>{config.map_record,config.program_record};
         session.position_refresh_call = config.position_refresh_call;
         session.position_advance_call = config.position_advance_call;
         session.sound_call = profile.sound_call; session.party_memory = profile.party_memory;
         session.party_strength = profile.party_strength;
+        session.party_class_check = profile.party_class_check;
         session.character_rules = profile.character_rules; session.initial_random = profile.random;
         session.random_dialect = profile.random_dialect;
         session.arithmetic_dialect = profile.arithmetic_dialect;
@@ -186,8 +188,8 @@ int main(int argc, char** argv) {
             candidate.state.random = HighWordLcg32(seed,profile.random->multiplier(),profile.random->increment());
             MovementHost probe(candidate,profile,game);
             const auto result = candidate.move(Direction::west,probe);
-            check(result.execution && !result.execution->exited && result.execution->bytecode_offset == 769 &&
-                result.execution->diagnostic == "Unknown ECL opcode 34","Encounter unsupported checkpoint changed");
+            check(result.execution && !result.execution->exited && result.execution->bytecode_offset == 776 &&
+                result.execution->diagnostic == "Unknown ECL opcode 35","Encounter surprise checkpoint changed");
         }
         auto walked = session; MovementHost movement_host(walked,profile,game);
         const auto move = walked.move(Direction::west,movement_host);

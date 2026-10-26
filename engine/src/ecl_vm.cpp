@@ -67,13 +67,17 @@ void EclHost::load_area(std::array<std::uint8_t,3>) { throw EclDecodeError("Map 
 void EclHost::load_character(std::uint8_t) { throw EclDecodeError("Party host unavailable"); }
 void EclHost::select_character(std::string_view) { throw EclDecodeError("Party selection host unavailable"); }
 std::uint8_t EclHost::party_strength() { throw EclDecodeError("Party strength host unavailable"); }
+bool EclHost::party_class_present() { throw EclDecodeError("Party class check host unavailable"); }
 void EclHost::program_changed(std::uint8_t) {}
 std::optional<std::uint8_t> EclHost::memory_byte(std::uint16_t) { return std::nullopt; }
 bool EclHost::write_memory(std::uint16_t, std::uint32_t, std::size_t) { return false; }
 std::optional<std::string> EclHost::string_at(std::uint16_t) { return std::nullopt; }
 bool EclHost::write_string(std::uint16_t, std::string_view) { return false; }
 
-std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDialect area, EclPartyDialect party) {
+std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDialect area, EclPartyDialect party,
+    EclPartyCheckDialect check) {
+    require(check == EclPartyCheckDialect::disabled || check == EclPartyCheckDialect::class_presence2,
+        "Unknown party check dialect");
     require(images == EclImageDialect::disabled || images == EclImageDialect::sprite3,"Unknown image dialect");
     require(area == EclAreaDialect::disabled || area == EclAreaDialect::map3,"Unknown area dialect");
     require(party == EclPartyDialect::disabled || party == EclPartyDialect::load_character ||
@@ -96,6 +100,7 @@ std::vector<EclOpcodeSpec> minimal_vm_opcodes(EclImageDialect images, EclAreaDia
         std::erase_if(result,[](const auto& op) { return op.opcode == 0x0a; });
     else result.push_back({0x39,"WHO",1});
     if (party == EclPartyDialect::weighted_strength) result.push_back({0x1d,"PARTY_STRENGTH",1});
+    if (check == EclPartyCheckDialect::class_presence2) result.push_back({0x22,"PARTY_CLASS_CHECK2",2});
     return result;
 }
 
@@ -123,6 +128,11 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x0a; }) == 1,
             "Conflicting VM party opcode definition");
         const auto who_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x39; });
+        const auto class_check = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x22; });
+        if (class_check != opcodes.end()) require(class_check->operand_count == 2 &&
+            class_check->variable_count_operand == -1 && class_check->mnemonic == "PARTY_CLASS_CHECK2" &&
+            std::count_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x22; }) == 1,
+            "Conflicting party check opcode definition");
         const auto strength_spec = std::find_if(opcodes.begin(),opcodes.end(),[](const auto& op) { return op.opcode == 0x1d; });
         if (strength_spec != opcodes.end()) require(strength_spec->operand_count == 1 &&
             strength_spec->variable_count_operand == -1 &&
@@ -195,6 +205,12 @@ EclExecution execute_ecl(std::span<const std::uint8_t> record, EclEventKind kind
             case 0x1d:
                 destination(args[0],state);
                 store(args[0],host.party_strength()); break;
+            case 0x22: {
+                destination(args[0],state); destination(args[1],state);
+                const auto present = host.party_class_present();
+                store(args[0],present ? 1 : 0); store(args[1],0);
+                break;
+            }
             case 0x20: {
                 const auto id = numeric(args[0]);
                 require(id <= 255,"ECL program ID outside byte range");

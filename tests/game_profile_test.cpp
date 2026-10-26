@@ -13,6 +13,8 @@ int main(int argc, char** argv) {
     assert(argc == 3);
     const auto pool = goldbox::read_game_profile(argv[1]);
     const auto curse = goldbox::read_game_profile(argv[2]);
+    assert(pool.party_class_check && !curse.party_class_check);
+    assert(pool.party_class_check->classes == (std::vector<std::string>{"ranger","cleric-ranger"}));
     assert(pool.arithmetic_dialect == goldbox::EclArithmeticDialect::unsigned16);
     assert(curse.arithmetic_dialect == goldbox::EclArithmeticDialect::disabled);
     assert(pool.original_display && !curse.original_display);
@@ -83,6 +85,17 @@ int main(int argc, char** argv) {
     fs::remove(path);
     if (!rejected) return 1;
     const std::string prefix = R"({"schemaVersion":1,"id":"test","title":"Test","formatFamily":"goldbox-dos","archiveFormat":"dax-v1","eventDialect":"unverified","rulesProfile":"test","validationStatus":"unverified","resourcePatterns":[],"colorBackdrop":)";
+    auto class_prefix = prefix;
+    class_prefix.replace(class_prefix.find("colorBackdrop"),13,"partyClassCheck");
+    for (const auto value : {R"({"dialect":"unknown","classes":["ranger"]})",
+        R"({"dialect":"ssi-class-presence2-v1","classes":[]})",
+        R"({"dialect":"ssi-class-presence2-v1","classes":["ranger","ranger"]})",
+        R"({"dialect":"ssi-class-presence2-v1","classes":["ranger"],"extra":1})"}) {
+        { std::ofstream output(path); output << class_prefix << value << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
     auto arithmetic_prefix = prefix;
     arithmetic_prefix.replace(arithmetic_prefix.find("colorBackdrop"),13,"arithmeticDialect");
     for (const auto value : {"\"unknown\"","false","3"}) {

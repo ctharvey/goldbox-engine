@@ -41,6 +41,37 @@ EclExecution run(const std::vector<std::uint8_t>& bytes, EclState& state, Host& 
 
 int main() {
     {
+        struct ClassHost : Host {
+            bool present{}; unsigned queries{};
+            bool party_class_present() override { ++queries; return present; }
+        } selected;
+        EclState state;
+        const auto ops = minimal_vm_opcodes(EclImageDialect::disabled,EclAreaDialect::disabled,
+            EclPartyDialect::disabled,EclPartyCheckDialect::class_presence2);
+        const auto invoke = [&](const auto& bytes, const auto& dialect) {
+            return execute_ecl(bytes,EclEventKind::move,{"ssi-five-entry-v1",0x9900,0xc04f},dialect,state,selected);
+        };
+        for (const auto present : {false,true}) {
+            selected.present = present;
+            state.memory[0x4a21] = 0xaa; state.memory[0x4a22] = 0xbb;
+            assert(invoke(program({3,0,1,0,2,0x22,3,0x20,0x4a,1,0x22,0x4a,0}),ops).exited);
+            assert(state.memory[0x4a20] == present && state.memory[0x4a21] == 0 && state.memory[0x4a22] == 0);
+            assert(state.comparison == -1);
+        }
+        assert(invoke(program({0x22,1,0x20,0x4a,1,0x20,0x4a,0}),ops).exited);
+        assert(state.memory[0x4a20] == 0); // The second output wins on aliased destinations.
+        const auto queries = selected.queries;
+        assert(!invoke(program({0x22,0,7,1,0x20,0x4a,0}),ops).exited && selected.queries == queries);
+        assert(!invoke(program({0x22,1,0x20,0x4a,0,7,0}),ops).exited && selected.queries == queries);
+        assert(!invoke(program({0x22,1,0x20,0x4a,1,0x21,0x4a,0}),minimal_vm_opcodes()).exited);
+        auto conflict = ops;
+        conflict.push_back({0x22,"INPUT_YES_NO",0});
+        assert(!invoke(program({0}),conflict).exited);
+        conflict = ops;
+        for (auto& spec : conflict) if (spec.opcode == 0x22) spec.mnemonic = "PARTY_SKILL_CHECK3";
+        assert(!invoke(program({0}),conflict).exited);
+    }
+    {
         // Expected results independently checked against the original unsigned handler.
         const unsigned cases[][5]{{0,1,1,0,0},{1,2,1,0,2},{17,5,65524,3,85},
             {255,2,65283,127,510},{256,3,65283,85,768},{32767,7,32776,4681,32761},
