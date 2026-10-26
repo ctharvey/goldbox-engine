@@ -439,3 +439,8 @@ The dialogue-wrap correction also consults the pinned SSI Engine
 comparison does not reproduce the native exact-fit boundary observed here.
 The independent C++ correction follows matched original screen evidence and
 synthetic color/fragment regressions; no Java wrapping code was adopted.
+
+The read-only position/clock binding consults the same pinned movement, memory
+and position interfaces as research references. Its addresses, zero padding and
+two-character formatting follow independent bounded native-code observations.
+No upstream clock implementation or native instructions were copied or ported.

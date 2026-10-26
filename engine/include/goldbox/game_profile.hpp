@@ -85,6 +85,8 @@ struct GameProfile {
         std::array<std::uint16_t,2> canvas{}, position{};
         std::array<std::uint16_t,4> scene{}, party{}, dialogue{}, commands{};
         std::uint16_t party_row_height{8};
+        // Script globals: minute units, minute tens, hours. Presentation is read-only.
+        std::optional<std::array<std::uint16_t,3>> clock_addresses{};
         // X, Y, symbol index, repeat count, vertical (0/1); symbols are 8x8.
         std::vector<std::array<std::uint16_t,5>> frame_runs;
     };

@@ -236,6 +236,7 @@ int main(int argc, char** argv) {
         check(window_fingerprints.at("partyName") == 13181112814587718321ull,"Native party name differs");
         check(window_fingerprints.at("armorClass") == 10896576774587328698ull,"Native armor class display differs");
         check(window_fingerprints.at("dialogue") == 3056256239859949209ull,"Native boundary dialogue differs");
+        check(window_fingerprints.at("position") == 13091622508662674760ull,"Native boundary clock differs");
         SDL_Quit();
 #endif
         std::cout << "{\"status\":\"original-resource-replay\",\"steps\":" << run.steps

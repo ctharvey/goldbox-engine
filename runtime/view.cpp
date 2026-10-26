@@ -45,6 +45,23 @@ std::uint8_t party_name_color(const ExplorationSession& session, std::size_t mem
     const std::size_t selected = address ? session.state.memory[*address] : 0;
     return selected == member ? 15 : 11;
 }
+std::string original_position_text(const ExplorationSession& session, const GameProfile::OriginalDisplay& layout) {
+    const auto direction = static_cast<unsigned>(session.facing);
+    if (direction > 3) throw std::runtime_error("Invalid display direction");
+    const char* directions[]{"N","E","S","W"};
+    auto text = std::to_string(session.column)+","+std::to_string(session.row)+" "+directions[direction];
+    if (layout.clock_addresses) {
+        const auto& addresses = *layout.clock_addresses;
+        const auto pair = [](unsigned value) {
+            auto digits = std::to_string(value);
+            if (digits.size() < 2) digits.insert(digits.begin(),'0');
+            return digits.substr(0,2);
+        };
+        text += " "+pair(session.state.memory[addresses[2]])+":"+
+            pair(session.state.memory[addresses[0]]+10u*session.state.memory[addresses[1]]);
+    }
+    return text;
+}
 namespace {
 void append_page(std::deque<std::string>& lines, std::deque<std::vector<std::uint8_t>>* ink,
     std::string_view text, std::span<const std::uint8_t> colors, bool clear,

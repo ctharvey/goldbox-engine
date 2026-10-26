@@ -196,6 +196,24 @@ int main(int argc, char** argv) {
     layout.party = {144,16,168,80}; layout.dialogue = {8,136,304,48};
     layout.commands = {0,192,320,8}; layout.position = {144,120};
     layout.frame_runs = {{8,8,0,3,0},{8,16,1,3,1}};
+    {
+        ExplorationSession position;
+        position.column = 15; position.row = 4; position.facing = Direction::west;
+        assert(original_position_text(position,layout) == "15,4 W");
+        auto clock_layout = layout; clock_layout.clock_addresses = {{100,200,300}};
+        for (const auto [hour,hour_text] : {std::pair{0,"00"},{1,"01"},{9,"09"},{10,"10"},
+                {23,"23"},{24,"24"},{99,"99"},{100,"10"},{255,"25"}})
+            for (const auto [minute,minute_text] : {std::pair{0,"00"},{9,"09"},{10,"10"},
+                    {59,"59"},{99,"99"},{255,"25"}}) {
+                position.state.memory[100] = minute%10; position.state.memory[200] = minute/10;
+                position.state.memory[300] = hour;
+                assert(original_position_text(position,clock_layout) == std::string("15,4 W ")+hour_text+":"+minute_text);
+            }
+        position.facing = Direction(4);
+        bool rejected = false;
+        try { (void)original_position_text(position,clock_layout); } catch (const std::runtime_error&) { rejected = true; }
+        assert(rejected);
+    }
     const std::vector<formats::IndexedImage> symbols{{8,8,std::vector<std::uint8_t>(64,4)},
         {8,8,std::vector<std::uint8_t>(64,14)}};
     OriginalPresentation original{layout,compose_original_frame(layout,symbols)};

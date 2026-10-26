@@ -244,8 +244,14 @@ normalized current AC with right alignment; unknown legacy combat state remains
 wrapping: an appended word wraps when it would exactly fill an occupied row.
 Initial full-width words retain the existing bounded handling without creating
 empty rows. Inline colors and continuation across PRINT calls are preserved.
-These region checks do not establish whole-screen parity: command labels and
-the position/clock line still differ, and HP rolls are not synchronized. Other
+Optional `originalDisplay.clockAddresses` binds minute units, minute tens and
+hours to three distinct script addresses. The display reads saved ECL state,
+zero-pads each clock component and retains the native first-two-character
+formatting. Pool selects 0x49C7/0x49C8/0x49C9. The matched boundary position/clock
+region now passes its native fingerprint check. This does not advance time;
+host-driven time progression remains unimplemented.
+These region checks do not establish whole-screen parity: command labels still
+differ, and HP rolls are not synchronized. Other
 dialogues, paging sequences and their native timing remain unverified.
 
 ADD stores through the existing typed memory interface with byte/word wrapping.

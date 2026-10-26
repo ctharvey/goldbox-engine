@@ -682,10 +682,8 @@ public:
             const auto health = hp ? std::to_string(hp->current) : "?";
             label(party[0]+party[2]-float(health.size()*8),y,health);
         }
-        const char* directions[]{"N","E","S","W"};
         color(85,255,85);
-        label(layout.position[0],layout.position[1],std::to_string(session.column)+","+
-            std::to_string(session.row)+" "+directions[static_cast<unsigned>(session.facing)]);
+        label(layout.position[0],layout.position[1],original_position_text(session,layout));
         const auto& text = layout.dialogue;
         const SDL_Rect text_clip{text[0],text[1],text[2],text[3]};
         checked(SDL_SetRenderClipRect(renderer,&text_clip));

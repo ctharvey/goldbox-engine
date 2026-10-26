@@ -2,6 +2,10 @@
 
 ## 2026-10-25
 
+- Display the native clock from profile-selected script globals beside position.
+  Verify 54 native formatting cases and the rendered boundary position region;
+  preserve saved script state without inventing elapsed-time advancement.
+
 - Match the native boundary dialogue by wrapping appended words on exact-width
   fits. Preserve inline colors and split PRINT continuation; assert the rendered
   dialogue fingerprint against the original capture.

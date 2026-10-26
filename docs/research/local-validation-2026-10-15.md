@@ -1866,3 +1866,41 @@ The final serialized two-worker run passed 30 suites; the Windows-only original
 RNG suite was skipped under WSL. The installed-resource renderer check ran and
 asserted the corrected dialogue fingerprint. Hygiene and attribution passed.
 Private logs: `parity-dialogue-focused.log` and `parity-dialogue-full-tests.log`.
+
+## Read-only native clock presentation (2026-10-25)
+
+The unmodified native position formatter reads script globals 0x49C7 (minute
+units), 0x49C8 (minute tens) and 0x49C9 (hours). Its two-character components are
+zero-padded or truncated from the leftmost digits, including unusual values.
+Fifty-four bounded native-code cases verified hours 0..255 and minute totals
+0..255, using synthetic word buffers and stopping before rendering. Each call
+had a 30,000-instruction/100 ms limit. The initial probe required correcting its
+resident CS and initializing the separate search-flag buffer; only the final
+54 passing cases support this conclusion. Private evidence:
+`.cache/goldbox-validation/original-position-clock-report.json`.
+
+Optional profile `originalDisplay.clockAddresses` supplies those three addresses
+to the shared display. It reads ordinary saved script memory and does not invent
+time advancement. The actual SDL boundary position/clock region now matches
+native fingerprint `13091622508662674760`. Synthetic cases check the observed
+formatting, absent bindings, invalid direction and malformed profile addresses.
+The three focused suites and full 30 runnable suites passed; the Windows-only
+RNG integration suite was skipped under WSL. Final focused run:
+`parity-clock-final-focused.log`; broad run: `parity-clock-full-tests.log`.
+
+A fresh boundary control probe reached a random goblin encounter instead of
+the previous non-encounter path. Its opening matched, but its boundary comparison
+correctly failed; it cannot be used as matched-path evidence. Private report:
+`original-exploration-controls-report.json`, native root `startup-reference-zae_dqy4`.
+An independent opening-only probe (`original-opening-controls-report.json`, root
+`startup-reference-ochy8jv8`) processed 24 turns without advancing the clock. Two
+processed LOOK inputs advanced it by ten minutes each; subsequent inputs did not
+establish reliable general advancement semantics. These observations do not
+justify a complete host time-progression policy. Owned processes were cleaned up.
+
+Thirty-two deterministic engine boundary replays then found two encounter paths,
+seeds 10 and 19, stopping at unsupported opcode 0x06 (DIVIDE), program 20 offset
+616. That temporary inventory instrumentation was removed. The next executable
+compatibility work is the native arithmetic handler, rather than a fabricated
+combat result or inactive original command labels. No game assets, native text,
+user saves or instructions were committed.

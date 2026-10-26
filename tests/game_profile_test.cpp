@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
         pool.campaign_startup->position_advance_call->wall_type_address == 0xc04e);
     assert(pool.campaign_startup->program_graphics.at(20) ==
         (std::vector<std::string>{"PIC2.DAX","SPRIT2.DAX","HEAD2.DAX","BODY2.DAX","WALLDEF2.DAX","8X8D2.DAX","8X8D1.DAX"}));
+    assert(pool.original_display->clock_addresses == (std::array<std::uint16_t,3>{0x49c7,0x49c8,0x49c9}));
     assert(pool.event_dialect == "unverified" && curse.event_dialect == "unverified");
     assert(pool.validation_status == "unverified");
     assert(pool.resource_patterns.size() == 4);
@@ -248,6 +249,14 @@ int main(int argc, char** argv) {
         bool rejected = false;
         try { (void)goldbox::read_game_profile(path); }
         catch (const std::runtime_error&) { rejected = true; }
+        fs::remove(path); assert(rejected);
+    }
+    for (const auto addresses : {"[]","[1,2]","[1,2,3,4]","[-1,2,3]","[65536,2,3]","[true,2,3]","[1,1,3]"}) {
+        auto invalid = display;
+        invalid.insert(invalid.size()-1,std::string(",\"clockAddresses\":")+addresses);
+        { std::ofstream output(path); output << display_prefix << invalid << '}'; }
+        bool rejected = false;
+        try { (void)goldbox::read_game_profile(path); } catch (const std::runtime_error&) { rejected = true; }
         fs::remove(path); assert(rejected);
     }
     auto movement_prefix = prefix;

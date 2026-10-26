@@ -45,7 +45,7 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
     if (const auto* value = root.if_contains("originalDisplay")) {
         const auto& config = j::object(*value,"originalDisplay");
         j::fields_only(config,{"fontArchive","fontRecord","symbolsArchive","symbolsRecord","canvas","scene",
-            "party","dialogue","commands","position","frameRuns","partyRowHeight"},"originalDisplay");
+            "party","dialogue","commands","position","frameRuns","partyRowHeight","clockAddresses"},"originalDisplay");
         GameProfile::OriginalDisplay display;
         const auto numbers = [&](const auto& value, auto& destination) {
             const auto& values = j::array(value,"display coordinates");
@@ -70,6 +70,19 @@ GameProfile read_game_profile(const std::filesystem::path& file) {
         }
         numbers(j::field(config,"canvas","originalDisplay"),display.canvas);
         numbers(j::field(config,"position","originalDisplay"),display.position);
+        if (const auto* clock = config.if_contains("clockAddresses")) {
+            const auto& addresses = j::array(*clock,"clockAddresses");
+            if (addresses.size() != 3) throw std::runtime_error("Clock requires three script addresses");
+            std::array<std::uint16_t,3> values{};
+            for (std::size_t i = 0; i < values.size(); ++i) {
+                const auto value = j::integer(addresses[i],"clock address");
+                if (value < 0 || value > 65535) throw std::runtime_error("Clock address out of range");
+                values[i] = static_cast<std::uint16_t>(value);
+            }
+            if (values[0] == values[1] || values[0] == values[2] || values[1] == values[2])
+                throw std::runtime_error("Duplicate clock addresses");
+            display.clock_addresses = values;
+        }
         if (const auto* row = config.if_contains("partyRowHeight")) {
             const auto n = j::integer(*row,"partyRowHeight");
             if (n < 8 || n > 32 || n%8) throw std::runtime_error("Invalid party row height");
