@@ -518,3 +518,13 @@ effect-expiry traversal and effect removal establish the implemented fields.
 Synthetic resource records and substituted allocation/effect callback boundaries
 were used; no native code was copied into the engine. Unknown item/effect
 properties and complete effect handlers remain unimplemented.
+
+Base-item follow-up inspected pinned Gold Box Explorer
+`src/Common/Plugins/Items/FruaItemFile.cs` and the same Stephen S. Lee FAQ 2.00,
+sections 12.2.4.2 and 12.6.2. These are research-only layout/routine references;
+no parser, name table, ability table, guide text or native implementation was
+adopted. The independent adapter handles the observed two-byte prefix and
+preserves raw flag/descriptor values. Native initialization and bounded weapon
+stat probes establish the implemented prefix handling, signed modifiers,
+small/medium stat adjustments and encoded arithmetic. Complete large-target
+attack/equipment/effect behavior is not asserted by decoding the record fields.

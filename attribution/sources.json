@@ -153,7 +153,8 @@
         "src/Common/Frua/Frua/FruaCharacter.cs",
         "src/Common/Frua/Frua/FruaCharacterFile.cs",
         "src/Common/Frua/Frua/FruaItem.cs",
-        "src/Common/Frua/Frua/FruaItemFile.cs"
+        "src/Common/Frua/Frua/FruaItemFile.cs",
+        "src/Common/Plugins/Items/FruaItemFile.cs"
       ],
       "license": "MIT",
       "licenseFile": "licenses/gold-box-explorer-MIT.txt",
@@ -161,7 +162,7 @@
       "copyrightNotice": "Copyright (c) 2018 Bil Simser",
       "localFiles": [],
       "purpose": "Cross-check DAX index byte count, RLE and ECL address bases; evaluate event-discovery heuristics; cross-check wall tile references and EGA color facts; corroborate native first-level spell IDs and character spell-slot fields during independently probed Pool creation research Research FruaCharacter annotations for Pool current THAC0/AC offsets and 60-minus encoding; no combat-stat derivation or rating code adopted.",
-      "modifications": "Research only; no source copied. Existing independent bounded DAX implementation retained with corrected index interpretation. Byte-pattern event discovery deliberately excluded. Wall assembly code referencing Simeon Pilgrim was not copied or ported. Native Pool spell IDs/capacities are independently probed; FRUA annotations only corroborate names and field meanings. No upstream spell array/viewer implementation adopted. Monster template research also inspected FRUA character/item parsers; incompatible offsets and parser code were not adopted. Independent native initializer/list-copy probes establish detached SSI snapshots and typed current HP/AC/THAC0/movement; encoded inventory/effect rules remain unresolved.",
+      "modifications": "Research only; no source copied. Existing independent bounded DAX implementation retained with corrected index interpretation. Byte-pattern event discovery deliberately excluded. Wall assembly code referencing Simeon Pilgrim was not copied or ported. Native Pool spell IDs/capacities are independently probed; FRUA annotations only corroborate names and field meanings. No upstream spell array/viewer implementation adopted. Monster template research also inspected FRUA character/item parsers; incompatible offsets and parser code were not adopted. Independent native initializer/list-copy probes establish detached SSI snapshots and typed current HP/AC/THAC0/movement; encoded inventory/effect rules remain unresolved. Base-item research inspected the plugin ReadItemDetails layout as a reference only. Independent decoding supports the observed two-byte prefix and native-checked small/medium weapon-stat adjustment using explicit ability inputs. No parser, ability/name tables or native instructions adopted; full attacks remain unavailable.",
       "reviewed": "2026-10-25"
     },
     {

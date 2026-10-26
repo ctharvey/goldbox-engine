@@ -2,6 +2,11 @@
 
 ## 2026-10-25
 
+- Decode the SSI two-byte-prefix/16-byte base-item table and signed weapon
+  bonuses. Add bounded native-backed small/medium weapon-stat calculations with
+  explicit ability inputs, ammunition and racial accuracy handling. Check all
+  128 installed base items against a native fingerprint; full attacks remain open.
+
 - Decode verified monster item type/equipped/weight/quantity and effect ID/timer/
   parameter/removal-handler fields. Preserve native stack-weight byte/word
   behavior and encounter movement effect precedence. Add native-backed boundary

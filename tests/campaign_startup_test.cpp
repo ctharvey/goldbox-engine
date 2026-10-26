@@ -7,6 +7,8 @@
 #include "view.hpp"
 #endif
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <map>
 #include <stdexcept>
@@ -132,6 +134,23 @@ int main(int argc, char** argv) {
         check(profile.campaign_startup && profile.character_rules && profile.random && profile.portrait,
             "Incomplete campaign profile");
         const auto game = std::filesystem::path(installation);
+        std::ifstream item_file(game/"ITEMS",std::ios::binary);
+        check(bool(item_file),"Base item table unavailable");
+        const std::vector<std::uint8_t> item_bytes{std::istreambuf_iterator<char>(item_file),std::istreambuf_iterator<char>()};
+        const auto base_items = decode_ssi_base_items(item_bytes);
+        check(base_items.size() == 128,"Installed base item table size changed");
+        std::uint64_t weapon_hash = 14695981039346656037ull;
+        for (std::size_t type = 0; type < base_items.size(); ++type) {
+            SsiMonsterItem weapon; weapon.type = type; weapon.magical_bonus = -1;
+            // Authored ability inputs, not a claim about real actor modifiers.
+            const SsiWeaponContext context{45,2,-2,3,-4,-1,2};
+            const auto result = ssi_weapon_stats(base_items,weapon,context);
+            for (const auto byte : {result.thac0_code,result.small_medium.count,result.small_medium.sides,
+                static_cast<std::uint8_t>(result.small_medium.bonus)}) {
+                weapon_hash ^= byte; weapon_hash *= 1099511628211ull;
+            }
+        }
+        check(weapon_hash == 4988089530893162104ull,"Installed native weapon-stat fingerprint differs");
         const auto& config = *profile.campaign_startup;
         check(config.graphics_archives.size() == 7,"Missing startup graphics binding");
         const auto family = [&](const auto& files) {
@@ -228,6 +247,7 @@ int main(int argc, char** argv) {
             check(actors.size() == group.count && actors.front() == actors.back(),"Monster clones differ");
             for (const auto& item : actors.front().items) {
                 const auto typed = decode_ssi_monster_item(item);
+                check(typed.type < base_items.size(),"Monster base item reference out of range");
                 check(typed.type == item[0x2e] && typed.equipped == (item[0x34] != 0) &&
                     typed.stack_weight() == ((unsigned(item[0x37])+(unsigned(item[0x38]) << 8))*
                         std::max(unsigned(item[0x39]),1u)%65536),"Decoded monster inventory differs");

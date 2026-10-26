@@ -3,11 +3,40 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <vector>
 
 namespace goldbox::formats {
+inline int ssi_signed_byte(std::uint8_t value) { return value < 128 ? int(value) : int(value)-256; }
+struct SsiDamageDice {
+    std::uint8_t count{}, sides{};
+    int bonus{};
+    bool operator==(const SsiDamageDice&) const = default;
+};
+struct SsiBaseItem {
+    std::uint8_t slot{}, hands{};
+    SsiDamageDice large, small_medium;
+    std::uint8_t rate{}, armor_descriptor{}, weapon_type{}, unknown8{}, range{}, class_mask{}, weapon_flags{}, unknown15{};
+    bool operator==(const SsiBaseItem&) const = default;
+};
+inline SsiBaseItem decode_ssi_base_item(std::span<const std::uint8_t> record) {
+    if (record.size() != 16) throw std::runtime_error("Invalid SSI base item record size");
+    return {record[0],record[1],{record[2],record[3],ssi_signed_byte(record[4])},
+        {record[9],record[10],ssi_signed_byte(record[11])},record[5],record[6],record[7],record[8],
+        record[12],record[13],record[14],record[15]};
+}
+// Explicit two-byte-prefix layout. The header is not a trusted record count.
+// Other title/file layouts must select their own adapter.
+inline std::vector<SsiBaseItem> decode_ssi_base_items(std::span<const std::uint8_t> bytes) {
+    if (bytes.size() < 18 || (bytes.size()-2)%16 || (bytes.size()-2)/16 > 256)
+        throw std::runtime_error("Invalid SSI base item table size");
+    std::vector<SsiBaseItem> result;
+    for (std::size_t offset = 2; offset < bytes.size(); offset += 16)
+        result.push_back(decode_ssi_base_item(bytes.subspan(offset,16)));
+    return result;
+}
 // Native SSI template resource boundaries, independently observed. This does
 // not decode combat rules or reinterpret serialized native pointers.
 inline void validate_ssi_monster_resources(std::span<const std::uint8_t> character,
@@ -29,6 +58,7 @@ struct SsiMonsterItem {
     std::uint8_t type{}, quantity{};
     bool equipped{};
     std::uint16_t unit_weight{};
+    int magical_bonus{};
     std::uint16_t stack_weight() const {
         return static_cast<std::uint16_t>(std::uint32_t(unit_weight)*std::max(unsigned(quantity),1u));
     }
@@ -37,7 +67,49 @@ struct SsiMonsterItem {
 inline SsiMonsterItem decode_ssi_monster_item(std::span<const std::uint8_t> record) {
     if (record.size() != 63) throw std::runtime_error("Invalid SSI monster item record size");
     return {record[0x2e],record[0x39],record[0x34] != 0,
-        static_cast<std::uint16_t>(record[0x37] | (unsigned(record[0x38]) << 8))};
+        static_cast<std::uint16_t>(record[0x37] | (unsigned(record[0x38]) << 8)),ssi_signed_byte(record[0x32])};
+}
+struct SsiWeaponContext {
+    std::uint8_t base_thac0_code{}, race_code{};
+    // Explicit resolved ability inputs; missing required inputs fail. This
+    // adapter does not guess modifiers from unverified character/effect state.
+    std::optional<int> dexterity_to_hit, strength_to_hit, strength_to_damage;
+    std::optional<int> arrow_bonus, bolt_bonus; // Absent means no equipped ammunition.
+};
+struct SsiWeaponStats {
+    std::uint8_t thac0_code{}; // Displayed THAC0 is 60 minus this unsigned byte.
+    SsiDamageDice small_medium;
+    bool operator==(const SsiWeaponStats&) const = default;
+};
+inline SsiWeaponStats ssi_weapon_stats(std::span<const SsiBaseItem> definitions,
+    const SsiMonsterItem& weapon, const SsiWeaponContext& context) {
+    if (weapon.type >= definitions.size()) throw std::runtime_error("SSI base item reference out of range");
+    const auto checked = [](int value) {
+        if (value < -128 || value > 127) throw std::runtime_error("SSI weapon modifier out of byte range");
+        return value;
+    };
+    const auto required = [&](const std::optional<int>& value) {
+        if (!value) throw std::runtime_error("SSI weapon ability modifier unavailable");
+        return checked(*value);
+    };
+    const auto wrap = [](int value) { return ssi_signed_byte(static_cast<std::uint8_t>(value)); };
+    const auto& definition = definitions[weapon.type];
+    int accuracy = context.base_thac0_code;
+    int damage = checked(definition.small_medium.bonus);
+    if (definition.weapon_flags & 2) accuracy += required(context.dexterity_to_hit);
+    if (definition.weapon_flags & 4) {
+        accuracy += required(context.strength_to_hit);
+        damage += required(context.strength_to_damage);
+    }
+    int bonus = checked(weapon.magical_bonus);
+    if ((definition.weapon_flags & 128) && context.bolt_bonus) bonus += checked(*context.bolt_bonus);
+    if ((definition.weapon_flags & 1) && context.arrow_bonus) bonus += checked(*context.arrow_bonus);
+    bonus = wrap(bonus);
+    damage = wrap(damage+bonus);
+    if (context.race_code == 2 && (weapon.type == 36 || weapon.type == 37 || (weapon.type > 40 && weapon.type < 45)))
+        bonus = wrap(bonus+1); // Native racial bonus affects accuracy after damage is assigned.
+    return {static_cast<std::uint8_t>(accuracy+bonus),
+        {definition.small_medium.count,definition.small_medium.sides,damage}};
 }
 struct SsiMonsterEffect {
     std::uint8_t type{};

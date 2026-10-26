@@ -450,3 +450,29 @@ rounding down. Presence is sufficient, including zero timers and duplicates;
 `27` takes precedence regardless of list order. This is not a general combat
 movement implementation or a party movement aggregator. Those runtime adapters
 must still account for their own state and title-selected rules.
+
+### Base items and equipped weapon statistics
+
+`decode_ssi_base_items()` explicitly selects the observed two-byte-prefix,
+16-byte-record layout. It derives the count from complete records, ignoring the
+prefix as the native reader does, and rejects empty, partial or greater-than-256
+tables. This is a bounded format adapter, not automatic title detection. The
+installed Pool table has 128 records. The view preserves unknown bytes `8/F` and
+exposes slot/hands, large and small/medium dice, rate, armor descriptor, weapon
+type, range, class mask and weapon flags. These are encoded properties, not
+implemented equipment rules. Large-target attack behavior remains unverified.
+
+The item view also exposes signed magical bonus byte `32`. `ssi_weapon_stats()`
+accepts a checked type reference and explicit context: baseline encoded THAC0,
+native race code, resolved Dexterity/Strength adjustments and optional equipped
+arrow/bolt bonuses. Required ability inputs fail when absent or outside signed
+byte range. The adapter does not derive them from incomplete character state.
+
+The observed dialect applies flags `2` (Dexterity accuracy), `4` (Strength
+accuracy/damage), `80` (bolt bonus) and `1` (arrow bonus). Ammunition bonuses
+combine with weapon bonus using signed byte wrapping. Damage is assigned before
+the native race-code-2 accuracy increment for type IDs 36/37/41..44. The result
+contains encoded THAC0 (displayed as `60 - byte`) and small/medium dice with a
+signed wrapped modifier. This preserves native behavior rather than imposing
+tabletop rules. It neither chooses equipment nor rolls/applies damage, checks a
+hit, targets large creatures, invokes effects or implements combat.

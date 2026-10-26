@@ -135,6 +135,73 @@ void monster_setup() {
         rejects([&] { validate_ssi_monster_resources(std::vector<std::uint8_t>(sizes[0]),
             std::vector<std::uint8_t>(sizes[1]),std::vector<std::uint8_t>(sizes[2])); });
 }
+void base_items_and_weapons() {
+    std::array<std::uint8_t,16> bytes{};
+    for (std::size_t i = 0; i < bytes.size(); ++i) bytes[i] = i;
+    bytes[4] = 128; bytes[11] = 255;
+    const auto definition = decode_ssi_base_item(bytes);
+    assert(definition.slot == 0 && definition.hands == 1 &&
+        (definition.large == SsiDamageDice{2,3,-128}) && (definition.small_medium == SsiDamageDice{9,10,-1}));
+    assert(definition.rate == 5 && definition.armor_descriptor == 6 && definition.weapon_type == 7 &&
+        definition.unknown8 == 8 && definition.range == 12 && definition.class_mask == 13 &&
+        definition.weapon_flags == 14 && definition.unknown15 == 15);
+    for (const auto& [encoded,expected] : std::array<std::pair<std::uint8_t,int>,4>{{{0,0},{127,127},{128,-128},{255,-1}}}) {
+        std::array<std::uint8_t,63> item{}; item[0x32] = encoded;
+        assert(decode_ssi_monster_item(item).magical_bonus == expected);
+        auto record = bytes; record[4] = encoded; record[11] = encoded;
+        const auto decoded = decode_ssi_base_item(record);
+        assert(decoded.large.bonus == expected && decoded.small_medium.bonus == expected);
+    }
+    std::vector<std::uint8_t> table{255,255}; table.insert(table.end(),bytes.begin(),bytes.end());
+    assert(decode_ssi_base_items(table) == std::vector<SsiBaseItem>{definition});
+    table[0] = 0; table[1] = 0;
+    assert(decode_ssi_base_items(table) == std::vector<SsiBaseItem>{definition}); // Prefix is not a count.
+    assert(decode_ssi_base_items(std::vector<std::uint8_t>(4098)).size() == 256);
+    for (const auto size : {0,1,2,17,19,4114})
+        rejects([&] { decode_ssi_base_items(std::vector<std::uint8_t>(size)); });
+    for (const auto size : {0,15,17})
+        rejects([&] { decode_ssi_base_item(std::vector<std::uint8_t>(size)); });
+    // Fingerprint of 960 unmodified native weapon-stat cases. Only the three
+    // ability helper boundaries were supplied synthetic signed-byte results.
+    std::vector<SsiBaseItem> definitions(256);
+    const std::array<int,5> bonuses{-128,-1,0,1,127};
+    const std::array<int,4> baselines{0,39,60,255};
+    std::uint64_t hash = 14695981039346656037ull;
+    unsigned i = 0;
+    for (const auto flags : {0,1,2,4,128,129,135,255}) for (const auto kind : {0,36,37,40,41,44,45,255})
+        for (const auto race : {0,2,255}) for (const auto magic : bonuses) {
+            auto& base = definitions[kind];
+            base.weapon_flags = flags;
+            base.small_medium = {static_cast<std::uint8_t>(i%256),static_cast<std::uint8_t>((i*7)%256),bonuses[(i/4)%5]};
+            SsiMonsterItem item; item.type = kind; item.magical_bonus = magic;
+            SsiWeaponContext context;
+            context.base_thac0_code = baselines[i%4]; context.race_code = race;
+            context.dexterity_to_hit = bonuses[(i/7)%5]; context.strength_to_hit = bonuses[(i/11)%5];
+            context.strength_to_damage = bonuses[(i/13)%5];
+            if (i%3) context.arrow_bonus = bonuses[i%5];
+            if (i%4) context.bolt_bonus = bonuses[(i/5)%5];
+            const auto result = ssi_weapon_stats(definitions,item,context);
+            for (const auto byte : {result.thac0_code,result.small_medium.count,result.small_medium.sides,
+                static_cast<std::uint8_t>(result.small_medium.bonus)}) {
+                hash ^= byte; hash *= 1099511628211ull;
+            }
+            ++i;
+        }
+    assert(i == 960 && hash == 5567199630209685347ull);
+    SsiMonsterItem weapon; SsiWeaponContext context;
+    definitions[0].weapon_flags = 2;
+    rejects([&] { ssi_weapon_stats(definitions,weapon,context); });
+    context.dexterity_to_hit = 128;
+    rejects([&] { ssi_weapon_stats(definitions,weapon,context); });
+    definitions[0].weapon_flags = 4;
+    context.strength_to_hit = 0;
+    rejects([&] { ssi_weapon_stats(definitions,weapon,context); });
+    definitions[0].weapon_flags = 1; context.arrow_bonus = -129;
+    rejects([&] { ssi_weapon_stats(definitions,weapon,context); });
+    definitions[0].weapon_flags = 0; weapon.magical_bonus = 128;
+    rejects([&] { ssi_weapon_stats(definitions,weapon,context); });
+    rejects([&] { ssi_weapon_stats(std::span<const SsiBaseItem>{},weapon,context); });
+}
 void monster_attachments() {
     // Matches the synthetic parameter grid exercised in native BA:0BB8..0D84.
     for (const auto weight : {0,1,255,256,65535}) for (const auto quantity : {0,1,2,255})
@@ -440,6 +507,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    base_items_and_weapons();
     monster_attachments();
     monster_templates();
     monster_setup();

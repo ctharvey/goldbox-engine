@@ -2332,3 +2332,62 @@ both seeded encounters. The Windows-only original RNG suite skipped under WSL.
 Private log: `monster-fields-full-tests.log`. Hygiene and attribution checks
 passed (13 records, five adopted local files). No original assets, saves,
 screenshots or derived item/effect records were committed.
+
+## Base-item table and weapon-stat adjustment (2026-10-25)
+
+The authorized installation's `ITEMS` is 2050 bytes: a two-byte prefix and 128
+complete 16-byte definitions. Native initialization `3E:05B7..05E5` seeks to byte
+two, requests `0810` bytes into the table at DS:5582 and does not interpret the
+prefix as a record count. The installed file supplies 2048 table bytes; the
+request's extra record is not treated as an extra decoded definition. Our
+explicitly selected layout adapter bounds references to actual complete records
+and rejects malformed sizes instead of exposing adjacent native memory.
+
+The base-item layout was cross-referenced with pinned Gold Box Explorer's
+`ReadItemDetails` and Stephen S. Lee's PC-specific FAQ 2.00. The independent view
+preserves unknown bytes 8/F, raw flag/descriptor fields and signed dice modifiers.
+Native weapon-stat execution confirms small/medium dice at 9/A/B and flag byte E;
+previous inventory probes establish slot/hands at 0/1. Large dice and other
+descriptors are decoded as documented layout fields; complete large-target,
+range/rate, armor and equipment semantics are not yet independently validated.
+
+Private `probe_original_weapon_stats.py` ran unmodified resident `BA:0000` with
+synthetic actor, weapon, ammunition and base-item records. Only three ability
+helper boundaries supplied authored signed-byte adjustments; no weapon-stat
+instructions were substituted. All 960 cases passed across eight flag patterns,
+eight type IDs, three race codes and five weapon bonuses. Baseline accuracy,
+base damage modifier, ability inputs, absent/present ammunition and signed-byte
+boundaries varied deterministically. All calls returned and preserved RNG.
+
+Native behavior includes signed wrapping of combined weapon/ammunition bonuses,
+Dexterity accuracy via flag 2, Strength accuracy/damage via flag 4, bolts via
+flag 80 and arrows via flag 1. Race code 2 gets the extra accuracy for type
+36/37/41..44 only, after damage assignment. No equivalent extra damage is added.
+The public synthetic grid fingerprint is `5567199630209685347` (FNV-1a64 over
+encoded THAC0, dice count, sides and wrapped modifier per case).
+
+An additional 128 native cases used all installed base definitions with authored
+context (encoded accuracy 45, race 2, Dexterity accuracy -2, Strength accuracy 3,
+Strength damage -4, weapon/arrow bonuses -1, bolt bonus 2). Fingerprint:
+`4988089530893162104`. The opt-in installed-resource C++ test reproduces it and
+bounds both seeded encounter groups' item references. These are real definitions
+with synthetic actor inputs, not verified combat stats for the actual monsters.
+No original record bytes or item names are output or committed. Each native call
+was bounded at 100 ms / 5,000 instructions; the batch deadline was 35 seconds.
+Private reports: `original-weapon-stats-report.json` and
+`original-weapon-stats-fingerprints.json`.
+
+The stat API fails for missing required ability inputs, out-of-range signed
+modifiers and invalid base-item references. It does not silently fabricate
+Strength/Dexterity state. Remaining dependencies are runtime ability/equipment
+resolution, large-target adjustment, actual hit/damage rolls and effect handlers.
+COMBAT remains an explicit unavailable-host boundary.
+
+Validation: the serialized two-worker full run passed 30 suites with zero
+failures in 42.92 seconds, including the installed-resource 128-definition
+fingerprint and both seeded encounter reference checks. The Windows-only native
+RNG integration suite skipped under WSL. Full private log:
+`weapon-stats-full-tests.log`. Hygiene and attribution passed (13 records, five
+adopted local files). The final focused suite also covers direct signed decoder
+boundaries 0/127/128/255 for item and base-damage bonuses.
+It passed in 0.74 seconds; private log: `weapon-stats-final-focused.log`.
