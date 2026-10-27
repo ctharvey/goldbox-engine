@@ -2447,3 +2447,56 @@ The Windows-only native RNG integration suite skipped under WSL. Private log:
 `weapon-inputs-full-tests.log`. Hygiene and attribution passed (13 records, five
 adopted local files). No original assets, extracted records or user saves were
 committed or modified.
+
+## Target damage and bounded roll primitives (2026-10-27)
+
+Private `probe_original_attack_primitives.py` exercised three isolated native
+paths, with an overall 55-second deadline and per-call 100 ms / instruction caps.
+No original record bytes or text are exported. The observed release's native
+entry points were selected through the existing routine/overlay mapping, not
+byte-pattern discovery in mixed script data.
+
+- 384 cases ran original `68:14FE..1583`, stopping before subsequent defense/
+  effect work. All 256 size bytes were included, followed by deterministic
+  generated cases with present/absent weapon and signed modifier boundaries.
+  Original table-copy instructions remained active. Large size means greater
+  than 128 or low-three-bit value greater than one; size 128 alone is small.
+  The weapon's large dice replace count/sides, and modifier becomes
+  `current - baseSmall + baseLarge`, with byte wrapping. No RNG was consumed.
+  Result fingerprint: `1067471470663856932`.
+- 336 cases ran original damage-dice wrapper `B0:0E2E` and original dice/RNG:
+  six seeds, seven counts (0/1/2/3/127/128/255), eight sides
+  (0/1/2/6/20/127/128/255). Returned byte and exact final RNG state matched.
+  Zero count consumes no RNG; zero sides advances once per die and contributes
+  one. The wrapper publishes count at DS:681C and preserves DS:6818. The new
+  generic C++ primitive matches arithmetic/RNG only; host bookkeeping is not
+  automatically published. Fingerprint: `7182648793210212076`.
+- 640 cases ran original defender-only hit helper `B0:0C4F` and ordinary hit
+  helper `B0:0CB7`. Original 1d20/RNG and ordinary invisibility-removal traversal
+  remained active; attacker/defender effect callbacks alone supplied explicit
+  synthetic effective-roll bytes. All natural outcomes 1..20, boundary encoded
+  scores, signed battle modifiers and effective-byte sign boundaries were
+  included. One RNG draw per attempt was observed. Natural one calls no effect
+  handlers and fails; natural twenty becomes 100 before callbacks. Negative
+  effective bytes fail. Equality succeeds in the ordinary helper, but fails
+  in the defender-only helper. Fingerprint: `15120811759041066323`.
+
+Instruction caps were 10,000 for target adjustment, 150,000 for dice (including
+255-die cases), and 20,000 for hit helpers. Every invocation returned or reached
+its declared stop boundary. Private report: `original-attack-primitives-report.json`.
+Public synthetic tests reproduce all three fingerprints, test direct equality,
+natural-one/twenty, invalid natural/modifier inputs and no-weapon cases. The
+installed-resource test also checks target-adjusted results across both seeded
+groups' clones for size codes 0/1/2/7/128/129/255.
+
+These are component-level observations. No original battle, effect execution,
+HP mutation, round sequencing, immunity handling or complete attack chain was
+validated. The ordinary hit helper's battle modifier remains an explicit
+caller-resolved input; no native address binding or fabricated zero default is
+added. Existing COMBAT still fails at the unavailable-host boundary.
+
+Validation: the serialized two-worker full build/test run passed 30 suites with
+zero failures in 35.89 seconds, including both installed-resource seeded groups.
+The Windows-only native RNG integration suite skipped under WSL. Private log:
+`attack-primitives-full-tests.log`. Hygiene and attribution checks passed; no
+original assets, extracted records or user saves were modified or committed.

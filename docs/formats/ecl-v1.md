@@ -460,7 +460,8 @@ tables. This is a bounded format adapter, not automatic title detection. The
 installed Pool table has 128 records. The view preserves unknown bytes `8/F` and
 exposes slot/hands, large and small/medium dice, rate, armor descriptor, weapon
 type, range, class mask and weapon flags. These are encoded properties, not
-implemented equipment rules. Large-target attack behavior remains unverified.
+implemented equipment rules. Target damage adjustment is covered below;
+complete large-target attack behavior remains unverified.
 
 The item view also exposes signed magical bonus byte `32`. `ssi_weapon_stats()`
 accepts a checked type reference and explicit context: baseline encoded THAC0,
@@ -498,3 +499,30 @@ when enabled, because the native translation leaves its result undefined there.
 Disabled Strength contributes zero. Modifiers are resolved only when the weapon
 flags require them. The adapter reads current bytes; it does not apply missing
 spell/equipment effects, recompute those bytes, or establish full combat parity.
+
+### Target adjustments and roll primitives
+
+The three-argument `prepare_ssi_weapon_stats()` overload accepts the native
+defender size byte (`+6C`) and returns `SsiTargetWeaponStats`, whose `damage` field
+describes that target. It preserves no-weapon absence. The observed large-target
+test is `size > 128 || (size & 7) > 1`; notably, 128 alone does not pass. The
+adjustment replaces dice count/sides with the base item's large dice and changes
+the signed modifier by `prepared - baseSmall + baseLarge`, wrapping to a byte.
+Accuracy is unchanged. This is stat preparation, not a complete attack.
+
+`roll_byte_dice()` consumes the caller-selected RNG once per die, adds one to
+each bounded draw and wraps the sum to a byte. Count zero consumes no RNG;
+sides zero still consumes one draw per die and contributes one. Byte-valued
+count bounds work to 255 draws. The generic primitive does not publish native
+DS:681C bookkeeping or change current damage/HP; the host owns those effects.
+
+`make_ssi_attack_roll()` validates a natural result 1..20 and encodes 20 as 100
+before effect resolution. A natural one bypasses native effect callbacks and
+fails. The caller must resolve applicable effects before comparing the mutable
+`effective` code. Negative signed effective values fail; zero can still pass.
+`ssi_attack_hits()` uses `accuracy + effective + battleModifier >= defense`,
+whereas `ssi_defender_only_attack_hits()` uses `accuracy + effective > defense`.
+These are encoded unsigned accuracy/defense bytes and a signed battle modifier,
+not displayed AC/THAC0. A natural 20 is not unconditional success against every
+encoded defense. The comparison functions do not implement, ignore or replace
+effect handlers. Unknown effects and live COMBAT remain unavailable upstream.

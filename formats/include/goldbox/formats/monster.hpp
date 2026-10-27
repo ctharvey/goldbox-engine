@@ -81,6 +81,43 @@ struct SsiWeaponStats {
     SsiDamageDice small_medium;
     bool operator==(const SsiWeaponStats&) const = default;
 };
+struct SsiTargetWeaponStats {
+    std::uint8_t thac0_code{};
+    SsiDamageDice damage;
+    bool operator==(const SsiTargetWeaponStats&) const = default;
+};
+inline SsiTargetWeaponStats ssi_target_weapon_stats(SsiWeaponStats prepared,
+    const SsiBaseItem& definition, std::uint8_t target_size_code) {
+    if (target_size_code <= 128 && (target_size_code & 7) <= 1) return {prepared.thac0_code,prepared.small_medium};
+    if (prepared.small_medium.bonus < -128 || prepared.small_medium.bonus > 127 ||
+        definition.small_medium.bonus < -128 || definition.small_medium.bonus > 127 ||
+        definition.large.bonus < -128 || definition.large.bonus > 127)
+        throw std::runtime_error("SSI target damage modifier out of byte range");
+    const auto bonus = ssi_signed_byte(static_cast<std::uint8_t>(
+        prepared.small_medium.bonus-definition.small_medium.bonus+definition.large.bonus));
+    return {prepared.thac0_code,{definition.large.count,definition.large.sides,bonus}};
+}
+struct SsiAttackRoll {
+    std::uint8_t natural{}, effective{};
+};
+inline SsiAttackRoll make_ssi_attack_roll(std::uint8_t natural) {
+    if (!natural || natural > 20) throw std::runtime_error("Invalid SSI natural attack roll");
+    return {natural,static_cast<std::uint8_t>(natural == 20 ? 100 : natural)};
+}
+// These compare an already effect-resolved roll; they do not invoke or bypass
+// effect handlers. A natural one bypasses effects in the native caller.
+inline bool ssi_defender_only_attack_hits(SsiAttackRoll roll, std::uint8_t accuracy, std::uint8_t defense) {
+    (void)make_ssi_attack_roll(roll.natural);
+    const auto effective = ssi_signed_byte(roll.effective);
+    return roll.natural != 1 && effective >= 0 && int(accuracy)+effective > int(defense);
+}
+inline bool ssi_attack_hits(SsiAttackRoll roll, std::uint8_t accuracy, std::uint8_t defense, int battle_modifier) {
+    (void)make_ssi_attack_roll(roll.natural);
+    if (battle_modifier < -128 || battle_modifier > 127)
+        throw std::runtime_error("SSI battle modifier out of byte range");
+    const auto effective = ssi_signed_byte(roll.effective);
+    return roll.natural != 1 && effective >= 0 && int(accuracy)+effective+battle_modifier >= int(defense);
+}
 inline SsiWeaponStats ssi_weapon_stats(std::span<const SsiBaseItem> definitions,
     const SsiMonsterItem& weapon, const SsiWeaponContext& context) {
     if (weapon.type >= definitions.size()) throw std::runtime_error("SSI base item reference out of range");
@@ -207,6 +244,16 @@ inline std::optional<SsiWeaponStats> prepare_ssi_weapon_stats(const SsiMonsterTe
     if (slots[11]) context.arrow_bonus = decode_ssi_monster_item(source.items[*slots[11]]).magical_bonus;
     if (slots[12]) context.bolt_bonus = decode_ssi_monster_item(source.items[*slots[12]]).magical_bonus;
     return ssi_weapon_stats(definitions,weapon,context);
+}
+inline std::optional<SsiTargetWeaponStats> prepare_ssi_weapon_stats(const SsiMonsterTemplate& source,
+    std::span<const SsiBaseItem> definitions, std::uint8_t target_size_code) {
+    const auto prepared = prepare_ssi_weapon_stats(source,definitions);
+    if (!prepared) return std::nullopt;
+    if (target_size_code <= 128 && (target_size_code & 7) <= 1)
+        return SsiTargetWeaponStats{prepared->thac0_code,prepared->small_medium};
+    const auto slots = resolve_ssi_readied_equipment(source,definitions);
+    const auto weapon = decode_ssi_monster_item(source.items[*slots[0]]);
+    return ssi_target_weapon_stats(*prepared,definitions[weapon.type],target_size_code);
 }
 // Per-creature input to the native encounter movement aggregator, not the full
 // combat movement/effect handler. Presence of 27 takes precedence over 2A,

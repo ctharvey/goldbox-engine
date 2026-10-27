@@ -135,6 +135,63 @@ void monster_setup() {
         rejects([&] { validate_ssi_monster_resources(std::vector<std::uint8_t>(sizes[0]),
             std::vector<std::uint8_t>(sizes[1]),std::vector<std::uint8_t>(sizes[2])); });
 }
+void attack_primitives() {
+    const auto append = [](std::uint64_t& hash, int byte) {
+        hash ^= static_cast<std::uint8_t>(byte); hash *= 1099511628211ull;
+    };
+    HighWordLcg32 fixture(104,0x08088405,1);
+    std::uint64_t large_hash = 14695981039346656037ull;
+    for (unsigned i = 0; i < 384; ++i) {
+        const auto size = i < 256 ? i : fixture.draw(256);
+        const auto present = fixture.draw(2); (void)fixture.draw(256); // Native fixture's item type.
+        SsiWeaponStats prepared{41,{static_cast<std::uint8_t>(fixture.draw(4)),
+            static_cast<std::uint8_t>(fixture.draw(12)+1),ssi_signed_byte(fixture.draw(256))}};
+        SsiBaseItem definition; definition.small_medium.bonus = ssi_signed_byte(fixture.draw(256));
+        definition.large = {static_cast<std::uint8_t>(fixture.draw(4)),
+            static_cast<std::uint8_t>(fixture.draw(12)+1),ssi_signed_byte(fixture.draw(256))};
+        const auto result = present ? ssi_target_weapon_stats(prepared,definition,size) :
+            SsiTargetWeaponStats{prepared.thac0_code,prepared.small_medium};
+        assert(result.thac0_code == prepared.thac0_code);
+        for (const auto value : {int(result.damage.count),int(result.damage.sides),result.damage.bonus}) append(large_hash,value);
+    }
+    assert(large_hash == 1067471470663856932ull);
+    std::uint64_t dice_hash = 14695981039346656037ull;
+    for (const auto seed : std::array<std::uint32_t,6>{0,1,10,19,0xffffffff,0x12345678})
+        for (const auto count : {0,1,2,3,127,128,255}) for (const auto sides : {0,1,2,6,20,127,128,255}) {
+            HighWordLcg32 random(seed,0x08088405,1);
+            append(dice_hash,roll_byte_dice(random,count,sides));
+            for (unsigned byte = 0; byte < 4; ++byte) append(dice_hash,random.state() >> (byte*8));
+        }
+    assert(dice_hash == 7182648793210212076ull);
+    const std::array<std::uint32_t,20> seeds{0,11,5,22,16,10,4,15,9,3,20,14,8,2,13,7,1,18,12,6};
+    const std::array<std::uint8_t,8> scores{0,1,39,60,100,127,128,255};
+    fixture = HighWordLcg32(6816,0x08088405,1);
+    std::uint64_t hit_hash = 14695981039346656037ull;
+    for (const auto mode : {0,1}) for (unsigned i = 0; i < 320; ++i) {
+        const auto natural = i%20+1;
+        const auto accuracy = scores[fixture.draw(scores.size())], defense = scores[fixture.draw(scores.size())];
+        const auto modifier = ssi_signed_byte(fixture.draw(256));
+        const auto effective = i%2 ? fixture.draw(256) : (natural == 20 ? 100 : natural);
+        HighWordLcg32 random(seeds[natural-1],0x08088405,1);
+        auto roll = make_ssi_attack_roll(roll_byte_dice(random,1,20));
+        assert(roll.natural == natural);
+        if (roll.natural != 1) roll.effective = effective; // Explicit synthetic effect boundary.
+        append(hit_hash,mode == 0 ? ssi_defender_only_attack_hits(roll,accuracy,defense) :
+            ssi_attack_hits(roll,accuracy,defense,modifier));
+        append(hit_hash,roll.effective);
+    }
+    assert(hit_hash == 15120811759041066323ull);
+    assert(ssi_attack_hits(make_ssi_attack_roll(10),50,60,0));
+    assert(!ssi_defender_only_attack_hits(make_ssi_attack_roll(10),50,60));
+    assert(!ssi_attack_hits(make_ssi_attack_roll(20),0,255,0));
+    assert(!ssi_attack_hits({1,100},255,0,127) && !ssi_attack_hits({10,128},255,0,127));
+    for (const auto natural : {0,21,255}) rejects([&] { make_ssi_attack_roll(natural); });
+    for (const auto modifier : {-129,128}) rejects([&] { ssi_attack_hits({10,10},50,60,modifier); });
+    rejects([&] { ssi_defender_only_attack_hits({0,0},0,0); });
+    SsiBaseItem invalid; invalid.large.bonus = 128;
+    rejects([&] { ssi_target_weapon_stats({0,{1,6,0}},invalid,2); });
+    assert(!prepare_ssi_weapon_stats(SsiMonsterTemplate{},std::span<const SsiBaseItem>{},2));
+}
 void weapon_inputs() {
     const auto append = [](std::uint64_t& hash, int byte) {
         hash ^= static_cast<std::uint8_t>(byte); hash *= 1099511628211ull;
@@ -564,6 +621,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    attack_primitives();
     weapon_inputs();
     base_items_and_weapons();
     monster_attachments();

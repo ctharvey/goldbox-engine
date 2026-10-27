@@ -536,3 +536,11 @@ adopted. Synthetic helper/equipment probes and read-only installed monster
 template probes establish this adapter's behavior. Unknown native Strength
 encodings produce explicit diagnostics rather than fabricated compatibility.
 Eligibility, AI equipment choice, effect application and full combat remain open.
+
+Target/roll research used the same Stephen S. Lee FAQ 2.00 routine references
+and independent native probes. No guide prose, combat tables, upstream battle
+implementation or native instructions were adopted. The target stat adjustment,
+byte dice arithmetic and effect-resolved comparison primitives were implemented
+from bounded behavioral observations. Native effect callbacks were replaced
+only with explicit synthetic boundaries in the hit-comparison probes; this
+does not establish effect execution or full combat compatibility.

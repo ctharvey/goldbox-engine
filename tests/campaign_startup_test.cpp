@@ -269,6 +269,9 @@ int main(int argc, char** argv) {
             check(actors.size() == group.count && actors.front() == actors.back(),"Monster clones differ");
             check(prepare_ssi_weapon_stats(actors.front(),base_items) == prepare_ssi_weapon_stats(actors.back(),base_items),
                 "Prepared clone weapon stats differ");
+            for (const auto target_size : {0,1,2,7,128,129,255})
+                check(prepare_ssi_weapon_stats(actors.front(),base_items,target_size) ==
+                    prepare_ssi_weapon_stats(actors.back(),base_items,target_size),"Target weapon clone stats differ");
             for (const auto& item : actors.front().items) {
                 const auto typed = decode_ssi_monster_item(item);
                 check(typed.type < base_items.size(),"Monster base item reference out of range");

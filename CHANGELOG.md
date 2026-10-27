@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-27
+
+- Add native-backed target-size damage adjustment, byte-wrapping dice and
+  effect-resolved hit comparison primitives. Preserve RNG consumption, signed
+  modifiers and distinct native equality rules. Add 1,360 native-oracle cases
+  plus seeded clone checks. Effects, HP changes and live combat remain open.
+
 ## 2026-10-26
 
 - Resolve readied equipment and real loaded-character ability inputs for SSI

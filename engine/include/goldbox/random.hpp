@@ -20,4 +20,14 @@ public:
 private:
     std::uint32_t state_, multiplier_, increment_;
 };
+
+// Explicit byte-sized dice primitive. Count bounds work to 255 draws; sums
+// wrap to one byte. A zero side count still draws, yielding one per die.
+// The caller selects RNG parameters and decides whether these rules apply.
+inline std::uint8_t roll_byte_dice(HighWordLcg32& random, std::uint8_t count, std::uint8_t sides) {
+    std::uint8_t total = 0;
+    for (unsigned i = 0; i < count; ++i)
+        total = static_cast<std::uint8_t>(unsigned(total)+random.draw(sides)+1);
+    return total;
+}
 } // namespace goldbox
