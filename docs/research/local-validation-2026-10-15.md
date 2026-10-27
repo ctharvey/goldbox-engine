@@ -2391,3 +2391,59 @@ RNG integration suite skipped under WSL. Full private log:
 adopted local files). The final focused suite also covers direct signed decoder
 boundaries 0/127/128/255 for item and base-damage bonuses.
 It passed in 0.74 seconds; private log: `weapon-stats-final-focused.log`.
+
+## Real weapon ability inputs and readied associations (2026-10-26)
+
+Native resident Dexterity helper `BA:1168` reads byte 13. Strength translation
+`BA:11EA` reads bytes 10/16; accuracy/damage helpers `BA:1282` / `BA:1325` gate
+their results on nonzero byte AA. These are loaded-record inputs, not derived
+solely from class, level or character creation choices. The adapter implements
+the independently observed branch behavior, retaining zero Dexterity adjustment
+above 25 and exceptional Strength thresholds 50/75/90/99/100. Enabled Strength
+above 25 or Strength 18 with percentile above 100 is rejected: the original
+translation does not initialize its return value on those paths. Disabled
+Strength returns zero modifiers. No proprietary table is embedded.
+
+The readied-association pass `BA:0BB8..0D84` clears thirteen native pointers and
+walks inventory order. Slots 0..8 are last-wins; the two ring pointers take the
+first two slot-9 items. Additional rings are ignored. Readied type 73 and 28
+select arrows and bolts. This is rebuilding associations, not checking whether
+an item may be readied or selecting what a creature should equip. Our pure
+resolver returns vector indices and never follows a serialized pointer. It only
+dereferences definitions for readied items and rejects invalid references.
+
+Private `probe_original_weapon_inputs.py` exercised 1,312 unmodified ability
+helper calls: all 256 Dexterity bytes and Strength 0..25 with exceptional
+boundaries/all valid 18 percentiles and enable flags 0/1/255. Return-byte
+fingerprint: `11913737308611779697`. Another 128 deterministic mixed-inventory
+cases ran the native association pass and complete weapon-stat helper, with
+original ability helpers (none replaced). Fixtures use the existing high-word
+LCG seeded at 6812 only to generate synthetic test inputs. Equipment and weapon
+fingerprints are `17918659399157245257` and `5740228811019828493`. The earlier
+Python-random exploratory fixtures are superseded by these cross-language cases.
+
+Finally, all 48 MON2/MON3 character templates and their inventories were decoded
+privately, combined with the installed base-item table and passed through the
+same native association/weapon helpers. No ability callbacks were substituted.
+Fingerprint over family/record ID, weapon presence and prepared weapon fields:
+`3134230191634101398`. The optional C++ original-resource test reproduces it for
+all 48 templates and checks both seeded groups' cloned weapon preparation.
+Native calls were bounded at 100 ms / 15,000 instructions, with a 40-second batch
+deadline; calls returned (or stopped at the declared association boundary) and
+preserved RNG. Reports/fixtures stay private in `.cache/goldbox-validation`:
+`original-weapon-inputs-report.json`, `synthetic-weapon-inputs-private.json`.
+
+This verifies template-stage weapon preparation with actual resource abilities
+and inventories, not fully effect-adjusted combatants or a battle result.
+Runtime normalized actor integration, effect application, eligibility/AI equipment
+choice, large-target behavior, hit/damage rolling and full combat remain open.
+The public regression tests also cover immutable input, missing/invalid readied
+references, no-weapon behavior and diagnostics for undefined Strength inputs.
+
+Validation: the full serialized two-worker build/test run passed 30 suites with
+zero failures in 37.02 seconds. This includes the 48-template installed-resource
+fingerprint, both seeded groups and the synthetic ability/equipment oracles.
+The Windows-only native RNG integration suite skipped under WSL. Private log:
+`weapon-inputs-full-tests.log`. Hygiene and attribution passed (13 records, five
+adopted local files). No original assets, extracted records or user saves were
+committed or modified.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-26
+
+- Resolve readied equipment and real loaded-character ability inputs for SSI
+  weapon preparation. Preserve native slot precedence, ammunition and Strength
+  enable/exceptional-score behavior; reject undefined encodings. Add native-backed
+  synthetic regressions and a fingerprint across 48 installed monster templates.
+  This does not enable attacks or complete combat.
+
 ## 2026-10-25
 
 - Decode the SSI two-byte-prefix/16-byte base-item table and signed weapon

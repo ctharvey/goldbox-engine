@@ -528,3 +528,11 @@ preserves raw flag/descriptor values. Native initialization and bounded weapon
 stat probes establish the implemented prefix handling, signed modifiers,
 small/medium stat adjustments and encoded arithmetic. Complete large-target
 attack/equipment/effect behavior is not asserted by decoding the record fields.
+
+Weapon-input follow-up consulted the same pinned SSI Engine creation/rules
+references and independently traced native readied associations and ability
+helper branches. No Java implementation or third-party ability tables were
+adopted. Synthetic helper/equipment probes and read-only installed monster
+template probes establish this adapter's behavior. Unknown native Strength
+encodings produce explicit diagnostics rather than fabricated compatibility.
+Eligibility, AI equipment choice, effect application and full combat remain open.

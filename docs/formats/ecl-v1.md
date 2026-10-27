@@ -476,3 +476,25 @@ contains encoded THAC0 (displayed as `60 - byte`) and small/medium dice with a
 signed wrapped modifier. This preserves native behavior rather than imposing
 tabletop rules. It neither chooses equipment nor rolls/applies damage, checks a
 hit, targets large creatures, invokes effects or implements combat.
+
+`prepare_ssi_weapon_stats()` now constructs that context from a decoded loaded
+template and its current readied inventory. It reads base accuracy `2D`, race
+`2E`, Dexterity `13`, Strength `10`, exceptional Strength `16` and the nonzero
+Strength-enable flag `AA`. It returns no weapon result when no main-hand item is
+readied; this does not replace native unarmed statistics with zero values.
+
+`resolve_ssi_readied_equipment()` rebuilds associations as vector indices,
+ignoring serialized equipment pointers. Slots 0..8 use the last readied item;
+slot 9 supplies the first two rings at indices 9/10. Extra rings are ignored.
+Readied type 73 supplies arrows at index 11 and type 28 bolts at index 12.
+Unreadied items do not dereference the base table; invalid readied references
+fail. This honors existing ready flags and does not decide eligibility, choose
+equipment, validate hand capacity or run combat AI.
+
+The ability helpers reproduce the observed native branch behavior without an
+embedded proprietary table. Dexterity above 25 yields zero accuracy adjustment.
+Strength above 25 or Strength 18 with exceptional score above 100 is rejected
+when enabled, because the native translation leaves its result undefined there.
+Disabled Strength contributes zero. Modifiers are resolved only when the weapon
+flags require them. The adapter reads current bytes; it does not apply missing
+spell/equipment effects, recompute those bytes, or establish full combat parity.

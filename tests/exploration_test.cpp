@@ -135,6 +135,63 @@ void monster_setup() {
         rejects([&] { validate_ssi_monster_resources(std::vector<std::uint8_t>(sizes[0]),
             std::vector<std::uint8_t>(sizes[1]),std::vector<std::uint8_t>(sizes[2])); });
 }
+void weapon_inputs() {
+    const auto append = [](std::uint64_t& hash, int byte) {
+        hash ^= static_cast<std::uint8_t>(byte); hash *= 1099511628211ull;
+    };
+    std::uint64_t ability_hash = 14695981039346656037ull;
+    for (unsigned dexterity = 0; dexterity <= 255; ++dexterity)
+        append(ability_hash,ssi_dexterity_accuracy(dexterity));
+    for (unsigned strength = 0; strength <= 25; ++strength) {
+        std::vector<unsigned> percentiles{0,100,255};
+        if (strength == 18) { percentiles.clear(); for (unsigned i = 0; i <= 100; ++i) percentiles.push_back(i); }
+        for (const auto percentile : percentiles) for (const auto flag : {0,1,255})
+            for (const auto bonus : ssi_strength_weapon_bonuses(strength,percentile,flag != 0)) append(ability_hash,bonus);
+    }
+    assert(ability_hash == 11913737308611779697ull); // 1,312 original helper returns.
+    for (unsigned strength = 26; strength <= 255; ++strength) {
+        rejects([&] { ssi_strength_weapon_bonuses(strength,0,true); });
+        assert((ssi_strength_weapon_bonuses(strength,255,false) == std::array<int,2>{0,0}));
+    }
+    for (unsigned percentile = 101; percentile <= 255; ++percentile)
+        rejects([&] { ssi_strength_weapon_bonuses(18,percentile,true); });
+    HighWordLcg32 fixture_random(6812,0x08088405,1);
+    const std::array<std::uint8_t,8> flags{0,1,2,4,128,129,135,255};
+    const std::array<std::uint8_t,5> types{0,1,28,73,255};
+    const std::array<std::uint8_t,4> ready{0,1,2,255};
+    std::uint64_t equipment_hash = 14695981039346656037ull, stats_hash = equipment_hash;
+    for (unsigned i = 0; i < 128; ++i) {
+        std::vector<SsiBaseItem> definitions(256);
+        for (auto& definition : definitions) {
+            definition.slot = fixture_random.draw(13); definition.hands = fixture_random.draw(3);
+            definition.small_medium.count = fixture_random.draw(4);
+            definition.small_medium.sides = fixture_random.draw(12)+1;
+            definition.small_medium.bonus = ssi_signed_byte(fixture_random.draw(256));
+            definition.weapon_flags = flags[fixture_random.draw(flags.size())];
+        }
+        SsiMonsterTemplate source;
+        source.character[0x10] = 18; source.character[0x16] = 100; source.character[0x13] = 17;
+        source.character[0xaa] = 1; source.character[0x2d] = 41; source.character[0x2e] = 2;
+        for (unsigned j = 0; j < i%15; ++j) {
+            auto& item = source.items.emplace_back();
+            item[0x2e] = types[fixture_random.draw(types.size())];
+            item[0x34] = ready[fixture_random.draw(ready.size())]; item[0x32] = fixture_random.draw(256);
+        }
+        const auto before = source;
+        for (const auto& slot : resolve_ssi_readied_equipment(source,definitions)) append(equipment_hash,slot ? *slot : 255);
+        const auto stats = prepare_ssi_weapon_stats(source,definitions);
+        append(stats_hash,stats ? 1 : 0);
+        if (stats) for (const auto value : {int(stats->thac0_code),int(stats->small_medium.count),
+            int(stats->small_medium.sides),stats->small_medium.bonus}) append(stats_hash,value);
+        assert(source == before);
+    }
+    assert(equipment_hash == 17918659399157245257ull);
+    assert(stats_hash == 5740228811019828493ull);
+    SsiMonsterTemplate source; source.items.emplace_back()[0x2e] = 255;
+    assert(!prepare_ssi_weapon_stats(source,{})); // Unreadied items do not dereference the table.
+    source.items[0][0x34] = 1;
+    rejects([&] { prepare_ssi_weapon_stats(source,{}); });
+}
 void base_items_and_weapons() {
     std::array<std::uint8_t,16> bytes{};
     for (std::size_t i = 0; i < bytes.size(); ++i) bytes[i] = i;
@@ -507,6 +564,7 @@ void movement_lifecycle() {
 } // namespace
 
 int main() {
+    weapon_inputs();
     base_items_and_weapons();
     monster_attachments();
     monster_templates();

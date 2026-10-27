@@ -133,6 +133,81 @@ struct SsiMonsterTemplate {
     }
     bool operator==(const SsiMonsterTemplate&) const = default;
 };
+inline int ssi_dexterity_accuracy(std::uint8_t dexterity) {
+    if (dexterity <= 2) return -4;
+    if (dexterity <= 5) return int(dexterity)-6;
+    if (dexterity >= 16 && dexterity <= 18) return int(dexterity)-15;
+    if (dexterity >= 19 && dexterity <= 20) return 3;
+    if (dexterity >= 21 && dexterity <= 23) return 4;
+    if (dexterity >= 24 && dexterity <= 25) return 5;
+    return 0;
+}
+inline std::array<int,2> ssi_strength_weapon_bonuses(std::uint8_t strength,
+    std::uint8_t exceptional, bool enabled) {
+    if (!enabled) return {0,0};
+    if (strength > 25 || (strength == 18 && exceptional > 100))
+        throw std::runtime_error("Undefined SSI weapon Strength encoding");
+    unsigned value = strength;
+    if (strength >= 19) value += 5;
+    else if (strength == 18 && exceptional) {
+        value = exceptional <= 50 ? 19 : (exceptional <= 75 ? 20 :
+            (exceptional <= 90 ? 21 : (exceptional <= 99 ? 22 : 23)));
+    }
+    int accuracy = 0, damage = 0;
+    if (value >= 1 && value <= 3) accuracy = -3;
+    else if (value >= 4 && value <= 5) accuracy = -2;
+    else if (value >= 6 && value <= 7) accuracy = -1;
+    else if (value >= 17 && value <= 19) accuracy = 1;
+    else if (value >= 20 && value <= 22) accuracy = 2;
+    else if (value >= 23 && value <= 25) accuracy = 3;
+    else if (value >= 26 && value <= 27) accuracy = 4;
+    else if (value >= 28) accuracy = int(value)-23;
+    if (value >= 1 && value <= 2) damage = -2;
+    else if (value >= 3 && value <= 5) damage = -1;
+    else if (value == 16) damage = 1;
+    else if (value >= 17 && value <= 19) damage = int(value)-16;
+    else if (value >= 20 && value <= 29) damage = int(value)-17;
+    else if (value == 30) damage = 14;
+    return {accuracy,damage};
+}
+// Rebuild existing readied associations, not eligibility checks or AI equipment
+// selection. Indices replace native pointers; no serialized pointer is followed.
+inline std::array<std::optional<std::size_t>,13> resolve_ssi_readied_equipment(
+    const SsiMonsterTemplate& source, std::span<const SsiBaseItem> definitions) {
+    std::array<std::optional<std::size_t>,13> slots{};
+    for (std::size_t i = 0; i < source.items.size(); ++i) {
+        const auto item = decode_ssi_monster_item(source.items[i]);
+        if (!item.equipped) continue;
+        if (item.type >= definitions.size()) throw std::runtime_error("SSI readied item reference out of range");
+        const auto slot = definitions[item.type].slot;
+        if (slot <= 8) slots[slot] = i; // Last readied item wins for ordinary slots.
+        else if (slot == 9) {
+            if (!slots[9]) slots[9] = i;
+            else if (!slots[10]) slots[10] = i;
+        }
+        if (item.type == 73) slots[11] = i;
+        if (item.type == 28) slots[12] = i;
+    }
+    return slots;
+}
+inline std::optional<SsiWeaponStats> prepare_ssi_weapon_stats(const SsiMonsterTemplate& source,
+    std::span<const SsiBaseItem> definitions) {
+    const auto slots = resolve_ssi_readied_equipment(source,definitions);
+    if (!slots[0]) return std::nullopt; // Native no-weapon path preserves existing stats.
+    const auto weapon = decode_ssi_monster_item(source.items[*slots[0]]);
+    const auto flags = definitions[weapon.type].weapon_flags;
+    SsiWeaponContext context;
+    context.base_thac0_code = source.character[0x2d]; context.race_code = source.character[0x2e];
+    if (flags & 2) context.dexterity_to_hit = ssi_dexterity_accuracy(source.character[0x13]);
+    if (flags & 4) {
+        const auto strength = ssi_strength_weapon_bonuses(source.character[0x10],source.character[0x16],
+            source.character[0xaa] != 0);
+        context.strength_to_hit = strength[0]; context.strength_to_damage = strength[1];
+    }
+    if (slots[11]) context.arrow_bonus = decode_ssi_monster_item(source.items[*slots[11]]).magical_bonus;
+    if (slots[12]) context.bolt_bonus = decode_ssi_monster_item(source.items[*slots[12]]).magical_bonus;
+    return ssi_weapon_stats(definitions,weapon,context);
+}
 // Per-creature input to the native encounter movement aggregator, not the full
 // combat movement/effect handler. Presence of 27 takes precedence over 2A,
 // including when its timer is zero; doubling wraps to one byte.

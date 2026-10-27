@@ -186,6 +186,28 @@ int main(int argc, char** argv) {
         std::map<std::uint8_t,MonsterBundle> monsters;
         for (const auto& [program,files] : profile.monster_archives) for (std::size_t i = 0; i < 3; ++i)
             if (!files[i].empty()) monsters[program][i] = family(std::vector<std::string>{files[i]});
+        std::uint64_t template_weapon_hash = 14695981039346656037ull;
+        unsigned template_weapon_count = 0;
+        const auto append_weapon_byte = [&](int byte) {
+            template_weapon_hash ^= static_cast<std::uint8_t>(byte); template_weapon_hash *= 1099511628211ull;
+        };
+        for (const auto& [program,family_id] : std::array<std::pair<std::uint8_t,std::uint8_t>,2>{{{20,2},{0,3}}}) {
+            const auto& bundle = monsters.at(program);
+            for (const auto& [id,character] : bundle[0]) {
+                const auto optional = [&](std::size_t index) -> std::span<const std::uint8_t> {
+                    const auto found = bundle[index].find(id);
+                    return found == bundle[index].end() ? std::span<const std::uint8_t>{} : found->second;
+                };
+                const auto source = decode_ssi_monster_resources(character,optional(1),optional(2));
+                const auto weapon = prepare_ssi_weapon_stats(source,base_items);
+                append_weapon_byte(family_id); append_weapon_byte(id); append_weapon_byte(weapon ? 1 : 0);
+                if (weapon) for (const auto value : {int(weapon->thac0_code),int(weapon->small_medium.count),
+                    int(weapon->small_medium.sides),weapon->small_medium.bonus}) append_weapon_byte(value);
+                ++template_weapon_count;
+            }
+        }
+        check(template_weapon_count == 48 && template_weapon_hash == 3134230191634101398ull,
+            "Installed monster ability/equipment weapon fingerprint differs");
         session.monster_resources = MonsterResources{[&](std::uint8_t program,std::uint8_t id) {
             const auto& bundle = monsters.at(program);
             const auto optional = [&](std::size_t index) -> std::span<const std::uint8_t> {
@@ -245,6 +267,8 @@ int main(int argc, char** argv) {
             };
             const auto actors = materialize(group);
             check(actors.size() == group.count && actors.front() == actors.back(),"Monster clones differ");
+            check(prepare_ssi_weapon_stats(actors.front(),base_items) == prepare_ssi_weapon_stats(actors.back(),base_items),
+                "Prepared clone weapon stats differ");
             for (const auto& item : actors.front().items) {
                 const auto typed = decode_ssi_monster_item(item);
                 check(typed.type < base_items.size(),"Monster base item reference out of range");
